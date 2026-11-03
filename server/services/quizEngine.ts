@@ -64,26 +64,30 @@ export function buildEducationalQuizPrompt(params: {
 
   const exampleQuestion = isArabic
     ? {
-        question: "ما النتيجة العلمية المترتبة على رفع درجة حرارة التفاعل الماص للحرارة؟",
+        question: "إذا كانت المصفوفة A = \\begin{bmatrix} 4 & 2 \\\\ 6 & 3 \\end{bmatrix}، فما هي النتيجة الرياضية الدقيقة لحساب محددها |A|، وما أثر ذلك على إمكانية إيجاد معكوسها الضربي A^{-1}؟",
         options: [
-          "زيادة سرعة التفاعل الكيميائي وزيادة قيمة ثابت الاتزان",
-          "انخفاض سرعة التفاعل وتراجع كمية النواتج",
-          "ثبات معدل التصادمات الفعالة بين الجزيئات",
-          "توقف التفاعل نهائياً بسبب وصوله إلى حالة التشبع"
+          "قيمة المحدد تساوي صفراً؛ وبالتالي المصفوفة منفردة (شاذة) ولا يمكن إيجاد معكوس ضربي لها.",
+          "حساب المعكوس مباشرة لأن محددها ≠ صفراً وتطبيق قانون المعكوس بالقسمة على المحدد.",
+          "استبدال عناصر القطر الرئيسي بالثانوي لإيجاد المعكوس دون الحاجة لحساب قيمة المحدد.",
+          "قسمة جميع عناصر المصفوفة على قيمة المحدد للحصول على مصفوفة الوحدة."
         ],
-        explanation: "التفسير النموذجي: رفع درجة الحرارة يزود الجزيئات بطاقة حركية كافية لتجاوز طاقة التنشيط. احذر من افتراض أن جميع التفاعلات تتأثر بنفس الطريقة.",
-        trapWarning: "تنبيه امتحاني: لا تخلط بين التفاعلات الماصة والطاردة للحرارة!"
+        explanation: "التحليل البيداغوجي: محدد المصفوفة |A| = (4 × 3) - (2 × 6) = 12 - 12 = 0. وبما أن قانون المعكوس يتطلب القسمة على المحدد (1/|A|)، والقسمة على صفر غير معرفة رياضياً؛ فإن المصفوفة منفردة (Singular Matrix) ولا تمتلك معكوساً ضربياً.",
+        trapWarning: "فخ الامتحان: تجنب التسرع في استبدال القطرين قبل حساب المحدد؛ فأي مصفوفة محددها صفر تكون شاذة ومنفردة ولا تمتلك معكوساً ضربياً!",
+        difficulty: "exam_trap",
+        bloomLevel: "analyze"
       }
     : {
-        question: "What is the expected outcome of increasing temperature in an endothermic reaction?",
+        question: "Given matrix A = \\begin{bmatrix} 4 & 2 \\\\ 6 & 3 \\end{bmatrix}, what is the exact mathematical outcome of calculating its determinant |A|, and how does it govern the existence of its inverse A^{-1}?",
         options: [
-          "Reaction rate increases and the equilibrium constant shifts toward products",
-          "Reaction rate decreases and product yield diminishes",
-          "Effective molecular collision rate remains entirely constant",
-          "The reaction completely ceases due to premature reactant saturation"
+          "The determinant is exactly zero; therefore, the matrix is singular and has no multiplicative inverse.",
+          "Compute the inverse directly because its determinant is non-zero.",
+          "Swap the primary and secondary diagonal elements to find the inverse without evaluating the determinant.",
+          "Divide all matrix elements by the determinant value to yield the identity matrix."
         ],
-        explanation: "Model Answer: Increasing temperature supplies kinetic energy exceeding activation energy. Avoid confusing endothermic with exothermic shifts.",
-        trapWarning: "Exam Trap Alert: Do not confuse equilibrium shift with reaction rate kinetics!"
+        explanation: "Pedagogical Breakdown: Determinant |A| = (4*3) - (2*6) = 12 - 12 = 0. Since the inverse formula requires dividing by the determinant (1/|A|), and division by zero is undefined, the matrix is singular with no inverse.",
+        trapWarning: "Exam Trap Alert: Never apply the diagonal swap rule before verifying that the determinant is strictly non-zero!",
+        difficulty: "exam_trap",
+        bloomLevel: "analyze"
       };
 
   return `
@@ -96,10 +100,24 @@ Create a rich, multi-dimensional diagnostic quiz of exactly ${count} diverse que
 - Course/Book: "${params.bookTitle || (isArabic ? 'المقرر التعليمي' : 'Academic Course')}"
 - Textbook Content Slice:
 """
-${params.chapterContent.substring(0, 5000)}
+${params.chapterContent.substring(0, 25000)}
 """
 
 🚨 CRITICAL ASSESSMENT INTEGRITY MANDATES (P0):
+0. 🎯 STRICT HIGH-ORDER BLOOM TAXONOMY & ANTI-LAZINESS MANDATE:
+   You are an elite, cunning national examination committee director.
+   STRICT PROHIBITION: NEVER generate direct recall questions or trivial copy-paste questions! Every question must force the student to think, compute, contrast, or avoid a trap.
+
+   MANDATORY QUESTION DISTRIBUTION (for exactly ${count} questions):
+   - [30% CONCEPTUAL GRASP (فهم واستيعاب عميق)]:
+     Questions testing underlying mechanisms, cause-effect, and rules (e.g., "What happens to variable Y if X doubles while Z is constant?").
+   - [40% APPLICATION & PROBLEM SOLVING (تطبيق وحل مسائل ومواقف)]:
+     Real numerical problems, code tracking, or grammatical analysis requiring multi-step thinking.
+   - [30% HIGHER-ORDER ANALYSIS & EXAM TRAPS (تحليل وفخاخ استنتاجية)]:
+     Questions featuring smart distractors based on the most common student misconceptions.
+     MANDATORY: The 'explanation' field MUST explain WHY the correct answer is right AND explicitly analyze why each of the other three distractors is wrong!
+     MANDATORY: The 'trapWarning' field MUST highlight the exact pitfall intended by the exam question!
+
 1. 🌐 LANGUAGE MANDATE:
    ${langMandate}
 
@@ -111,10 +129,15 @@ ${params.chapterContent.substring(0, 5000)}
      * Inline equations use $...$ (e.g. $x > 5$ or $E = mc^2$).
      * Block equations use $$...$$.
    - Numbers in formulas and equations MUST be Western digits (0-9).
+   - 🚫 STRICT MATHEMATICAL LOGIC & BOUNDS CONSISTENCY:
+     * Double check all numerical bounds and inequalities! NEVER write impossible bounds like $\sqrt{16} < x < \sqrt{9}$ (which is mathematically invalid because 4 cannot be less than 3).
+     * Lower bounds MUST strictly precede upper bounds: $\sqrt{9} < x < \sqrt{16} \implies 3 < x < 4$.
+     * Verify all algebraic solution sets, signs, and domains (ℝ vs ℚ vs ℚ') before finalizing.
 
-3. 🚫 STRICT BAN ON LITERAL LABELS IN OPTIONS:
+3. 🚫 STRICT BAN ON LITERAL LABELS & SINGLE LETTERS IN OPTIONS:
    - 🚫 NEVER output options like ["أ", "ب", "ج", "د"], ["A", "B", "C", "D"], ["Option A", "Option B"], or ["True", "False"]!
-   - Every single element in "options" MUST be a COMPLETE, ARTICULATE, INFORMATIVE PHRASE OR STATEMENT extracted directly from the subject matter!
+   - Every single option MUST be a COMPLETE, DETAILED, SUBSTANTIVE MATHEMATICAL/CONCEPTUAL STATEMENT (e.g., "$x = 2 \\pm \\sqrt{5}$ وكلاهما عددان حقيقيان غير نسبيين ينتميان إلى $\\mathbb{R}$").
+   - Exactly 4 fully formulated, distinct choices per question. Zero single-letter placeholders!
 
 4. DIVERSE QUESTION TYPES:
    Provide an engaging mix of questions across multiple formats:

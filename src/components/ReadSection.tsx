@@ -10,12 +10,14 @@ import {
   ChevronDown, ChevronUp, Sparkles, CheckCircle2,
   ZoomIn, ZoomOut, Check, Clock, Maximize2, Minimize2,
   Headphones, X, Compass, FlaskConical, Scale,
-  Edit3, Save, Undo, Redo, Bold, Italic, Heading1, Heading2, List, ListOrdered, Quote, Code, Eye
+  Edit3, Save, Undo, Redo, Bold, Italic, Heading1, Heading2, List, ListOrdered, Quote, Code, Eye,
+  MessageSquare, HelpCircle, Send, Bot, AlertTriangle
 } from 'lucide-react';
 import { Chapter } from '../types';
 import { useGlobalAudio } from '../hooks/useGlobalAudio';
 import { sanitizeBookContent } from '../utils/sanitizeBookContent';
 import { useLanguage } from '../i18n/LanguageContext';
+import MathRenderer from './MathRenderer';
 
 /**
  * Deep text sanitizer to remove escaped characters, format LaTeX smoothly into clear math typography,
@@ -150,6 +152,16 @@ function extractRawText(node: any): string {
 
 // Custom Markdown components for clean pedagogical rendering
 const markdownComponents = {
+  span: ({ className, children, ...props }: any) => {
+    if (className?.includes('katex')) {
+      return (
+        <span dir="ltr" className={`${className} inline-block select-text mx-1 align-middle`} tabIndex={-1} {...props}>
+          {children}
+        </span>
+      );
+    }
+    return <span className={className} {...props}>{children}</span>;
+  },
   blockquote: ({ children }: any) => {
     const rawText = extractRawText(children);
 
@@ -175,6 +187,20 @@ const markdownComponents = {
             <span>تنبيه امتحاني وتريكة هامة</span>
           </div>
           <div className="text-xs sm:text-sm font-bold leading-relaxed">
+            {children}
+          </div>
+        </div>
+      );
+    }
+
+    if (rawText.includes('نص المذكرة') || rawText.includes('المصدر الأصلي') || rawText.includes('النص الأصلي')) {
+      return (
+        <div className="my-5 p-5 sm:p-6 rounded-2xl bg-[#FFFDF9] border-2 border-amber-300/80 border-r-6 border-r-amber-500 shadow-sm text-slate-900 relative">
+          <div className="flex items-center gap-2 text-xs font-black text-amber-900 mb-2.5 pb-2 border-b border-amber-200/60">
+            <span className="text-lg">📜</span>
+            <span>نص المذكرة الأصلي المعتمد (المصدر النصي الموثق)</span>
+          </div>
+          <div className="text-xs sm:text-sm font-serif leading-relaxed text-slate-800">
             {children}
           </div>
         </div>
@@ -213,11 +239,17 @@ const markdownComponents = {
       {children}
     </h4>
   ),
-  h3: ({ children }: any) => (
-    <h5 className="text-xs sm:text-sm font-bold text-gray-800 mt-4 mb-2">
-      {children}
-    </h5>
-  ),
+  h3: ({ children }: any) => {
+    const raw = extractRawText(children);
+    if (raw.includes('نص المذكرة') || raw.includes('المصدر الأصلي') || raw.includes('النص الأصلي')) {
+      return null;
+    }
+    return (
+      <h5 className="text-xs sm:text-sm font-bold text-gray-800 mt-4 mb-2">
+        {children}
+      </h5>
+    );
+  },
   p: ({ children }: any) => {
     const rawText = extractRawText(children);
 
@@ -865,15 +897,126 @@ interface ReadSectionProps {
   isInstructorOrAdmin?: boolean;
   isEditMode?: boolean;
   onSaveChapter?: (updatedChapter: Chapter) => Promise<void>;
+  initialTab?: 'interleaved' | 'teacher_sos';
 }
 
-export function ReadSection({ chapter, isInstructorOrAdmin, isEditMode, onSaveChapter }: ReadSectionProps) {
+export function ReadSection({ chapter, isInstructorOrAdmin, isEditMode, onSaveChapter, initialTab }: ReadSectionProps) {
   const { t, language, dir } = useLanguage();
   const { isItemPlaying, isItemLoading, play, stop } = useGlobalAudio();
   const [showOriginalSource, setShowOriginalSource] = useState(false);
   const [isZenMode, setIsZenMode] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [selectedConcept, setSelectedConcept] = useState<{ title: string; desc: string } | null>(null);
+  const [readerTab, setReaderTab] = useState<'interleaved' | 'teacher_sos'>(initialTab || 'interleaved');
+
+  useEffect(() => {
+    if (initialTab) {
+      setReaderTab(initialTab);
+    }
+  }, [initialTab]);
+
+  // 🛰️ AXIS 2: LIGHTWEIGHT TELEMETRY ACTIVE READING TRACKER
+  const [activeReadingSeconds, setActiveReadingSeconds] = useState(0);
+  const lastActivityTimeRef = useRef(Date.now());
+  const activeReadingSecondsRef = useRef(0);
+
+  useEffect(() => {
+    const markActive = () => { lastActivityTimeRef.current = Date.now(); };
+    window.addEventListener('mousemove', markActive);
+    window.addEventListener('keydown', markActive);
+    window.addEventListener('scroll', markActive);
+    window.addEventListener('touchstart', markActive);
+
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible' && Date.now() - lastActivityTimeRef.current < 35000) {
+        activeReadingSecondsRef.current += 1;
+        setActiveReadingSeconds(activeReadingSecondsRef.current);
+      }
+    }, 1000);
+
+    const syncInterval = setInterval(() => {
+      if (activeReadingSecondsRef.current > 5) {
+        fetch('/api/telemetry/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            studentId: localStorage.getItem('osera_user_id') || 'std_curr',
+            studentName: localStorage.getItem('osera_user_name') || 'طالب المنصة',
+            bookId: (chapter as any).bookId || 'active_book',
+            chapterId: chapter.id,
+            chapterTitle: chapter.title,
+            activeReadingSeconds: activeReadingSecondsRef.current,
+            audioListenPercentage: Math.min(100, Math.round((activeReadingSecondsRef.current / 180) * 100)),
+            isCompleted: activeReadingSecondsRef.current > 90
+          })
+        }).catch(() => {});
+      }
+    }, 25000);
+
+    return () => {
+      window.removeEventListener('mousemove', markActive);
+      window.removeEventListener('keydown', markActive);
+      window.removeEventListener('scroll', markActive);
+      window.removeEventListener('touchstart', markActive);
+      clearInterval(timer);
+      clearInterval(syncInterval);
+    };
+  }, [chapter.id]);
+
+
+
+  // 🙋‍♂️ AXIS 1: TEACHER DIRECT SOS HELPDESK STATE
+  const [sosQuestionText, setSosQuestionText] = useState('');
+  const [sosSnippet, setSosSnippet] = useState('');
+  const [sosTicketsList, setSosTicketsList] = useState<any[]>([]);
+  const [isSendingSos, setIsSendingSos] = useState(false);
+  const [sosSuccessNotice, setSosSuccessNotice] = useState(false);
+
+  const loadSosTickets = async () => {
+    try {
+      const res = await fetch(`/api/helpdesk/tickets?chapterId=${chapter.id}`);
+      const data = await res.json();
+      if (data.tickets) setSosTicketsList(data.tickets);
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    loadSosTickets();
+  }, [chapter.id]);
+
+  const handleSendSosTicket = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!sosQuestionText.trim() || isSendingSos) return;
+    setIsSendingSos(true);
+    try {
+      const res = await fetch('/api/helpdesk/ask-teacher', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bookId: (chapter as any).bookId || 'active_book',
+          bookTitle: chapter.title,
+          chapterId: chapter.id,
+          chapterTitle: chapter.title,
+          studentId: localStorage.getItem('osera_user_id') || 'std_curr',
+          studentName: localStorage.getItem('osera_user_name') || 'طالب المنصة',
+          selectedSnippet: sosSnippet || chapter.summary?.substring(0, 100),
+          questionText: sosQuestionText.trim()
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSosSuccessNotice(true);
+        setSosQuestionText('');
+        setSosSnippet('');
+        loadSosTickets();
+        setTimeout(() => setSosSuccessNotice(false), 4000);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSendingSos(false);
+    }
+  };
 
   // 📝 INLINE WORD-LIKE EDITOR STATE FOR INSTRUCTORS
   const [isInlineEditing, setIsInlineEditing] = useState(false);
@@ -1084,6 +1227,9 @@ export function ReadSection({ chapter, isInstructorOrAdmin, isEditMode, onSaveCh
     }
 
     const cleanText = fullNarrationText
+      .replace(/^[ \t]*>[ \t]*/gm, ' ')
+      .replace(/(?:^|\n)\s*>\s*/g, ' ')
+      .replace(/(?:نص المذكرة الأصلي المعتمد|المصدر النصي الموثق|ماذا ستتعلم وتتقن في هذا الدرس|التشريح العلمي وتفكيك المعنى|معجم القواعد والمصطلحات الحاكمة|المسائل التدريبية والحلول النموذجية|منظومة المسائل الثلاثية الإلزامية المتدرجة|مصيدة الامتحان والقاعدة الذهبية)/gi, ' ')
       .replace(/\[\!(IMPORTANT|WARNING|TIP|NOTE)\]/gi, ' ')
       .replace(/\[.*?\]/g, ' ')
       .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
@@ -1094,7 +1240,7 @@ export function ReadSection({ chapter, isInstructorOrAdmin, isEditMode, onSaveCh
       .replace(/(\d+)\s*[\/÷]\s*(\d+)/g, '$1 على $2')
       .replace(/([^\d\s\/\\]+)\s*[\/\\]\s*([^\d\s\/\\]+)/g, '$1 أو $2')
       .replace(/[\(\)\[\]\{\}«»‹›（）【】〔〕《》“”"'\`\/\\]/g, ' ')
-      .replace(/[*_#`~\|\$]/g, ' ')
+      .replace(/[><*_#`~\|\$]/g, ' ')
       .replace(/\.{2,}/g, ' ، ')
       .replace(/…/g, ' ، ')
       .replace(/[:؛;]/g, ' ، ')
@@ -1199,6 +1345,8 @@ export function ReadSection({ chapter, isInstructorOrAdmin, isEditMode, onSaveCh
           </button>
         </div>
       </div>
+
+
 
 
 
@@ -1451,27 +1599,6 @@ export function ReadSection({ chapter, isInstructorOrAdmin, isEditMode, onSaveCh
         </div>
       )}
 
-      {/* 🎯 2. LEARNING OBJECTIVES & QUICK SUMMARY PILL BANNER */}
-      {normalizedSummary && (
-        <div id="learning-objectives" className="bg-gradient-to-br from-indigo-50/90 via-white to-indigo-50/50 border border-indigo-100 rounded-3xl p-5 sm:p-6 shadow-xs space-y-3 scroll-mt-16">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold shadow-xs">
-              <Target className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-[10px] font-black text-indigo-600 block">نواتج التعلّم المستهدفة</span>
-              <h4 className="text-sm font-black text-indigo-950">ماذا ستتعلم وتتقن في هذا الدرس؟</h4>
-            </div>
-          </div>
-
-          <div className="p-4 bg-white rounded-2xl border border-indigo-100/80 text-xs sm:text-sm text-gray-800 leading-relaxed font-medium">
-            <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={markdownComponents}>
-              {normalizedSummary}
-            </ReactMarkdown>
-          </div>
-
-        </div>
-      )}
 
       {/* 💡 3. CORE CONCEPTS INTERACTIVE GRID WITH AUDIO PRONUNCIATION */}
       {conceptsArr.length > 0 && (
@@ -1498,14 +1625,19 @@ export function ReadSection({ chapter, isInstructorOrAdmin, isEditMode, onSaveCh
 
               const handleSpeakConcept = (e: React.MouseEvent) => {
                 e.stopPropagation();
-                if ('speechSynthesis' in window) {
-                  window.speechSynthesis.cancel();
-                  const fullSpeech = `${cName}. ${cDesc}`;
-                  const utter = new SpeechSynthesisUtterance(fullSpeech);
-                  utter.lang = 'ar-SA';
-                  utter.rate = 0.95;
-                  window.speechSynthesis.speak(utter);
-                }
+                const fullSpeech = `${cName}. ${cDesc}`;
+                const audioUrl = `/api/tts/stream?text=${encodeURIComponent(fullSpeech)}&speaker=female&voice=ar-XA-Chirp3-HD-Aoede&lang=ar`;
+                const audio = new Audio(audioUrl);
+                audio.play().catch(() => {
+                  if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel();
+                    const cleanFallback = fullSpeech.replace(/["'«»<>{}\[\]]/g, ' ');
+                    const utter = new SpeechSynthesisUtterance(cleanFallback);
+                    utter.lang = 'ar-SA';
+                    utter.rate = 0.95;
+                    window.speechSynthesis.speak(utter);
+                  }
+                });
               };
 
               return (
@@ -1575,7 +1707,10 @@ export function ReadSection({ chapter, isInstructorOrAdmin, isEditMode, onSaveCh
         </div>
       )}
 
-      {/* 📖 5. UNIFIED DEEP LESSON CONTENT (THE CORE READER) */}
+            {/* TAB 1: INTERLEAVED READER (DEFAULT) */}
+      {readerTab === 'interleaved' && (
+        <div>
+          {/* 📖 5. UNIFIED DEEP LESSON CONTENT (THE CORE READER) */}
       {normalizedContent && (
         <div id="detailed-content" className="bg-white border border-gray-100 shadow-sm rounded-3xl p-6 sm:p-8 space-y-5 scroll-mt-16">
           <div className="flex items-center justify-between pb-4 border-b border-gray-100">
@@ -1599,7 +1734,110 @@ export function ReadSection({ chapter, isInstructorOrAdmin, isEditMode, onSaveCh
         </div>
       )}
 
-      {/* 📑 6. COLLAPSIBLE ORIGINAL SOURCE MATERIAL */}
+      
+        </div>
+      )}
+
+
+
+      {/* TAB 4: TEACHER DIRECT SOS HELPDESK */}
+      {readerTab === 'teacher_sos' && (
+        <div className="bg-white border-2 border-rose-200 rounded-3xl p-6 sm:p-8 space-y-6 shadow-sm animate-fade-in">
+          <div className="flex items-center justify-between pb-4 border-b border-rose-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
+                <HelpCircle className="w-5 h-5 text-rose-600" />
+              </div>
+              <div>
+                <h4 className="text-base sm:text-lg font-black text-rose-950">استفسارات المعلم المباشرة (Teacher Direct SOS)</h4>
+                <p className="text-xs text-rose-700">أرسل استفسارك مباشرة لمعلم المذكرة وسيرد عليك بشرح تفصيلي أو تسجيل صوتي موجه</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Form to submit question */}
+          <form onSubmit={handleSendSosTicket} className="space-y-4 bg-rose-50/40 p-5 rounded-2xl border border-rose-200/80">
+            <div className="space-y-1.5">
+              <label className="text-xs font-black text-slate-800 block">نص الاستفسار أو المسألة التي استوقفتك:</label>
+              <textarea
+                value={sosQuestionText}
+                onChange={(e) => setSosQuestionText(e.target.value)}
+                placeholder="اكتب استفسارك المحدد للمعلم هنا (مثال: لم أفهم كيفية حصر الجذر بين مربعين كاملين في خطوة 2)..."
+                rows={3}
+                required
+                className="w-full p-3.5 bg-white border border-rose-200 rounded-xl text-xs sm:text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-500/30"
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[11px] text-slate-500">
+                📌 يتم إرفاق سياق الدرس الحالي ({chapter.title}) تلقائياً مع تذكرتك.
+              </span>
+
+              <button
+                type="submit"
+                disabled={isSendingSos}
+                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-black shadow-sm transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {isSendingSos ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                <span>إرسال الاستفسار للمعلم 🚀</span>
+              </button>
+            </div>
+
+            {sosSuccessNotice && (
+              <div className="p-3 bg-emerald-100 border border-emerald-300 text-emerald-900 text-xs font-bold rounded-xl flex items-center gap-2 animate-fade-in">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>تم إرسال استفسارك بنجاح إلى المعلم وسيظهر رده هنا وفي إشعارات حسابك!</span>
+              </div>
+            )}
+          </form>
+
+          {/* Previous Tickets & Teacher Answers */}
+          <div className="space-y-3 pt-2">
+            <h5 className="text-xs font-black text-slate-900 flex items-center gap-2">
+              <MessageSquare className="w-4 h-4 text-indigo-600" />
+              <span>الاستفسارات السابقة وردود المعلم المعتمدة:</span>
+            </h5>
+
+            {sosTicketsList.length === 0 ? (
+              <div className="text-center py-8 text-xs text-slate-400 bg-slate-50 rounded-2xl border border-slate-200">
+                لا توجد استفسارات مرسلة في هذا الدرس بعد. اكتب سؤالك أعلاه لتلقي توضيح مباشر من المعلم.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {sosTicketsList.map((ticket) => (
+                  <div key={ticket.id} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                    <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-200">
+                      <span className="font-bold text-slate-700">سؤالك حول: {ticket.chapterTitle}</span>
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${
+                        ticket.status === 'answered' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {ticket.status === 'answered' ? 'تم الرد من المعلم ✅' : 'قيد انتظار رد المعلم ⏳'}
+                      </span>
+                    </div>
+
+                    <p className="text-xs sm:text-sm font-bold text-slate-900">{ticket.questionText}</p>
+
+                    {ticket.teacherAnswer && (
+                      <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl space-y-1">
+                        <span className="text-[10px] font-black text-emerald-800 flex items-center gap-1">
+                          <span>👨‍🏫 رد وتوجيه المعلم:</span>
+                        </span>
+                        <p className="text-xs sm:text-sm text-emerald-950 font-medium leading-relaxed">
+                          <MathRenderer text={ticket.teacherAnswer} />
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+
+{/* 📑 6. COLLAPSIBLE ORIGINAL SOURCE MATERIAL */}
       {normalizedOriginal && (
         <div id="original-source" className="bg-gray-50/80 border border-gray-200/80 rounded-3xl overflow-hidden transition-all scroll-mt-16">
           <button

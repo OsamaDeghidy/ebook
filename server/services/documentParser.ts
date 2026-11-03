@@ -11,12 +11,43 @@ export interface ParsedDocument {
 }
 
 /**
+ * Normalizes Unicode Arabic Presentation Forms (Forms-A \uFB50-\uFDFF and Forms-B \uFE70-\uFEFF)
+ * and Egyptian Ministry PDF ligatures (e.g., ﻻ, ﻷ, ﻹ, ﻵ) into standard Arabic Unicode (\u0621-\u064A).
+ */
+export function normalizeArabicPresentationForms(text: string): string {
+  if (!text) return "";
+
+  // 1. Unicode Compatibility Canonical Decomposition & Recomposition (NFKC)
+  let normalized = text.normalize("NFKC");
+
+  // 2. Explicit ligature & lam-alef decomposition/cleanup
+  normalized = normalized
+    .replace(/\u0644\u0627\u0654/g, "لأ")
+    .replace(/\u0644\u0627\u0655/g, "لإ")
+    .replace(/\u0644\u0627\u0653/g, "لآ")
+    .replace(/\u0644\u0627/g, "لا")
+    .replace(/[\uFEF5\uFEF6]/g, "لآ")
+    .replace(/[\uFEF7\uFEF8]/g, "لأ")
+    .replace(/[\uFEF9\uFEFA]/g, "لإ")
+    .replace(/[\uFEFB\uFEFC]/g, "لا");
+
+  // 3. Remove zero-width non-joiners/joiners and Byte Order Mark if used for legacy visual shaping
+  normalized = normalized.replace(/[\u200B\u200C\u200D\u200E\u200F\uFEFF]/g, "");
+
+  // 4. Clean vector replacement glyphs and orphan control pictures often embedded in educational PDFs
+  normalized = normalized.replace(/[\uFFFD\u2400-\u243F]/g, " ");
+
+  return normalized;
+}
+
+/**
  * Clean & normalize raw extracted text from PDFs, DOCX, or text files
  */
 export function normalizeExtractedText(rawText: string): string {
   if (!rawText) return "";
 
-  let cleaned = rawText;
+  // 0. Normalize Arabic Presentation Forms and Ministry Ligatures first
+  let cleaned = normalizeArabicPresentationForms(rawText);
 
   // 1. Normalize line endings
   cleaned = cleaned.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
@@ -49,18 +80,54 @@ export function normalizeExtractedText(rawText: string): string {
  * rather than empty scanned pages or corrupted custom-font glyphs (\uFFFD / Private Use Area)
  */
 export function isMeaningfulExtractedText(text: string): boolean {
-  if (!text || text.trim().length < 350) return false;
-  const trimmed = text.trim();
+  if (!text || text.trim().length < 150) return false;
+  const trimmed = normalizeArabicPresentationForms(text).trim();
   // Base letters only (Arabic letters \u0621-\u064A without diacritics, plus Latin a-zA-Z)
   const baseLetters = (trimmed.match(/[\u0621-\u064Aa-zA-Z]/g) || []).length;
   const diacritics = (trimmed.match(/[\u064B-\u065F\u0670]/g) || []).length;
   const brokenGlyphs = (trimmed.match(/[\uFFFD\u2400-\u243F\uE000-\uF8FF]/g) || []).length;
-  if (baseLetters < 250) return false;
-  // If replacement/control-picture glyphs (\uFFFD, ␦, PUA) exceed 5% of base letters, CMap is corrupted
-  if (brokenGlyphs > baseLetters * 0.05) return false;
-  // If diacritics (harakat) outnumber actual base letters, most base consonants were lost in CMap
-  if (diacritics > baseLetters * 0.85) return false;
-  return true;
+  
+  // If we have at least 150 real base letters (authentic curriculum words):
+  if (baseLetters >= 150) {
+    // Only reject if unrecoverable broken glyphs completely overwhelm the text
+    if (brokenGlyphs > baseLetters * 1.2) return false;
+    // For Arabic KG / early-childhood / Quranic texts, diacritics can be abundant, so we allow up to 2.5x base letters
+    if (diacritics > baseLetters * 2.5) return false;
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Detects whether extracted text suffers from reversed/scrambled glyph streams
+ * or disconnected Arabic character encoding (common in ministry/educational PDFs)
+ * Example from corrupted extraction: "ع ي تَّ وَ تَّ هُ ن آ قَّ رِ يَّ ت كلام"
+ */
+export function detectReversedOrBrokenArabic(text: string): boolean {
+  if (!text || text.length < 80) return false;
+  const sample = text.substring(0, 8000);
+  
+  // 1. Isolated single Arabic letters followed by spaces: e.g. "ع ي ت و ت ه ن"
+  const isolatedLetters = sample.match(/(?:^|\s)[\u0621-\u064A][\u064B-\u065F\u0670]?(?=\s|$)/g) || [];
+  const words = sample.split(/\s+/).filter(Boolean);
+  
+  if (words.length >= 15) {
+    const isolatedRatio = isolatedLetters.length / words.length;
+    // In normal Arabic, single-letter words (only 'و' and rarely 'ف') account for < 10% of words.
+    // If > 20% of words are single isolated Arabic letters, it's a corrupted disconnected glyph stream.
+    if (isolatedRatio > 0.20) {
+      return true;
+    }
+  }
+
+  // 2. 4 or more consecutive single Arabic letters separated by spaces:
+  // e.g. "ق . ت ر ق ل أ و م خ" or "ع ي ت و ت ه ن"
+  const consecutiveIsolated = sample.match(/(?:[\u0621-\u064A][\u064B-\u065F\u0670]?\s+){4,}/g);
+  if (consecutiveIsolated && consecutiveIsolated.length >= 2) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -91,7 +158,10 @@ export async function parseDocumentBuffer(
     } else if (isPdf) {
       let pdfParser: PDFParse | null = null;
       try {
-        pdfParser = new PDFParse({ data: buffer } as any);
+        const uint8Data = (buffer instanceof Uint8Array && !Buffer.isBuffer(buffer))
+          ? buffer
+          : new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+        pdfParser = new PDFParse(uint8Data as any);
         const parsed = await pdfParser.getText();
         const rawPdfText = parsed.text || "";
         const pageMatch = rawPdfText.match(/--\s*\d+\s*of\s*(\d+)\s*--/i);
@@ -104,8 +174,8 @@ export async function parseDocumentBuffer(
         console.warn("[Document Parser] PDF text parsing fallback attempt:", pdfErr);
         extractedText = "";
       } finally {
-        if (pdfParser) {
-          try { await pdfParser.destroy(); } catch (e) {}
+        if (pdfParser && typeof (pdfParser as any).destroy === 'function') {
+          try { await (pdfParser as any).destroy(); } catch (e) {}
         }
       }
     } else {
@@ -118,9 +188,10 @@ export async function parseDocumentBuffer(
   }
 
   let normalized = normalizeExtractedText(extractedText);
-  if (isPdf && !isMeaningfulExtractedText(normalized)) {
+  const isCorruptedGlyphStream = isPdf && detectReversedOrBrokenArabic(normalized);
+  if (isPdf && (!isMeaningfulExtractedText(normalized) || isCorruptedGlyphStream)) {
     console.log(
-      `[Document Parser] PDF "${fileName}" has non-readable/scanned text layer (normalized len: ${normalized.length}, pages: ${pageCount || "?"}). Marking for Vision OCR.`
+      `[Document Parser] PDF "${fileName}" has non-readable or corrupted/reversed text layer (normalized len: ${normalized.length}, corruptedGlyphs: ${isCorruptedGlyphStream}, pages: ${pageCount || "?"}). Marking for Vision OCR.`
     );
     normalized = "";
   }
@@ -168,7 +239,10 @@ export async function extractPdfTextViaVisionPages(
 
   let pdfParser: PDFParse | null = null;
   try {
-    pdfParser = new PDFParse({ data: buffer } as any);
+    const uint8Data = (buffer instanceof Uint8Array && !Buffer.isBuffer(buffer))
+      ? buffer
+      : new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+    pdfParser = new PDFParse(uint8Data as any);
     const textProbe = await pdfParser.getText({ partial: [1] } as any).catch(() => ({ text: "", total: 0 }));
     const pageMatch = (textProbe.text || "").match(/--\s*\d+\s*of\s*(\d+)\s*--/i);
     const totalPages = (textProbe as any)?.total || (pageMatch ? parseInt(pageMatch[1], 10) : 20);

@@ -6,7 +6,8 @@ import {
   Search, BookMarked, Phone, Mail, Globe, Layers, Laptop, Code2, Brain,
   Briefcase, HeartHandshake, ChevronLeft, Lock, ArrowUpRight, Flame,
   FileText, Film, HelpCircle, Check, RotateCw, ChevronRight, MessageSquare,
-  Printer, Download, Eye, EyeOff, Upload, X, Volume2, VolumeX, ShieldAlert
+  Printer, Download, Eye, EyeOff, Upload, X, Volume2, VolumeX, ShieldAlert,
+  BarChart3, XCircle
 } from 'lucide-react';
 import { MarketplaceBook } from '../types';
 import { getPlatformConfig, PlatformConfig } from '../services/platformConfigService';
@@ -33,6 +34,16 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
     window.addEventListener('platform-config-changed', handleConfigChange);
     return () => window.removeEventListener('platform-config-changed', handleConfigChange);
   }, []);
+
+  // 🌟 EL MAESTRO AXIS 4: DUAL HERO AUDIENCE SELECTOR
+  const [heroAudience, setHeroAudience] = useState<'student' | 'teacher'>('student');
+
+  // 🌟 45-SECOND INTERACTIVE PRODUCT DEMO PREVIEW
+  const [demoStep, setDemoStep] = useState<1 | 2 | 3>(1);
+  const [demoAudioPlaying, setDemoAudioPlaying] = useState(false);
+  const [demoNumberVal, setDemoNumberVal] = useState<number>(5);
+  const [demoQuizOption, setDemoQuizOption] = useState<number | null>(null);
+  const [demoQuizAnswered, setDemoQuizAnswered] = useState(false);
 
   // 🔊 REAL SPEECH SYNTHESIS ENGINE (محرّك النطق الصوتي الحي والمسموع النقي)
   const [isMuted, setIsMuted] = useState(false);
@@ -406,59 +417,131 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
         <div className="absolute bottom-0 left-10 w-96 h-96 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none" />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+
+          {/* 🌟 AUDIENCE SWITCHER (EL MAESTRO AXIS 4) */}
+          <div className="flex items-center justify-center mb-8">
+            <div className="inline-flex p-1.5 bg-slate-900/90 border border-indigo-500/40 rounded-2xl shadow-xl backdrop-blur-md">
+              <button
+                onClick={() => setHeroAudience('student')}
+                className={`px-5 py-2.5 rounded-xl font-black text-xs sm:text-sm flex items-center gap-2 transition cursor-pointer ${
+                  heroAudience === 'student'
+                    ? 'bg-gradient-to-r from-teal-500 to-indigo-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <GraduationCap className="w-4 h-4" />
+                <span>أنا طالب أبحث عن التفوق 🎓</span>
+              </button>
+
+              <button
+                onClick={() => setHeroAudience('teacher')}
+                className={`px-5 py-2.5 rounded-xl font-black text-xs sm:text-sm flex items-center gap-2 transition cursor-pointer ${
+                  heroAudience === 'teacher'
+                    ? 'bg-gradient-to-r from-amber-500 to-rose-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Briefcase className="w-4 h-4" />
+                <span>أنا معلم / صانع محتوى 💼</span>
+              </button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
             
             {/* RIGHT COLUMN: PUNCHY HEADLINE & CTA */}
             <div className="lg:col-span-6 space-y-6 text-center lg:text-right">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-900/80 border border-indigo-500/40 text-teal-300 text-xs font-black shadow-lg shadow-indigo-950/50">
-                <span className="w-2 h-2 rounded-full bg-teal-400 animate-ping" />
-                <span>مساعدك الدراسي الذكي الشامل بالذكاء الاصطناعي ✨</span>
-              </div>
+              {heroAudience === 'student' ? (
+                <>
+                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-900/80 border border-indigo-500/40 text-teal-300 text-xs font-black shadow-lg shadow-indigo-950/50">
+                    <span className="w-2 h-2 rounded-full bg-teal-400 animate-ping" />
+                    <span>مساعدك الدراسي الذكي الشامل بالذكاء الاصطناعي ✨</span>
+                  </div>
 
-              <h1 className="text-3xl sm:text-5xl lg:text-5xl font-black text-white leading-[1.3] tracking-tight">
-                حوّل أي مذكرة أو كتاب إلى{' '}
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 via-teal-300 to-indigo-300">
-                  تجربة تعليمية حيّة في ثوانٍ!
-                </span>
-              </h1>
+                  <h1 className="text-3xl sm:text-5xl lg:text-5xl font-black text-white leading-[1.3] tracking-tight">
+                    حوّل أي مذكرة أو كتاب إلى{' '}
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 via-teal-300 to-indigo-300">
+                      تجربة تعليمية حيّة في ثوانٍ!
+                    </span>
+                  </h1>
 
-              <p className="text-sm sm:text-base text-slate-300 font-medium leading-relaxed max-w-xl mx-auto lg:mx-0">
-                مساعدك الذكي لإنجاز المذاكرة: بودكاست صوتي مسموع بين شخصيتين (كريم وفرح)، خرائط ذهنية لكل درس، ريلز سريعة 60 ثانية، وامتحانات مطبوعة موقوتة بنماذج إجابة معتمدة.
-              </p>
+                  <p className="text-sm sm:text-base text-slate-300 font-medium leading-relaxed max-w-xl mx-auto lg:mx-0">
+                    مساعدك الذكي لإنجاز المذاكرة: بودكاست صوتي مسموع بين شخصيتين (كريم وفرح)، معامل تفاعلية حية، خرائط ذهنية لكل درس، وامتحانات موقوتة بنماذج إجابة معتمدة.
+                  </p>
 
-              {/* Primary Dual CTA Buttons */}
-              <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3.5 pt-2">
-                <button
-                  onClick={onOpenAuth}
-                  className="px-7 py-3.5 bg-gradient-to-r from-teal-500 via-teal-400 to-indigo-500 hover:from-teal-400 hover:to-indigo-400 text-slate-950 font-black text-sm sm:text-base rounded-2xl shadow-xl shadow-teal-500/25 hover:shadow-teal-500/40 transition transform hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-2.5 cursor-pointer"
-                >
-                  <Sparkles className="w-5 h-5 text-slate-950" />
-                  <span>جرّب مجاناً الآن 🚀</span>
-                  <ArrowLeft className="w-4 h-4 text-slate-950" />
-                </button>
+                  {/* Primary Dual CTA Buttons */}
+                  <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3.5 pt-2">
+                    <button
+                      onClick={onOpenAuth}
+                      className="px-7 py-3.5 bg-gradient-to-r from-teal-500 via-teal-400 to-indigo-500 hover:from-teal-400 hover:to-indigo-400 text-slate-950 font-black text-sm sm:text-base rounded-2xl shadow-xl shadow-teal-500/25 hover:shadow-teal-500/40 transition transform hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-2.5 cursor-pointer"
+                    >
+                      <Sparkles className="w-5 h-5 text-slate-950" />
+                      <span>جرّب مجاناً الآن 🚀</span>
+                      <ArrowLeft className="w-4 h-4 text-slate-950" />
+                    </button>
 
-                <button
-                  onClick={() => setIsVideoModalOpen(true)}
-                  className="px-6 py-3.5 bg-white/10 hover:bg-white/15 text-white font-bold text-sm sm:text-base rounded-2xl border border-white/20 backdrop-blur-md transition flex items-center gap-2 cursor-pointer"
-                >
-                  <Play className="w-4 h-4 text-teal-300 fill-teal-300" />
-                  <span>شاهد كيف يعمل في دقيقة ▶</span>
-                </button>
-              </div>
+                    <button
+                      onClick={() => setIsVideoModalOpen(true)}
+                      className="px-6 py-3.5 bg-white/10 hover:bg-white/15 text-white font-bold text-sm sm:text-base rounded-2xl border border-white/20 backdrop-blur-md transition flex items-center gap-2 cursor-pointer"
+                    >
+                      <Play className="w-4 h-4 text-teal-300 fill-teal-300" />
+                      <span>شاهد كيف يعمل في دقيقة ▶</span>
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-950/80 border border-amber-500/40 text-amber-300 text-xs font-black shadow-lg">
+                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                    <span>منصة المعلم الرقمي المتكاملة لحماية ونشر المذكرات 🛡️</span>
+                  </div>
+
+                  <h1 className="text-3xl sm:text-5xl lg:text-5xl font-black text-white leading-[1.3] tracking-tight">
+                    حوّل مذكراتك إلى{' '}
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-rose-300 to-indigo-300">
+                      أكاديمية تفاعلية واحمِ ملكيتك الفكرية!
+                    </span>
+                  </h1>
+
+                  <p className="text-sm sm:text-base text-slate-300 font-medium leading-relaxed max-w-xl mx-auto lg:mx-0">
+                    حماية تامة من التسريب، توليد بنوك أسئلة وامتحانات مطبوعة آلياً، رادار لحظي لكشف تعثر الطلاب ونقاط الاختناق، وسحب فوري لصافي أرباحك بنسبة 85% عبر فودافون كاش وإنستاباي.
+                  </p>
+
+                  {/* Primary Dual CTA Buttons */}
+                  <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3.5 pt-2">
+                    <button
+                      onClick={onOpenAuth}
+                      className="px-7 py-3.5 bg-gradient-to-r from-amber-500 via-rose-500 to-indigo-600 hover:from-amber-400 hover:to-indigo-500 text-white font-black text-sm sm:text-base rounded-2xl shadow-xl shadow-rose-500/25 transition transform hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-2.5 cursor-pointer"
+                    >
+                      <Briefcase className="w-5 h-5 text-white" />
+                      <span>انضم كمعلم معتمد 💼</span>
+                      <ArrowLeft className="w-4 h-4 text-white" />
+                    </button>
+
+                    <button
+                      onClick={() => navigate('/admin')}
+                      className="px-6 py-3.5 bg-white/10 hover:bg-white/15 text-white font-bold text-sm sm:text-base rounded-2xl border border-white/20 backdrop-blur-md transition flex items-center gap-2 cursor-pointer"
+                    >
+                      <BarChart3 className="w-4 h-4 text-amber-300" />
+                      <span>استكشف رادار كشف التعثر 📊</span>
+                    </button>
+                  </div>
+                </>
+              )}
 
               {/* Trust Indicators */}
               <div className="pt-4 flex flex-wrap items-center justify-center lg:justify-start gap-5 text-xs font-bold text-slate-400 border-t border-slate-800/80">
                 <div className="flex items-center gap-1.5">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  <span>50+ مقرر تفاعلي جاهز</span>
+                  <span>50+ مقرر تفاعلي معتمد</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
-                  <span>4.9 تقييم الطلاب والمعلمين</span>
+                  <span>+15,000 طالب نشط</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <Radio className="w-4 h-4 text-teal-400" />
-                  <span>صوت مسموع حي 100%</span>
+                  <ShieldCheck className="w-4 h-4 text-teal-400" />
+                  <span>100% حماية ملكية فكرية وعائد 85%</span>
                 </div>
               </div>
             </div>
@@ -565,6 +648,251 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
               </div>
             </div>
 
+          </div>
+        </div>
+      </section>
+
+      {/* ⚡ EL MAESTRO AXIS 4: 45-SECOND INTERACTIVE PRODUCT DEMO PREVIEW (ZERO LOGIN REQUIRED) */}
+      <section className="py-12 sm:py-16 bg-slate-900 text-white border-b border-indigo-950 relative overflow-hidden">
+        <div className="absolute top-1/2 left-0 w-80 h-80 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-1/4 right-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 relative z-10">
+          <div className="text-center space-y-3">
+            <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-teal-500/20 text-teal-300 text-xs font-black border border-teal-500/30">
+              <Zap className="w-3.5 h-3.5 text-teal-400" />
+              <span>معاينة حية بدون تسجيل دخول أو دفع مسبق</span>
+            </span>
+            <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
+              جرّب التقنيات الثلاث السيادية في 45 ثانية!
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-300 max-w-xl mx-auto">
+              تنقل بين الشرح الصوتي البشري، المعمل الرياضي الحي، والكويز التفاعلي لتختبر الفارق الجوهري بنفسك.
+            </p>
+
+            {/* Step Selector Pills */}
+            <div className="flex items-center justify-center gap-2 pt-2 flex-wrap">
+              <button
+                onClick={() => setDemoStep(1)}
+                className={`px-4 py-2 rounded-xl text-xs font-black transition flex items-center gap-2 cursor-pointer ${
+                  demoStep === 1
+                    ? 'bg-teal-500 text-slate-950 shadow-md ring-2 ring-teal-400'
+                    : 'bg-white/10 text-white hover:bg-white/15'
+                }`}
+              >
+                <Radio className="w-3.5 h-3.5" />
+                <span>1. الراوي الصوتي البشري 🎙️</span>
+              </button>
+
+              <button
+                onClick={() => setDemoStep(2)}
+                className={`px-4 py-2 rounded-xl text-xs font-black transition flex items-center gap-2 cursor-pointer ${
+                  demoStep === 2
+                    ? 'bg-indigo-500 text-white shadow-md ring-2 ring-indigo-400'
+                    : 'bg-white/10 text-white hover:bg-white/15'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>2. المعمل الرياضي التفاعلي 🧪</span>
+              </button>
+
+              <button
+                onClick={() => setDemoStep(3)}
+                className={`px-4 py-2 rounded-xl text-xs font-black transition flex items-center gap-2 cursor-pointer ${
+                  demoStep === 3
+                    ? 'bg-amber-500 text-slate-950 shadow-md ring-2 ring-amber-400'
+                    : 'bg-white/10 text-white hover:bg-white/15'
+                }`}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>3. التقييم الذاتي والتصحيح ⚡</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Interactive Demo Container */}
+          <div className="bg-slate-950/80 border-2 border-indigo-500/30 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl">
+            {/* STEP 1: AUDIBLE NARRATOR DEMO */}
+            {demoStep === 1 && (
+              <div className="space-y-6 animate-fade-in text-center sm:text-right">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+                  <div>
+                    <h3 className="text-base font-black text-white flex items-center justify-center sm:justify-start gap-2">
+                      <Radio className="w-5 h-5 text-teal-400 animate-pulse" />
+                      <span>محرك الترجمة الصوتية للمعادلات والرموز الرياضية</span>
+                    </h3>
+                    <p className="text-xs text-slate-400">تحويل لغة KaTeX الصامتة إلى لغة عربية فصحى مقروءة بنبرة معلم حقيقي</p>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      if (demoAudioPlaying) {
+                        setDemoAudioPlaying(false);
+                        stopAllSpeech();
+                      } else {
+                        setDemoAudioPlaying(true);
+                        playSpeech(
+                          "أهلاً بك! في منصتنا لن تسمع قراءة رموز عمياء، بل ننطق: مصفوفة مربعة، صفها الأول ألف وباء، ونميز بين الجذر الأصم والنسبي بدقة فصحى نقية.",
+                          'farah',
+                          () => setDemoAudioPlaying(false)
+                        );
+                      }
+                    }}
+                    className={`px-5 py-2.5 rounded-xl font-black text-xs flex items-center justify-center gap-2 transition cursor-pointer mx-auto sm:mx-0 ${
+                      demoAudioPlaying
+                        ? 'bg-rose-500 text-white animate-pulse'
+                        : 'bg-teal-500 hover:bg-teal-400 text-slate-950 shadow-md'
+                    }`}
+                  >
+                    {demoAudioPlaying ? (
+                      <>
+                        <Pause className="w-4 h-4 fill-current" />
+                        <span>إيقاف الصوت ⏸️</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-4 h-4 fill-current" />
+                        <span>تشغيل العينة الصوتية الآن ▶</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Script Display */}
+                <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-2">
+                  <span className="text-[10px] font-bold text-teal-400 block">النص المقروء صوتياً بلغة فصحى مشكولة:</span>
+                  <p className="text-sm text-slate-200 leading-relaxed font-sans">
+                    "أَهْلاً بِكَ! فِي مَنَصَّتِنَا لَنْ تَسْمَعَ قِرَاءَةَ رُمُوزٍ عَمْيَاء، بَلْ نَنْطِقُ: مَصْفُوفَةٌ مُرَبَّعَةٌ، صَفُّهَا الأَوَّلُ أَلِف وَبَاء، وَنُمَيِّزُ بَيْنَ الْجَذْرِ الأَصَمِّ وَالنِّسْبِيِّ بِدِقَّةِ فُصْحَى نَقِيَّة."
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 2: INTERACTIVE LAB (NUMBER LINE & IRRATIONALS) */}
+            {demoStep === 2 && (
+              <div className="space-y-6 animate-fade-in">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+                  <div>
+                    <h3 className="text-base font-black text-white flex items-center gap-2">
+                      <Layers className="w-5 h-5 text-indigo-400" />
+                      <span>المعمل التفاعلي الحي: خط الأعداد والعمليات على الأعداد الحقيقية</span>
+                    </h3>
+                    <p className="text-xs text-slate-400">حرّك المؤشر لمشاهدة الحسابات والتصنيف البيداغوجي المباشر</p>
+                  </div>
+                  <div className="text-left font-mono">
+                    <span className="text-xs text-slate-400">قيمة المتغير X:</span>
+                    <span className="text-2xl font-black text-indigo-400 mr-2">{demoNumberVal}</span>
+                  </div>
+                </div>
+
+                {/* Range Slider */}
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs text-slate-400 font-mono">
+                    <span>1</span>
+                    <span className="text-indigo-300 font-bold">اسحب للتحكم بالقيمة الحية (1 - 25)</span>
+                    <span>25</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={1}
+                    max={25}
+                    value={demoNumberVal}
+                    onChange={(e) => setDemoNumberVal(Number(e.target.value))}
+                    className="w-full accent-indigo-500 cursor-pointer h-2 bg-slate-800 rounded-lg"
+                  />
+                </div>
+
+                {/* Live Computed Metrics */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                  <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-2xl space-y-1">
+                    <span className="text-[10px] text-slate-400 font-bold block">الجذر التربيعي (√X)</span>
+                    <span className="text-lg font-black text-teal-400 font-mono">
+                      {Math.sqrt(demoNumberVal).toFixed(3)}
+                    </span>
+                    <span className="text-[10px] text-slate-400 block">
+                      {Number.isInteger(Math.sqrt(demoNumberVal)) ? '🟢 مربع كامل (عدد نسبي Q)' : '⚡ جذر أصم (عدد غير نسبي Q\')'}
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-2xl space-y-1">
+                    <span className="text-[10px] text-slate-400 font-bold block">مربع العدد (X²)</span>
+                    <span className="text-lg font-black text-indigo-400 font-mono">
+                      {demoNumberVal * demoNumberVal}
+                    </span>
+                    <span className="text-[10px] text-slate-400 block">مساحة المربع الهندسي المنشأ</span>
+                  </div>
+
+                  <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-2xl space-y-1">
+                    <span className="text-[10px] text-slate-400 font-bold block">المعكوس الضربي (1 / X)</span>
+                    <span className="text-lg font-black text-amber-400 font-mono">
+                      {(1 / demoNumberVal).toFixed(3)}
+                    </span>
+                    <span className="text-[10px] text-slate-400 block">كسر اعتيادي منتهي أو دوري</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 3: INSTANT SELF-SCORING QUIZ */}
+            {demoStep === 3 && (
+              <div className="space-y-6 animate-fade-in">
+                <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+                  <div>
+                    <h3 className="text-base font-black text-white flex items-center gap-2">
+                      <CheckCircle2 className="w-5 h-5 text-amber-400" />
+                      <span>كويز التقييم الذاتي والتصحيح اللحظي مع المعلم الذكي</span>
+                    </h3>
+                    <p className="text-xs text-slate-400">انقر على الخيار الصحيح لاختبار مصفوفة التغذية الراجعة الفورية</p>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-4">
+                  <h4 className="text-sm sm:text-base font-black text-white">
+                    أي من الأعداد الآتية يعتبر عدداً غير نسبي (ينتمي إلى المجموعة Q')؟
+                  </h4>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {[
+                      { text: 'الجذر التربيعي للعدد 25 (الناتج = 5)', isCorrect: false },
+                      { text: 'الكسر الاعتيادي 22 / 7', isCorrect: false },
+                      { text: 'الجذر التربيعي للعدد 5 (جذر أصم)', isCorrect: true },
+                      { text: 'الكسر العشري المنتهي 3.5', isCorrect: false }
+                    ].map((opt, oIdx) => {
+                      const isChosen = demoQuizOption === oIdx;
+                      let btnClass = "bg-slate-800/80 hover:bg-slate-800 border-slate-700 text-slate-200";
+                      if (demoQuizAnswered) {
+                        if (opt.isCorrect) btnClass = "bg-emerald-950/80 border-emerald-500 text-emerald-200 ring-2 ring-emerald-500/50";
+                        else if (isChosen) btnClass = "bg-rose-950/80 border-rose-500 text-rose-200 ring-2 ring-rose-500/50";
+                        else btnClass = "bg-slate-900 border-slate-800 text-slate-500 opacity-50";
+                      }
+                      return (
+                        <button
+                          key={oIdx}
+                          onClick={() => {
+                            setDemoQuizOption(oIdx);
+                            setDemoQuizAnswered(true);
+                          }}
+                          className={`p-3 rounded-xl border text-right text-xs font-bold transition flex items-center justify-between cursor-pointer ${btnClass}`}
+                        >
+                          <span>{opt.text}</span>
+                          {demoQuizAnswered && opt.isCorrect && <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />}
+                          {demoQuizAnswered && isChosen && !opt.isCorrect && <XCircle className="w-4 h-4 text-rose-400 shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {demoQuizAnswered && (
+                    <div className="p-3 bg-indigo-950/50 border border-indigo-500/40 rounded-xl text-xs space-y-1 animate-fade-in">
+                      <span className="font-bold text-teal-300 block">💡 التفسير البيداغوجي للمعلم الذكي:</span>
+                      <p className="text-slate-300 leading-relaxed text-[11px]">
+                        الجذر التربيعي للعدد 5 لا يمكن وضعه على صورة كسر اعتيادي بسطه ومقامه أعداد صحيحة ومقامه لا يساوي صفراً، وعشريته غير منتهية وغير دورية، لذلك فهو عدد غير نسبي أصيل.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </section>

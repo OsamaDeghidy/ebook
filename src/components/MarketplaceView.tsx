@@ -638,31 +638,73 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
         </div>
 
         {/* ROW 3: QUICK ATTRIBUTE PILLS + RESULTS COUNT */}
-        <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 scrollbar-none">
-          <div className="flex items-center gap-1.5">
+        <div className="space-y-2 pb-1">
+          {/* Quick Stage Taxonomy Selector (El Maestro Axis 5) */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
             {[
-              { id: 'all', label: 'الكل' },
-              { id: 'free', label: 'المجانية 🆓' },
-              { id: 'paid', label: 'المدفوعة 💎' },
-              { id: 'certified', label: 'معتمد 🛡️' },
-              { id: 'ai_interactive', label: 'تفاعلي بالـ AI ⚡' },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setQuickFilter(tab.id as any)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer shrink-0 ${
-                  quickFilter === tab.id
-                    ? 'bg-slate-900 text-white shadow-xs font-black'
-                    : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-                }`}
-              >
-                <span>{tab.label}</span>
-              </button>
-            ))}
+              { id: 'all', label: 'كافة المراحل 📚' },
+              { id: 'kg', label: 'رياض أطفال 🎨' },
+              { id: 'primary', label: 'ابتدائي 🎒' },
+              { id: 'prep', label: 'إعدادي 📐' },
+              { id: 'sec', label: 'ثانوي 🎓' },
+              { id: 'uni', label: 'جامعي 🏛️' },
+            ].map((stg) => {
+              const isSelected = 
+                (stg.id === 'all' && selectedGradeLevel === 'all') ||
+                (stg.id === 'kg' && selectedGradeLevel === 'رياض الأطفال') ||
+                (stg.id === 'primary' && selectedGradeLevel === 'المرحلة الابتدائية') ||
+                (stg.id === 'prep' && selectedGradeLevel === 'المرحلة الإعدادية') ||
+                (stg.id === 'sec' && selectedGradeLevel === 'المرحلة الثانوية') ||
+                (stg.id === 'uni' && selectedGradeLevel === 'المرحلة الجامعية');
+              return (
+                <button
+                  key={stg.id}
+                  onClick={() => {
+                    if (stg.id === 'all') setSelectedGradeLevel('all');
+                    else if (stg.id === 'kg') setSelectedGradeLevel('رياض الأطفال');
+                    else if (stg.id === 'primary') setSelectedGradeLevel('المرحلة الابتدائية');
+                    else if (stg.id === 'prep') setSelectedGradeLevel('المرحلة الإعدادية');
+                    else if (stg.id === 'sec') setSelectedGradeLevel('المرحلة الثانوية');
+                    else if (stg.id === 'uni') setSelectedGradeLevel('المرحلة الجامعية');
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer shrink-0 ${
+                    isSelected
+                      ? 'bg-indigo-900 text-white shadow-xs font-black ring-2 ring-indigo-500/30'
+                      : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                  }`}
+                >
+                  <span>{stg.label}</span>
+                </button>
+              );
+            })}
           </div>
 
-          <div className="text-[11px] text-slate-500 font-bold whitespace-nowrap shrink-0">
-            المعروض: <strong className="text-teal-700">{filteredBooks.length}</strong> من {books.length}
+          <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 scrollbar-none">
+            <div className="flex items-center gap-1.5">
+              {[
+                { id: 'all', label: 'الكل' },
+                { id: 'free', label: 'المجانية 🆓' },
+                { id: 'paid', label: 'المدفوعة 💎' },
+                { id: 'certified', label: 'معتمد 🛡️' },
+                { id: 'ai_interactive', label: 'تفاعلي بالـ AI ⚡' },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setQuickFilter(tab.id as any)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer shrink-0 ${
+                    quickFilter === tab.id
+                      ? 'bg-slate-900 text-white shadow-xs font-black'
+                      : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="text-[11px] text-slate-500 font-bold whitespace-nowrap shrink-0">
+              المعروض: <strong className="text-teal-700">{filteredBooks.length}</strong> من {books.length}
+            </div>
           </div>
         </div>
       </div>
@@ -792,6 +834,22 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                           )}
                         </div>
                       )}
+
+                      {/* Pedagogical Curriculum Badges (El Maestro Axis 5) */}
+                      <div className="flex flex-wrap items-center gap-1 text-[9px] font-bold pt-1 border-t border-slate-100">
+                        <span className="px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200/60 flex items-center gap-0.5">
+                          <Radio className="w-2.5 h-2.5" />
+                          <span>شرح صوتي شامل</span>
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 border border-teal-200/60 flex items-center gap-0.5">
+                          <Layers className="w-2.5 h-2.5" />
+                          <span>معمل تفاعلي</span>
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200/60 flex items-center gap-0.5">
+                          <CheckCircle2 className="w-2.5 h-2.5" />
+                          <span>بنك أسئلة</span>
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -805,21 +863,21 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 
                         if (!isUnlocked) {
                           return (
-                            <div className="grid grid-cols-2 gap-2" onClick={(e) => e.stopPropagation()}>
+                            <div className="space-y-1.5" onClick={(e) => e.stopPropagation()}>
                               <button
-                                onClick={() => setPurchasingBook(book)}
-                                className="py-2 px-3 bg-amber-500 hover:bg-amber-600 text-white font-black text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-xs transition active:scale-95 cursor-pointer"
+                                onClick={() => onLaunchBook(book)}
+                                className="w-full py-2 px-3 bg-gradient-to-r from-teal-600 to-indigo-600 hover:from-teal-500 hover:to-indigo-500 text-white font-black text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition active:scale-95 cursor-pointer"
                               >
-                                <ShoppingCart className="w-3.5 h-3.5" />
-                                <span>شراء ({book.price} ج.م)</span>
+                                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                                <span>🚀 تجربة الدرس الأول مجاناً</span>
                               </button>
 
                               <button
-                                onClick={() => onLaunchBook(book)}
-                                className="py-2 px-3 bg-gray-50 hover:bg-gray-100 text-gray-800 font-bold text-xs rounded-xl border border-gray-200 flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer"
+                                onClick={() => setPurchasingBook(book)}
+                                className="w-full py-2 px-3 bg-amber-500 hover:bg-amber-600 text-white font-black text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-xs transition active:scale-95 cursor-pointer"
                               >
-                                <Eye className="w-3.5 h-3.5 text-gray-600" />
-                                <span>معاينة مجانية</span>
+                                <ShoppingCart className="w-3.5 h-3.5" />
+                                <span>شراء وتفعيل كامل المقرر ({book.price} ج.م)</span>
                               </button>
                             </div>
                           );
@@ -834,7 +892,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                             className="w-full py-2.5 px-4 bg-teal-600 hover:bg-teal-700 text-white font-black text-xs rounded-xl flex items-center justify-center gap-2 shadow-xs transition active:scale-95 cursor-pointer"
                           >
                             <Play className="w-3.5 h-3.5 fill-current" />
-                            <span>{isPurchased && !isFree ? 'متابعة القراءة 📖' : 'ابدأ القراءة 📖'}</span>
+                            <span>{isPurchased && !isFree ? 'متابعة القراءة والتعلم 📖' : 'ابدأ القراءة والتفاعل 📖'}</span>
                           </button>
                         );
                       })()}

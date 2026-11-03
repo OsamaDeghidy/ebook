@@ -18,7 +18,8 @@ export interface EducationalReelPayload {
 }
 
 /**
- * Builds the Master Prompt for High-Yield Educational Micro-Learning Reels
+ * Builds the Master Prompt for High-Yield Educational Micro-Learning Reels (Pillar 5)
+ * 4-Phase Viral Loop (0-7s Shock Hook, 8-35s Core Deconstruction, 36-50s Exam Trap, 51-60s Interactive Challenge)
  */
 export function buildEducationalReelPrompt(params: {
   bookTitle: string;
@@ -41,34 +42,40 @@ Your role: ${persona.name} (${persona.title}).
 Transform this educational chapter into an ELITE 45-60 second viral educational reel:
 - Book: "${params.bookTitle}"
 - Chapter / Lesson: "${params.chapterTitle}"
-- Content Context:
-${params.chapterContent.substring(0, 3500)}
+- Teacher Persona: "${persona.name}" - Tone: "${persona.profile?.dialogueTone || 'تربوي مشوق ومحفز'}"
+- Content Context (Authentic Textbook Material):
+${params.chapterContent.substring(0, 10000)}
 
-🌟 PEDAGOGICAL REEL RULES:
-1. 🎯 HOOK (0-5s): Start with a curiosity-sparking question or real-life dilemma (e.g., "عمرك سألت نفسك ليه...؟" أو "سؤال في الامتحان بيوقع 80% من الطلاب!").
-2. 💡 CORE INTUITION (5-35s): Explain the concept simply and brilliantly in 3 clear sentences. No fluff, pure insight.
-3. 🚨 EXAM TRICK / GOLDEN TIP (35-45s): Reveal the secret trap or rule that guarantees full marks on this point.
-4. 🎮 INTERACTIVE CHALLENGE (45-60s): End with a rapid-fire quiz question with 3-4 options.
-5. 🎙️ NARRATION SCRIPT:
-   - Provide a smooth, natural spoken script in lively Arabic (Fusha with natural rhythm).
-   - 🚫 NO markdown symbols, emojis, or dashes in the narration script so text-to-speech reads it cleanly.
+🌟 4-PHASE 60-SECOND VIRAL LOOP RULES (إلزامية صارمة):
+1. 🎯 المرحلة الأولى (0 - 7 ثوانٍ) - الخطاف الذهني الصادم (Shock Hook):
+   - سؤال غير مألوف أو مفارقة تثير الفضول فوراً وتصدم المشاهد (مثال: "ليه 90% من الطلاب بيخسروا الدرجة النهائية في النقطة دي بالذات؟" أو "لو شفت السؤال ده في الامتحان هتجاوبه غلط لو ما ركزتش معايا 7 ثواني!").
+2. 💡 المرحلة الثانية (8 - 35 ثانية) - التشريح البيداغوجي العميق (Core Deconstruction):
+   - تفكيك المفهوم الجوهري في 3 جمل محكمة خالية من الحشو. اشرح "السر" والسبب العلمي وليس مجرد سرد نصوص.
+3. 🚨 المرحلة الثالثة (36 - 50 ثانية) - تفجير فخ الامتحان (Exam Trap Cracked):
+   - كشف فخ الامتحانات الأكثر تكراراً، مع القاعدة الذهبية الصارمة للحل السريع المضمون.
+4. 🎮 المرحلة الرابعة (51 - 60 ثانية) - التحدي التفاعلي اللحظي (Interactive Challenge):
+   - سؤال اختبار سريع من متعدد يجيب عليه الطالب فوراً لتثبيت المعلومة.
+
+🎙️ قواعد السرد الصوتي (Narration Script):
+- كتابة النص الصوتي مشكولاً بدقة لضمان النطق العربي الفصيح الخالي من اللحن.
+- 🚫 ممنوع نهائياً كتابة الرموز الرياضية أو النجوم أو الهاشتاجات أو الشرطات أو الإيموجي داخل نص السرد الصوتي (narrationScript) حتى لا تنطقها المحركات الصوتية وتفسد التجربة.
 
 OUTPUT MUST BE VALID JSON ONLY:
 {
-  "title": "عنوان ريل جذاب ومحدد للدرس",
+  "title": "عنوان ريل جذاب وقصير للدرس",
   "topic": "${params.chapterTitle}",
-  "hook": "الخطاف الذهني الافتتاحي في أول 5 ثوانٍ",
-  "explanation": "الشرح التعليمي المركز والمبسط",
-  "examTip": "تريكة الامتحان وسر الدرجة النهائية",
+  "hook": "الخطاف الذهني الصادم في أول 7 ثوانٍ",
+  "explanation": "التشريح العلمي المبسط والمكثف في 25 ثانية",
+  "examTip": "تريكة وفخ الامتحان والحل الذهبي",
   "interactiveChallenge": {
-    "question": "سؤال التحدي التفاعلي السريع للمشاهد؟",
+    "question": "سؤال التحدي التفاعلي السريع؟",
     "options": ["الخيار الأول", "الخيار الثاني", "الخيار الثالث", "الخيار الرابع"],
     "correctIndex": 0,
-    "explanation": "تفسير الإجابة الصحيحة بأسلوب مشجع"
+    "explanation": "تفسير سريع ومقنع للإجابة الصحيحة"
   },
-  "narrationScript": "النص الصوتي الكامل المكتوب للسرد الصوتي بدون رموز أو إيموجي",
-  "visualPrompt": "Detailed visual background description for educational motion graphics",
-  "tags": ["تعليم", "ريلز_تعليمي", "تريكات_امتحانات"]
+  "narrationScript": "النص الصوتي المشكول الكامل الخالي تماما من الرموز والشرطات والإيموجي لضمان نطق صوتي فائق النقاء",
+  "visualPrompt": "Detailed motion graphics and animated textbook slices description",
+  "tags": ["تعليم", "ريلز_المذاكرة", "تريكات_امتحانات"]
 }
 `;
 }

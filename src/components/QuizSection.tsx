@@ -19,6 +19,7 @@ import {
   ChevronLeft,
   Printer,
   ShieldAlert,
+  AlertCircle,
   Flame,
   FileText,
   BookOpen,
@@ -30,6 +31,7 @@ import { QuizQuestion, QuestionType } from '../types';
 import { supabase } from '../lib/supabase';
 import { useLanguage } from '../i18n/LanguageContext';
 import { sanitizeMathText } from '../utils/sanitizeMathText';
+import MathRenderer from './MathRenderer';
 
 export interface StoredExam {
   id: string;
@@ -89,9 +91,16 @@ function getSanitizedOptions(q: QuizQuestion | undefined): string[] {
     // If stripped down to empty or single letter
     if (!clean || /^(أ|ب|ج|د|a|b|c|d)$/i.test(clean)) {
       if (q.explanation && i === q.correctOptionIndex) {
-        return q.explanation.substring(0, 80);
+        const core = q.explanation.replace(/^(التحليل البيداغوجي|نموذج الإجابة|التفسير العلمي)[\:\-]\s*/i, '').trim();
+        return core.split('.')[0] || core.substring(0, 80);
       }
-      return `الصياغة التفصيلية للاختيار (${i + 1}) في ضوء معطيات السؤال`;
+      const contextualDistractors = [
+        'قيمة عددية مغايرة لا تحقق شروط المعادلة',
+        'استنتاج بديل يتناقض مع خواص المسألة الرياضية',
+        'حل تقريبي لا ينتمي لمجموعة التعويض المحددة',
+        'علاقة عكسية لا تطابق القانون الحاكم للمسألة'
+      ];
+      return contextualDistractors[i % contextualDistractors.length];
     }
     return sanitizeMathText(clean);
   });
@@ -922,58 +931,89 @@ export default function QuizSection({
                 return (
                   <div
                     key={qIdx}
-                    className={`p-5 sm:p-6 bg-white border rounded-3xl shadow-2xs transition space-y-4 text-right ${
+                    className={`p-6 sm:p-7 bg-white border-2 rounded-3xl shadow-sm hover:shadow-md transition-all duration-300 space-y-5 text-right relative overflow-hidden ${
                       isAnsweredThis
-                        ? isCorrect ? 'border-emerald-300 ring-1 ring-emerald-500/20' : 'border-rose-300 ring-1 ring-rose-500/20'
-                        : 'border-slate-200 hover:border-slate-300'
+                        ? isCorrect
+                          ? 'border-emerald-400 bg-emerald-50/20 ring-2 ring-emerald-500/20'
+                          : 'border-rose-400 bg-rose-50/20 ring-2 ring-rose-500/20'
+                        : 'border-slate-200 hover:border-indigo-300'
                     }`}
                   >
-                    {/* Header: Question Number & Cognitive Badges */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
-                      <div className="flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-700 font-black text-xs flex items-center justify-center">
+                    {/* Header: Question Number & Modern Difficulty Badges */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3.5">
+                      <div className="flex items-center gap-2.5">
+                        <span className="w-8 h-8 rounded-xl bg-indigo-600 text-white font-black text-xs flex items-center justify-center shadow-xs">
                           {qIdx + 1}
                         </span>
-                        <span className="text-xs font-black text-slate-800">
-                          {q.questionType === 'true_false' ? 'صواب أم خطأ ⚖️' : 'سؤال اختيار من متعدد 🔘'}
-                        </span>
+                        <div>
+                          <span className="text-xs font-black text-slate-900 block">
+                            {q.questionType === 'true_false' ? 'ميزان الصواب والخطأ ⚖️' : 'سؤال اختيار من متعدد 🔘'}
+                          </span>
+                          <span className="text-[10px] text-slate-500 font-bold">
+                            {q.points || 2} درجات معتمدة
+                          </span>
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-2">
+                        {/* Cognitive Level */}
                         {q.cognitiveLevel && (
-                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
+                          <span className="px-3 py-1 rounded-xl text-[11px] font-black bg-slate-100 text-slate-700 border border-slate-200">
                             {q.cognitiveLevel}
                           </span>
                         )}
-                        {q.difficulty && (
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                            q.difficulty === 'hard' ? 'bg-rose-50 text-rose-700' : q.difficulty === 'medium' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'
-                          }`}>
-                            {q.difficulty === 'hard' ? 'متقدم 🔥' : q.difficulty === 'medium' ? 'متوسط ⚡' : 'أساسي 🟢'}
-                          </span>
-                        )}
+                        {/* Difficulty Level with Dynamic Theme */}
+                        {(() => {
+                          const isTrap = (q.difficulty as string) === 'hard' || (q.difficulty as string) === 'exam_trap' || /فخ|صعب|متقدم/i.test(q.difficulty || '');
+                          const isAnalytical = q.difficulty === 'medium' || /متوسط|تحليل/i.test(q.difficulty || '');
+                          if (isTrap) {
+                            return (
+                              <span className="px-3 py-1 rounded-xl text-[11px] font-black bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-1 shadow-xs">
+                                <span>🔥 فخ امتحانات</span>
+                              </span>
+                            );
+                          }
+                          if (isAnalytical) {
+                            return (
+                              <span className="px-3 py-1 rounded-xl text-[11px] font-black bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1 shadow-xs">
+                                <span>⚡ استنتاجي تحليلي</span>
+                              </span>
+                            );
+                          }
+                          return (
+                            <span className="px-3 py-1 rounded-xl text-[11px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1 shadow-xs">
+                              <span>🟢 مستوى تأسيسي</span>
+                            </span>
+                          );
+                        })()}
                       </div>
                     </div>
 
                     {/* Question Text */}
-                    <h4 className="text-sm sm:text-base font-black text-slate-900 leading-snug">
-                      {q.question}
+                    <h4 className="text-base sm:text-lg font-black text-slate-900 leading-relaxed font-sans">
+                      <MathRenderer text={q.question} />
                     </h4>
 
-                    {/* Options */}
-                    <div className="space-y-2 pt-1">
+                    {/* Modern Assessment Options with Letter Badges */}
+                    <div className="space-y-2.5 pt-1">
                       {options.map((opt, optIdx) => {
                         const isSelected = userAnswer === optIdx;
                         const isThisCorrect = optIdx === q.correctOptionIndex;
+                        const optionLetters = ['أ', 'ب', 'ج', 'د', 'هـ'];
 
-                        let optClass = "bg-slate-50 border-slate-200 text-slate-800 hover:bg-slate-100";
+                        let optClass = "bg-slate-50/80 hover:bg-indigo-50/50 border-slate-200 text-slate-800 hover:border-indigo-300 hover:translate-x-[-2px]";
+                        let badgeClass = "bg-white border-slate-300 text-slate-600";
+
                         if (isAnsweredThis) {
                           if (isThisCorrect) {
-                            optClass = "bg-emerald-50 border-emerald-500 text-emerald-950 font-black ring-1 ring-emerald-500/30";
+                            optClass = "bg-emerald-50 border-emerald-500 text-emerald-950 font-black ring-2 ring-emerald-500/30 shadow-xs";
+                            badgeClass = "bg-emerald-600 text-white border-emerald-600";
                           } else if (isSelected) {
-                            optClass = "bg-rose-50 border-rose-500 text-rose-950 font-black";
+                            optClass = "bg-rose-50 border-rose-500 text-rose-950 font-black ring-2 ring-rose-500/30 shadow-xs";
+                            badgeClass = "bg-rose-600 text-white border-rose-600";
                           } else {
-                            optClass = "bg-slate-50 border-slate-200 text-slate-400 opacity-60";
+                            optClass = "bg-slate-50 border-slate-200 text-slate-400 opacity-50";
+                            badgeClass = "bg-slate-200 text-slate-400 border-slate-200";
                           }
                         }
 
@@ -987,33 +1027,65 @@ export default function QuizSection({
                                 setScore(s => s + 1);
                               }
                             }}
-                            className={`w-full p-3.5 rounded-2xl border text-right text-xs sm:text-sm font-bold transition flex items-center justify-between cursor-pointer ${optClass}`}
+                            className={`w-full p-4 rounded-2xl border-2 text-right text-xs sm:text-sm font-bold transition-all duration-200 flex items-center justify-between gap-3 cursor-pointer active:scale-[0.99] ${optClass}`}
                           >
-                            <span>{opt}</span>
-                            {isAnsweredThis && isThisCorrect && <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />}
-                            {isAnsweredThis && isSelected && !isThisCorrect && <XCircle className="w-4 h-4 text-rose-600 shrink-0" />}
+                            <div className="flex items-center gap-3">
+                              <span className={`w-7 h-7 rounded-xl border flex items-center justify-center text-xs font-black shrink-0 transition-colors ${badgeClass}`}>
+                                {optionLetters[optIdx] || optIdx + 1}
+                              </span>
+                              <span className="leading-relaxed">
+                                <MathRenderer text={opt} />
+                              </span>
+                            </div>
+
+                            {isAnsweredThis && isThisCorrect && (
+                              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                            )}
+                            {isAnsweredThis && isSelected && !isThisCorrect && (
+                              <XCircle className="w-5 h-5 text-rose-600 shrink-0" />
+                            )}
                           </button>
                         );
                       })}
                     </div>
 
-                    {/* AI Feedback & Explanation */}
+                    {/* AI Feedback & High-Order Explanation */}
                     {isAnsweredThis && (
-                      <div className="pt-2 space-y-2 animate-fade-in">
-                        <div className={`p-3.5 rounded-2xl text-xs space-y-1.5 border ${
-                          isCorrect ? 'bg-emerald-50/80 border-emerald-200 text-emerald-950' : 'bg-rose-50/80 border-rose-200 text-rose-950'
+                      <div className="pt-2 space-y-3 animate-fade-in">
+                        <div className={`p-5 rounded-2xl text-xs space-y-3 border-2 shadow-xs ${
+                          isCorrect 
+                            ? 'bg-emerald-50/90 border-emerald-300 text-emerald-950' 
+                            : 'bg-rose-50/90 border-rose-400 text-rose-950 ring-2 ring-rose-500/20'
                         }`}>
-                          <div className="flex items-center gap-1.5 font-black">
+                          <div className="flex items-center gap-2 font-black text-sm">
                             {isCorrect ? (
-                              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
                             ) : (
-                              <XCircle className="w-4 h-4 text-rose-600" />
+                              <XCircle className="w-5 h-5 text-rose-600 shrink-0" />
                             )}
-                            <span>{isCorrect ? 'إجابة نموذجية وصحيحة!' : 'إجابة غير صحيحة، راجع التوضيح التالي:'}</span>
+                            <span className="text-sm font-black">
+                              {isCorrect ? 'إجابة نموذجية دقيقة! 🎯 درجة كاملة' : 'إجابة غير صحيحة - وقعت في فخ هذا السؤال! ⚠️'}
+                            </span>
                           </div>
-                          <p className="font-medium leading-relaxed">
-                            💡 <strong>تفسير الذكاء الاصطناعي:</strong> {q.explanation || 'تم تأكيد الإجابة الصحيحة وفقاً لما ورد في محتوى هذا الفصل.'}
-                          </p>
+
+                          {!isCorrect && (
+                            <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-300/80 text-rose-950 font-bold space-y-1 shadow-xs">
+                              <div className="flex items-center gap-1.5 text-xs text-rose-700 font-black">
+                                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                                <span>فخ الامتحان المرصود 🚨:</span>
+                              </div>
+                              <p className="text-xs leading-relaxed">
+                                <MathRenderer text={q.trapWarning || 'تنبيه امتحاني: احذر من التعميم المتسرع أو استبدال المتغيرات دون التأكد من تحقق الشروط الرياضية والقانونية الحاكمة أولاً!'} />
+                              </p>
+                            </div>
+                          )}
+
+                          <div className="pt-1 space-y-1 text-slate-800">
+                            <span className="block font-black text-slate-900 text-xs">💡 التحليل البيداغوجي والتعليل النموذجي:</span>
+                            <p className="font-medium leading-relaxed text-xs sm:text-sm">
+                              <MathRenderer text={q.explanation || 'تم تأكيد الإجابة الصحيحة وتفكيك المشتتات الامتحانية وفقاً لنواتج تعلم هذا الفصل.'} />
+                            </p>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -1131,7 +1203,7 @@ export default function QuizSection({
             </div>
 
             <h4 className="text-lg font-black text-gray-900 leading-snug font-sans">
-              {currentQuestion.question}
+              <MathRenderer text={currentQuestion.question} />
             </h4>
 
             <div className="space-y-3">
@@ -1147,7 +1219,9 @@ export default function QuizSection({
                         : 'bg-gray-50 border-gray-200 text-gray-800 hover:bg-gray-100'
                     }`}
                   >
-                    <span>{option}</span>
+                    <span>
+                      <MathRenderer text={option} />
+                    </span>
                     <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${isSelected ? 'border-indigo-600 bg-indigo-600' : 'border-gray-300'}`}>
                       {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                     </div>

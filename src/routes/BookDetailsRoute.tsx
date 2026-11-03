@@ -381,7 +381,7 @@ export default function BookDetailsRoute({
 
   const book = books.find(b => b.id === id);
   const [activeChapterId, setActiveChapterId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'read' | 'mindmap' | 'practice' | 'videos' | 'editor'>(() => {
+  const [activeTab, setActiveTab] = useState<'read' | 'mindmap' | 'practice' | 'videos' | 'teacher_sos' | 'editor'>(() => {
     if (initialTab === 'quiz' || initialTab === 'flashcards' || initialTab === 'sandbox' || initialTab === 'practice') return 'practice';
     if (initialTab === 'reels' || initialTab === 'videos') return 'videos';
     if (initialTab === 'interactive_curriculum' || initialTab === 'interactive_lesson') return 'mindmap';
@@ -722,7 +722,7 @@ export default function BookDetailsRoute({
       const res = await fetch(`/api/ebooks/${book.id}/expand-chapters`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ additionalCount: 5 })
+        body: JSON.stringify({ additionalCount: 1 })
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -731,10 +731,13 @@ export default function BookDetailsRoute({
       const data = await res.json();
       if (data.newChapters && data.newChapters.length > 0) {
         const updatedChapters = [...(book.chapters || []), ...data.newChapters];
-        setEbooks(prev => prev.map(b => b.id === book.id ? { ...b, chapters: updatedChapters } : b));
+        setEbooks(prev => prev.map(b => b.id === book.id ? { ...b, chapters: updatedChapters, blueprint: data.book?.blueprint || (b as any).blueprint } as any : b));
         try {
           await supabase.from('books').update({ chapters: updatedChapters }).eq('id', book.id);
         } catch (e) {}
+        showToast(`تم استكمال وتوليد فصل تعليمي جديد بنجاح!`, 'success');
+      } else {
+        showToast(data.message || 'تم استعراض جميع فصول المستند المتاحة بنجاح.', 'info');
       }
     } catch (err: any) {
       showToast('حدث خطأ أثناء استكمال الفصول: ' + err.message, 'error');
@@ -1068,7 +1071,7 @@ export default function BookDetailsRoute({
         </div>
       )}
 
-      {/* 🧭 STICKY 5-CORE TABS BAR */}
+      {/* 🧭 STREAMLINED SOVEREIGN 4-CORE TABS BAR */}
       <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-2xl p-2 shadow-xs">
         <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none pb-0.5">
           {/* TAB 1: READ */}
@@ -1093,18 +1096,7 @@ export default function BookDetailsRoute({
             <span>شرح وخريطة المنهج 🗺️</span>
           </button>
 
-          {/* TAB 3: PRACTICE & ASSESSMENT */}
-          <button
-            onClick={() => setActiveTab('practice')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
-              activeTab === 'practice' ? 'bg-indigo-600 text-white font-black shadow-xs' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <HelpCircle className="w-3.5 h-3.5" />
-            <span>التقييم والمذاكرة 📝</span>
-          </button>
-
-          {/* TAB 4: VIDEOS */}
+          {/* TAB 3: VIDEOS */}
           <button
             onClick={() => setActiveTab('videos')}
             className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
@@ -1113,6 +1105,28 @@ export default function BookDetailsRoute({
           >
             <Film className="w-3.5 h-3.5" />
             <span>الفيديوهات 🎬</span>
+          </button>
+
+          {/* TAB 4: TEACHER DIRECT SOS HELPDESK */}
+          <button
+            onClick={() => setActiveTab('teacher_sos')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
+              activeTab === 'teacher_sos' ? 'bg-rose-600 text-white font-black shadow-xs' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <HelpCircle className="w-3.5 h-3.5" />
+            <span>استفسار المعلم (SOS) 🙋‍♂️</span>
+          </button>
+
+          {/* TAB 5: PRACTICE & ASSESSMENT */}
+          <button
+            onClick={() => setActiveTab('practice')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
+              activeTab === 'practice' ? 'bg-indigo-600 text-white font-black shadow-xs' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <HelpCircle className="w-3.5 h-3.5" />
+            <span>التقييم والمذاكرة 📝</span>
           </button>
 
           {/* TAB 6: TEACHER CONTENT EDITOR (Only visible in Teacher Edit Mode) */}
@@ -1455,9 +1469,23 @@ export default function BookDetailsRoute({
                 isInstructorOrAdmin={isInstructorOrAdmin}
                 isEditMode={isTeacherEditMode}
                 onSaveChapter={handleSaveChapter}
+                initialTab="interleaved"
               />
             </div>
           </ScreenShieldGuard>
+        )}
+
+        {/* 🙋‍♂️ TAB 3: TEACHER DIRECT SOS HELPDESK */}
+        {activeTab === 'teacher_sos' && activeChapter && (
+          <div className="relative w-full">
+            <ReadSection
+              chapter={activeChapter}
+              isInstructorOrAdmin={isInstructorOrAdmin}
+              isEditMode={isTeacherEditMode}
+              onSaveChapter={handleSaveChapter}
+              initialTab="teacher_sos"
+            />
+          </div>
         )}
 
         {/* 🚀 FULL CURRICULUM CONNECTED EXPLANATION & MIND MAP */}
@@ -1631,11 +1659,11 @@ export default function BookDetailsRoute({
                             className="px-3 py-2 bg-indigo-50/80 border border-indigo-200 rounded-xl text-xs font-black text-indigo-900 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                             title="اختيار صوت المعلق الصوتي بالذكاء الاصطناعي"
                           >
-                            <option value="ar-XA-Chirp3-HD-Fenrir">🌟 صوت كريم (طبيعي / هادئ) 🎙️</option>
-                            <option value="ar-XA-Chirp3-HD-Aoede">🌟 صوت فرح (واضح / تعليمي) 🎙️</option>
-                            <option value="ar-XA-Chirp3-HD-Puck">🌟 بوك (Google Chirp 3 HD - حماسي وتفاعلي)</option>
-                            <option value="ar-XA-Chirp3-HD-Kore">🌟 كوري (Google Chirp 3 HD - معلمة واضحة)</option>
-                            <option value="ar-XA-Chirp3-HD-Charon">🌟 شارون (Google Chirp 3 HD - أستاذ رزين)</option>
+                            <option value="ar-XA-Chirp3-HD-Fenrir">🌟 صوت كريم (طبيعي وواضح) 🎙️</option>
+                            <option value="ar-XA-Chirp3-HD-Aoede">🌟 صوت فرح (تعليمي وهادئ) 🎙️</option>
+                            <option value="ar-XA-Chirp3-HD-Puck">🌟 صوت أحمد (حماسي وتفاعلي)</option>
+                            <option value="ar-XA-Chirp3-HD-Kore">🌟 صوت سارة (شرح مبسط)</option>
+                            <option value="ar-XA-Chirp3-HD-Charon">🌟 صوت أستاذ محمود (وقور ورزين)</option>
                             <option value="ar-SA-HamedNeural">🎙️ 🇸🇦 حامد (سعودي فخم)</option>
                             <option value="ar-EG-ShakirNeural">🎙️ 🇪🇬 شاكر (مصري دافئ)</option>
                             <option value="ar-JO-TaimNeural">🎙️ 🇯🇴 تيم (أردني شبابي)</option>
@@ -1739,11 +1767,11 @@ export default function BookDetailsRoute({
                             onChange={(e) => setSelectedVoice(e.target.value)}
                             className="w-full p-3 bg-white/10 border border-white/20 rounded-2xl text-xs font-bold text-white outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer"
                           >
-                            <option value="ar-XA-Chirp3-HD-Fenrir" className="bg-slate-900 text-white">🌟 صوت كريم (طبيعي / هادئ) 🎙️</option>
-                            <option value="ar-XA-Chirp3-HD-Aoede" className="bg-slate-900 text-white">🌟 صوت فرح (واضح / تعليمي) 🎙️</option>
-                            <option value="ar-XA-Chirp3-HD-Puck" className="bg-slate-900 text-white">🌟 بوك (Google Chirp 3 HD - حماسي وتفاعلي)</option>
-                            <option value="ar-XA-Chirp3-HD-Kore" className="bg-slate-900 text-white">🌟 كوري (Google Chirp 3 HD - معلمة واضحة)</option>
-                            <option value="ar-XA-Chirp3-HD-Charon" className="bg-slate-900 text-white">🌟 شارون (Google Chirp 3 HD - أستاذ رزين)</option>
+                            <option value="ar-XA-Chirp3-HD-Fenrir" className="bg-slate-900 text-white">🌟 صوت كريم (طبيعي وواضح) 🎙️</option>
+                            <option value="ar-XA-Chirp3-HD-Aoede" className="bg-slate-900 text-white">🌟 صوت فرح (تعليمي وهادئ) 🎙️</option>
+                            <option value="ar-XA-Chirp3-HD-Puck" className="bg-slate-900 text-white">🌟 صوت أحمد (حماسي وتفاعلي)</option>
+                            <option value="ar-XA-Chirp3-HD-Kore" className="bg-slate-900 text-white">🌟 صوت سارة (شرح مبسط)</option>
+                            <option value="ar-XA-Chirp3-HD-Charon" className="bg-slate-900 text-white">🌟 صوت أستاذ محمود (وقور ورزين)</option>
                             <option value="ar-SA-HamedNeural" className="bg-slate-900 text-white">🇸🇦 حامد (سعودي فخم ووقور)</option>
                             <option value="ar-EG-ShakirNeural" className="bg-slate-900 text-white">🇪🇬 شاكر (مصري دافئ ومفصل)</option>
                             <option value="ar-JO-TaimNeural" className="bg-slate-900 text-white">🇯🇴 تيم (أردني شبابي وحماسي)</option>

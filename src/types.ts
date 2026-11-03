@@ -60,6 +60,7 @@ export interface QuizQuestion {
   difficulty?: 'easy' | 'medium' | 'hard';
   topicTag?: string;
   cognitiveLevel?: string; // Bloom's Taxonomy: تذكر | فهم واستيعاب | تطبيق وحل مسائل | تحليل واستنتاج
+  trapWarning?: string; // High-order exam trap and misconception warning
   points?: number;
 }
 
@@ -328,3 +329,88 @@ export interface EduReel {
   is_public_teaser?: boolean;
   created_at?: string;
 }
+
+export interface StudentTelemetryPayload {
+  studentId: string;
+  studentName?: string;
+  studentEmail?: string;
+  bookId: string;
+  bookTitle?: string;
+  chapterId: string;
+  chapterTitle?: string;
+  activeReadingSeconds: number;
+  audioListenPercentage: number;
+  quizScore?: number;
+  quizAttempts?: {
+    questionIndex: number;
+    selectedOption: number;
+    isCorrect: boolean;
+    trapTriggered?: boolean;
+  }[];
+  isCompleted?: boolean;
+  timestamp?: string;
+}
+
+export interface TeacherTicket {
+  id: string;
+  bookId: string;
+  bookTitle: string;
+  chapterId: string;
+  chapterTitle: string;
+  studentId: string;
+  studentName: string;
+  studentEmail?: string;
+  selectedSnippet?: string;
+  questionText: string;
+  status: 'pending' | 'answered';
+  teacherAnswer?: string;
+  teacherAudioUrl?: string;
+  createdAt: string;
+  answeredAt?: string;
+}
+
+export interface InstructorCockpitAnalytics {
+  totalLearners: number;
+  activeLearnersCount: number;
+  avgReadingMinutes: number;
+  avgAudioListenPercent: number;
+  studentsAtRisk: {
+    studentId: string;
+    studentName: string;
+    bookTitle: string;
+    avgScore: number;
+    lastActive: string;
+    riskFactor: string;
+  }[];
+  curriculumBottlenecks: {
+    chapterTitle: string;
+    questionIndex: number;
+    failRate: number;
+    trapDescription: string;
+  }[];
+  studentLogs: {
+    studentId: string;
+    studentName: string;
+    bookTitle: string;
+    totalMinutes: number;
+    chaptersCompleted: number;
+    quizAccuracy: number;
+    lastActive: string;
+  }[];
+}
+
+export interface InstructorWallet {
+  totalEarnings: number;
+  availableBalance: number;
+  pendingPayouts: number;
+  platformFeePercent: number;
+  transactions: {
+    id: string;
+    amount: number;
+    type: 'sale' | 'payout' | 'fee';
+    description: string;
+    date: string;
+    status: 'completed' | 'pending' | 'rejected';
+  }[];
+}
+

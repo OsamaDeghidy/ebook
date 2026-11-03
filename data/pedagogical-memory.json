@@ -1,0 +1,33 @@
+[
+  {
+    "id": "rule-seed-math-01",
+    "subject": "رياضيات",
+    "mistake_pattern": "Using raw 'eq 0' instead of KaTeX '\\neq 0' or writing math in reversed RTL direction",
+    "correction_rule": "Write non-equality strictly as KaTeX '\\neq 0' inside isolated $...$ delimiters. Never mix Arabic conjunctions inside math strings.",
+    "failure_rate": 0.45,
+    "context_type": "math",
+    "active": true,
+    "created_at": "2026-11-03T14:23:01.456Z"
+  },
+  {
+    "id": "rule-seed-math-02",
+    "subject": "رياضيات",
+    "mistake_pattern": "Generating multiple-choice options with placeholder text like 'الصياغة التفصيلية للاختيار'",
+    "correction_rule": "Every quiz option must contain authentic, solved mathematical expressions or distinct conceptual choices. Never output placeholder option titles.",
+    "failure_rate": 0.6,
+    "context_type": "quiz",
+    "active": true,
+    "created_at": "2026-11-03T14:23:01.456Z"
+  },
+  {
+    "id": "rule-seed-kg-01",
+    "subject": "رياض أطفال",
+    "grade_level": "kg2",
+    "mistake_pattern": "Condensing early childhood books into abstract adult text without phonics or letter activities",
+    "correction_rule": "Structure every KG lesson around letter recognition, phonics (fat-ha, damma, kasra, sukoon), listening stories, and interactive visual games.",
+    "failure_rate": 0.5,
+    "context_type": "kg",
+    "active": true,
+    "created_at": "2026-11-03T14:23:01.456Z"
+  }
+]

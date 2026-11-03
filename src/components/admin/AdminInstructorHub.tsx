@@ -5,9 +5,10 @@ import {
   Eye, EyeOff, Edit, Trash2, Plus, Lock, Check, Layers, AlertCircle, HelpCircle, Search, Filter,
   Calendar, CreditCard, ChevronDown, CheckSquare, Zap, Smartphone, QrCode, CheckCheck, Wallet,
   RotateCcw, Send, CheckCircle, XCircle, Info, DollarSign, ArrowUpRight, ArrowDownLeft, ShieldCheck,
-  Building2, MessageSquare, Play, Film, Video, Sliders, Globe
+  Building2, MessageSquare, Play, Film, Video, Sliders, Globe, AlertTriangle, Radio, Mic, MessageCircle
 } from 'lucide-react';
-import { MarketplaceBook, UserRole, EduReel, EduReelStyle } from '../../types';
+import { MarketplaceBook, UserRole, EduReel, EduReelStyle, InstructorCockpitAnalytics, TeacherTicket, InstructorWallet } from '../../types';
+import MathRenderer from '../MathRenderer';
 import { supabase } from '../../lib/supabase';
 import { EduReelPlayer } from '../reels/EduReelPlayer';
 import { PlatformSettingsTab } from './PlatformSettingsTab';
@@ -40,8 +41,32 @@ export const AdminInstructorHub: React.FC<AdminInstructorHubProps> = ({
   onOpenCreateModal,
   onOpenExternalModal
 }) => {
-  const [activeTab, setActiveTab] = useState<'analytics' | 'users' | 'support' | 'exams' | 'vouchers' | 'approvals' | 'wallet' | 'reels' | 'settings'>('analytics');
+  const [activeTab, setActiveTab] = useState<'analytics' | 'learning_radar' | 'teacher_sos' | 'users' | 'support' | 'exams' | 'vouchers' | 'approvals' | 'wallet' | 'reels' | 'settings'>('analytics');
   const [booksList, setBooksList] = useState<MarketplaceBook[]>(initialBooks);
+
+  // ==========================================
+  // 🎯 COCKPIT ANALYTICS & LEARNING RADAR STATE
+  // ==========================================
+  const [cockpitData, setCockpitData] = useState<InstructorCockpitAnalytics | null>(null);
+  const [isLoadingCockpit, setIsLoadingCockpit] = useState(false);
+
+  // ==========================================
+  // 🙋‍♂️ TEACHER SOS HELPDESK TICKETS STATE
+  // ==========================================
+  const [sosTickets, setSosTickets] = useState<TeacherTicket[]>([]);
+  const [ticketFilter, setTicketFilter] = useState<'all' | 'pending' | 'answered'>('pending');
+  const [replyTextMap, setReplyTextMap] = useState<Record<string, string>>({});
+  const [replyAudioMap, setReplyAudioMap] = useState<Record<string, string>>({});
+  const [isSubmittingReply, setIsSubmittingReply] = useState<Record<string, boolean>>({});
+
+  // ==========================================
+  // 💰 HARDENED INSTRUCTOR WALLET & PAYOUTS STATE
+  // ==========================================
+  const [instructorWallet, setInstructorWallet] = useState<InstructorWallet | null>(null);
+  const [payoutAmount, setPayoutAmount] = useState<number>(500);
+  const [payoutMethod, setPayoutMethod] = useState<'vodafone_cash' | 'instapay' | 'bank_transfer'>('vodafone_cash');
+  const [payoutAccount, setPayoutAccount] = useState('');
+  const [isRequestingPayout, setIsRequestingPayout] = useState(false);
 
 
   useEffect(() => {
@@ -104,7 +129,108 @@ export const AdminInstructorHub: React.FC<AdminInstructorHubProps> = ({
 
   useEffect(() => {
     reloadWalletAndData();
+    loadCockpitAndTickets();
   }, [currentUser]);
+
+  const loadCockpitAndTickets = async () => {
+    try {
+      setIsLoadingCockpit(true);
+      const instructorId = currentUser?.id || 'inst-1';
+      const [resCockpit, resTickets, resWallet] = await Promise.all([
+        fetch(`/api/instructor/analytics?instructorId=${encodeURIComponent(instructorId)}`),
+        fetch(`/api/helpdesk/tickets?instructorId=${encodeURIComponent(instructorId)}`),
+        fetch(`/api/instructor/wallet?instructorId=${encodeURIComponent(instructorId)}`)
+      ]);
+
+      if (resCockpit.ok) {
+        const cData = await resCockpit.json();
+        setCockpitData(cData);
+      }
+      if (resTickets.ok) {
+        const tData = await resTickets.json();
+        setSosTickets(tData.tickets || []);
+      }
+      if (resWallet.ok) {
+        const wData = await resWallet.json();
+        setInstructorWallet(wData);
+      }
+    } catch (e) {
+      console.warn('Error loading cockpit/tickets:', e);
+    } finally {
+      setIsLoadingCockpit(false);
+    }
+  };
+
+  const handleSendTicketReply = async (ticketId: string) => {
+    const text = (replyTextMap[ticketId] || '').trim();
+    const audio = (replyAudioMap[ticketId] || '').trim();
+    if (!text && !audio) {
+      alert('يرجى كتابة نص الإجابة أو رابط الملاحظة الصوتية');
+      return;
+    }
+    setIsSubmittingReply(prev => ({ ...prev, [ticketId]: true }));
+    try {
+      const res = await fetch('/api/helpdesk/reply-ticket', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ticketId,
+          teacherAnswer: text,
+          teacherAudioUrl: audio || undefined
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSosTickets(prev => prev.map(t => t.id === ticketId ? data.ticket : t));
+        setStatusMsg('تم إرسال الرد النموذجي للطالب بنجاح! 🎉');
+        setTimeout(() => setStatusMsg(null), 4000);
+      } else {
+        alert('حدث خطأ أثناء إرسال الرد');
+      }
+    } catch (e) {
+      alert('تعذر الاتصال بالخادم لإرسال الرد');
+    } finally {
+      setIsSubmittingReply(prev => ({ ...prev, [ticketId]: false }));
+    }
+  };
+
+  const handleRequestPayout = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!payoutAccount.trim()) {
+      alert('يرجى إدخال رقم المحفظة أو الحساب');
+      return;
+    }
+    const available = instructorWallet?.availableBalance || walletBalance || 0;
+    if (payoutAmount > available) {
+      alert(`الرصيد المتاح للسحب هو ${available} ج.م فقط`);
+      return;
+    }
+    setIsRequestingPayout(true);
+    try {
+      const res = await fetch('/api/instructor/payout-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          instructorId: currentUser?.id || 'inst-1',
+          amount: payoutAmount,
+          method: payoutMethod,
+          accountDetails: payoutAccount
+        })
+      });
+      if (res.ok) {
+        setStatusMsg('تم تقديم طلب السحب بنجاح بنسبة استحقاق 85% وسيتم التحويل خلال دقائق! 🚀');
+        setTimeout(() => setStatusMsg(null), 5000);
+        loadCockpitAndTickets();
+      } else {
+        const err = await res.json();
+        alert(err.error || 'فشل تقديم طلب السحب');
+      }
+    } catch (e) {
+      alert('تعذر تقديم طلب السحب');
+    } finally {
+      setIsRequestingPayout(false);
+    }
+  };
 
   // ==========================================
   // 🖨️ SCALABLE CUSTOM EXAM BUILDER STATE
@@ -967,6 +1093,40 @@ export const AdminInstructorHub: React.FC<AdminInstructorHubProps> = ({
           </button>
 
           <button
+            onClick={() => setActiveTab('learning_radar')}
+            className={`px-3.5 py-2.5 rounded-xl transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
+              activeTab === 'learning_radar'
+                ? 'bg-white text-indigo-900 shadow-sm font-black'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Radio className="w-4 h-4 text-indigo-600 animate-pulse" />
+            <span>🎯 رادار التعلم وكشف التعثر</span>
+            {cockpitData?.studentsAtRisk && cockpitData.studentsAtRisk.length > 0 && (
+              <span className="px-1.5 py-0.2 bg-rose-500 text-white rounded-full text-[10px] font-black">
+                {cockpitData.studentsAtRisk.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('teacher_sos')}
+            className={`px-3.5 py-2.5 rounded-xl transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
+              activeTab === 'teacher_sos'
+                ? 'bg-white text-rose-900 shadow-sm font-black'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <HelpCircle className="w-4 h-4 text-rose-600" />
+            <span>🙋‍♂️ استفسارات الطلاب (SOS)</span>
+            {sosTickets.filter(t => t.status === 'pending').length > 0 && (
+              <span className="px-1.5 py-0.2 bg-rose-500 text-white rounded-full text-[10px] font-black animate-bounce">
+                {sosTickets.filter(t => t.status === 'pending').length}
+              </span>
+            )}
+          </button>
+
+          <button
             onClick={() => setActiveTab('approvals')}
             className={`px-3.5 py-2.5 rounded-xl transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
               activeTab === 'approvals'
@@ -1161,6 +1321,428 @@ export const AdminInstructorHub: React.FC<AdminInstructorHubProps> = ({
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 🎯 TAB: LEARNING RADAR & STUDENTS AT RISK (EL MAESTRO AXIS 2) */}
+      {/* ========================================================================= */}
+      {activeTab === 'learning_radar' && (
+        <div className="space-y-6 animate-fade-in">
+          {/* Header Bar */}
+          <div className="p-6 bg-gradient-to-r from-indigo-950 via-slate-900 to-slate-900 text-white rounded-3xl border border-indigo-500/30 shadow-lg space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center font-black text-2xl border border-indigo-500/40">
+                  <Radio className="w-6 h-6 text-indigo-400 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="font-black text-lg text-white">رادار التعلم البيداغوجي وكشف تعثر الطلاب</h3>
+                  <p className="text-xs text-indigo-200/80">مراقبة فورية للوقت الفعلي الصافي للقراءة، استماع الشرح الصوتي، ونقاط الاختناق المعرفية</p>
+                </div>
+              </div>
+
+              <button
+                onClick={loadCockpitAndTickets}
+                disabled={isLoadingCockpit}
+                className="px-4 py-2 bg-indigo-600/80 hover:bg-indigo-600 text-white font-bold text-xs rounded-xl border border-indigo-400/30 flex items-center gap-1.5 transition active:scale-95 cursor-pointer shrink-0"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isLoadingCockpit ? 'animate-spin' : ''}`} />
+                <span>تحديث الرادار</span>
+              </button>
+            </div>
+
+            {/* Live KPI Grid */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
+              <div className="p-4 bg-white/5 rounded-2xl border border-white/10 space-y-1">
+                <div className="text-[11px] font-bold text-indigo-300">إجمالي المتعلمين</div>
+                <div className="text-2xl font-black text-white">{cockpitData?.totalLearners || 0}</div>
+                <div className="text-[10px] text-slate-400">طالب مسجل في مذكراتك</div>
+              </div>
+
+              <div className="p-4 bg-white/5 rounded-2xl border border-white/10 space-y-1">
+                <div className="text-[11px] font-bold text-teal-300">الطلاب النشطين (آخر 48 س)</div>
+                <div className="text-2xl font-black text-teal-400">{cockpitData?.activeLearnersCount || 0}</div>
+                <div className="text-[10px] text-slate-400">تفاعل وقراءة حية مستمرة</div>
+              </div>
+
+              <div className="p-4 bg-white/5 rounded-2xl border border-white/10 space-y-1">
+                <div className="text-[11px] font-bold text-amber-300">متوسط دقائق القراءة الفعالة</div>
+                <div className="text-2xl font-black text-amber-400 font-mono">
+                  {cockpitData?.avgReadingMinutes || 0} <span className="text-xs font-sans text-slate-300">دقيقة</span>
+                </div>
+                <div className="text-[10px] text-slate-400">بعد استبعاد فترات الخمول</div>
+              </div>
+
+              <div className="p-4 bg-white/5 rounded-2xl border border-white/10 space-y-1">
+                <div className="text-[11px] font-bold text-purple-300">نسبة الاستماع الصوتي الحي</div>
+                <div className="text-2xl font-black text-purple-400 font-mono">
+                  {cockpitData?.avgAudioListenPercent || 0}%
+                </div>
+                <div className="text-[10px] text-slate-400">إتمام شروح الدروس والمصائد</div>
+              </div>
+            </div>
+          </div>
+
+          {/* TWO MAIN COLUMNS: AT RISK QUEUE + CURRICULUM BOTTLENECKS */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            {/* 1. STUDENTS AT RISK QUEUE (7 Cols) */}
+            <div className="lg:col-span-7 bg-white border border-gray-200 rounded-3xl p-6 shadow-sm space-y-5">
+              <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-black">
+                    <AlertTriangle className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="font-black text-sm text-slate-900">🚨 الطلاب المعرضين للتعثر (Students at Risk)</h4>
+                    <p className="text-[11px] text-slate-500">تم رصدهم استباقياً لتدني درجات الاختبار أو انقطاع النشاط التعليمي</p>
+                  </div>
+                </div>
+                <span className="px-2.5 py-1 bg-rose-100 text-rose-800 rounded-full text-xs font-black">
+                  {cockpitData?.studentsAtRisk?.length || 0} حالات
+                </span>
+              </div>
+
+              {!cockpitData?.studentsAtRisk || cockpitData.studentsAtRisk.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 space-y-2">
+                  <CheckCircle2 className="w-10 h-10 mx-auto text-emerald-500" />
+                  <p className="text-sm font-black text-slate-700">لا يوجد طلاب معرضين للتعثر حالياً! 🎉</p>
+                  <p className="text-xs text-slate-400">جميع الطلاب المسجلين يحققون متوسط درجات أعلى من 60% مع استمرارية قراءة ممتازة.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {cockpitData.studentsAtRisk.map((student) => {
+                    const isCritical = student.avgScore < 50;
+                    return (
+                      <div
+                        key={student.studentId}
+                        className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                          isCritical
+                            ? 'bg-rose-50/50 border-rose-200'
+                            : 'bg-amber-50/40 border-amber-200'
+                        }`}
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-black text-sm text-slate-900">{student.studentName}</span>
+                            <span
+                              className={`px-2 py-0.5 rounded-md text-[10px] font-black ${
+                                isCritical
+                                  ? 'bg-rose-600 text-white animate-pulse'
+                                  : 'bg-amber-500 text-white'
+                              }`}
+                            >
+                              {isCritical ? '⚠️ خطر حرج' : '⚡ تنبيه متابعة'}
+                            </span>
+                            <span className="text-[10px] font-bold text-slate-500">
+                              (المذكرة: {student.bookTitle})
+                            </span>
+                          </div>
+                          <p className="text-xs text-rose-900 font-medium">
+                            {student.riskFactor}
+                          </p>
+                          <div className="text-[10px] text-slate-400 font-mono">
+                            آخر نشاط مسجل: {new Date(student.lastActive).toLocaleDateString('ar-EG')} • متوسط الاختبارات: {student.avgScore}%
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => {
+                            setActiveTab('teacher_sos');
+                            setStatusMsg(`تم توجيهك إلى شاشة المساعدة للتواصل مع الطالب: ${student.studentName}`);
+                          }}
+                          className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5 text-teal-400" />
+                          <span>إرسال توجيه ودعم 💬</span>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* 2. CURRICULUM BOTTLENECKS HEATMAP (5 Cols) */}
+            <div className="lg:col-span-5 bg-white border border-gray-200 rounded-3xl p-6 shadow-sm space-y-5">
+              <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-black">
+                    <Flame className="w-4 h-4 text-amber-500" />
+                  </div>
+                  <div>
+                    <h4 className="font-black text-sm text-slate-900">⚠️ نقاط الاختناق في المنهج</h4>
+                    <p className="text-[11px] text-slate-500">أسئلة ومفاهيم تعثر بها أكثر من 35% من الطلاب</p>
+                  </div>
+                </div>
+              </div>
+
+              {!cockpitData?.curriculumBottlenecks || cockpitData.curriculumBottlenecks.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 space-y-2">
+                  <CheckCircle className="w-8 h-8 mx-auto text-emerald-500" />
+                  <p className="text-xs font-bold text-slate-600">لا توجد أسئلة ذات نسبة خطأ مرتفعة حالياً.</p>
+                  <p className="text-[11px] text-slate-400">يتم رصد الأسئلة التي يفشل فيها الطلاب آلياً لتنبيهك لتعديل الشرح.</p>
+                </div>
+              ) : (
+                <div className="space-y-3.5">
+                  {cockpitData.curriculumBottlenecks.map((item, idx) => (
+                    <div key={idx} className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-xs font-black text-slate-800 leading-relaxed">
+                          {item.chapterTitle} (سؤال {item.questionIndex + 1})
+                        </span>
+                        <span className="px-2 py-0.5 rounded-lg bg-rose-100 text-rose-800 font-black text-[11px] shrink-0 font-mono">
+                          {item.failRate}% نسبة الخطأ
+                        </span>
+                      </div>
+                      <div className="p-2.5 bg-amber-50/80 border border-amber-200/80 rounded-xl text-[11px] text-amber-950 font-medium">
+                        <span className="font-bold text-amber-800 block mb-0.5">💡 المفهوم الخاطئ الشائع لدى الطلاب:</span>
+                        {item.trapDescription}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 3. ACTIVE TELEMETRY LEDGER (ALL LEARNERS PROGRESS) */}
+          <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm space-y-4">
+            <h4 className="font-black text-sm text-slate-900 flex items-center gap-2">
+              <Users className="w-4 h-4 text-indigo-600" />
+              <span>سجل النشاط الفعلي والتتبع البيداغوجي لجميع الطلاب</span>
+            </h4>
+
+            {!cockpitData?.studentLogs || cockpitData.studentLogs.length === 0 ? (
+              <div className="p-6 text-center text-xs text-slate-400">
+                لا توجد سجلات تتبع حديثة بعد. ستظهر بيانات الطلاب فور قيامهم بالقراءة والاستماع.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-right text-xs">
+                  <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
+                    <tr>
+                      <th className="p-3">اسم الطالب</th>
+                      <th className="p-3">المقرر / المذكرة</th>
+                      <th className="p-3">صافي وقت القراءة</th>
+                      <th className="p-3">الفصول المنجزة</th>
+                      <th className="p-3">دقة الاختبارات</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium">
+                    {cockpitData.studentLogs.map((row) => (
+                      <tr key={row.studentId} className="hover:bg-slate-50/50">
+                        <td className="p-3 font-bold text-slate-900">{row.studentName}</td>
+                        <td className="p-3 text-slate-600">{row.bookTitle}</td>
+                        <td className="p-3 font-mono text-indigo-600 font-bold">{row.totalMinutes} دقيقة</td>
+                        <td className="p-3 font-mono text-purple-600 font-bold">{row.chaptersCompleted} فصول</td>
+                        <td className="p-3 font-mono">
+                          <span className={`px-2 py-0.5 rounded-md font-bold ${
+                            row.quizAccuracy >= 80 ? 'bg-emerald-100 text-emerald-800' :
+                            row.quizAccuracy >= 60 ? 'bg-amber-100 text-amber-800' :
+                            'bg-rose-100 text-rose-800'
+                          }`}>
+                            {row.quizAccuracy}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 🙋‍♂️ TAB: TEACHER SOS HELPDESK TICKETS (EL MAESTRO AXIS 1) */}
+      {/* ========================================================================= */}
+      {activeTab === 'teacher_sos' && (
+        <div className="space-y-6 animate-fade-in">
+          <div className="p-6 bg-white border border-gray-200 rounded-3xl shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-700 flex items-center justify-center font-black text-2xl border border-rose-200 shadow-xs">
+                  🙋‍♂️
+                </div>
+                <div>
+                  <h3 className="font-black text-lg text-slate-900">منظومة استفسارات الطلاب المباشرة (Teacher SOS Bridge)</h3>
+                  <p className="text-xs text-slate-500">إجابة تساؤلات الطلاب مع إرساء تلقائي لنص الفقرة وسياق الكتاب الدراسي</p>
+                </div>
+              </div>
+
+              {/* Filter Pills */}
+              <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl text-xs font-bold">
+                <button
+                  onClick={() => setTicketFilter('all')}
+                  className={`px-3 py-1.5 rounded-lg transition ${ticketFilter === 'all' ? 'bg-white text-slate-900 shadow-xs font-black' : 'text-slate-600'}`}
+                >
+                  الكل ({sosTickets.length})
+                </button>
+                <button
+                  onClick={() => setTicketFilter('pending')}
+                  className={`px-3 py-1.5 rounded-lg transition ${ticketFilter === 'pending' ? 'bg-white text-rose-700 shadow-xs font-black' : 'text-slate-600'}`}
+                >
+                  في انتظار الرد ({sosTickets.filter(t => t.status === 'pending').length})
+                </button>
+                <button
+                  onClick={() => setTicketFilter('answered')}
+                  className={`px-3 py-1.5 rounded-lg transition ${ticketFilter === 'answered' ? 'bg-white text-emerald-700 shadow-xs font-black' : 'text-slate-600'}`}
+                >
+                  تم الحل ({sosTickets.filter(t => t.status === 'answered').length})
+                </button>
+              </div>
+            </div>
+
+            {/* Tickets Stream */}
+            {(() => {
+              const filtered = sosTickets.filter(t => {
+                if (ticketFilter === 'all') return true;
+                return t.status === ticketFilter;
+              });
+
+              if (filtered.length === 0) {
+                return (
+                  <div className="p-12 text-center text-slate-400 space-y-2">
+                    <CheckCircle2 className="w-10 h-10 mx-auto text-emerald-500" />
+                    <p className="text-sm font-black text-slate-700">لا توجد استفسارات في هذه القائمة حالياً! 🌟</p>
+                    <p className="text-xs text-slate-400">ستصلك استفسارات الطلاب وتنبيهات SOS فور إرسالها من صفحة قراءة المذكرة.</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-5 pt-2">
+                  {filtered.map((ticket) => {
+                    const isOpen = ticket.status === 'pending';
+                    return (
+                      <div
+                        key={ticket.id}
+                        className={`p-6 rounded-3xl border-2 transition-all space-y-4 ${
+                          isOpen
+                            ? 'bg-white border-rose-200 shadow-sm'
+                            : 'bg-slate-50/70 border-slate-200'
+                        }`}
+                      >
+                        {/* Ticket Header */}
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3">
+                          <div className="flex items-center gap-2.5">
+                            <span className="w-8 h-8 rounded-xl bg-slate-900 text-white font-black text-xs flex items-center justify-center">
+                              {ticket.studentName.charAt(0) || 'ط'}
+                            </span>
+                            <div>
+                              <div className="text-xs font-black text-slate-900">{ticket.studentName}</div>
+                              <div className="text-[10px] text-slate-500 font-bold">
+                                {ticket.bookTitle} • {ticket.chapterTitle}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              {new Date(ticket.createdAt).toLocaleDateString('ar-EG')}
+                            </span>
+                            <span
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-black ${
+                                isOpen
+                                  ? 'bg-rose-100 text-rose-800 animate-pulse'
+                                  : 'bg-emerald-100 text-emerald-800'
+                              }`}
+                            >
+                              {isOpen ? '🔴 في انتظار إجابتك' : '🟢 تم الرد والمساعدة'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Anchored Textbook Snippet Block */}
+                        {ticket.selectedSnippet && (
+                          <div className="p-3.5 bg-amber-50/60 border-r-4 border-amber-500 rounded-xl text-xs space-y-1">
+                            <span className="text-[10px] font-black text-amber-800 block">
+                              📖 سياق الفقرة الأصلية التي سأل عنها الطالب من المذكرة:
+                            </span>
+                            <div className="text-slate-800 italic leading-relaxed">
+                              <MathRenderer text={ticket.selectedSnippet} />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Student Question */}
+                        <div className="space-y-1">
+                          <span className="text-[11px] font-bold text-slate-500 block">سؤال الطالب:</span>
+                          <p className="text-sm font-black text-slate-900 leading-relaxed">
+                            <MathRenderer text={ticket.questionText} />
+                          </p>
+                        </div>
+
+                        {/* Answered View vs Reply Form */}
+                        {ticket.status === 'answered' ? (
+                          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-1.5 text-xs">
+                            <div className="flex items-center justify-between text-emerald-900 font-black">
+                              <span>✅ إجابة المعلم المعتمد ({ticket.answeredAt ? 'تم الرد' : 'المعلم'}):</span>
+                              {ticket.teacherAudioUrl && (
+                                <span className="px-2 py-0.5 rounded bg-emerald-200 text-emerald-900 text-[10px] flex items-center gap-1 font-bold">
+                                  <Mic className="w-3 h-3" />
+                                  <span>ملاحظة صوتية مرفقة</span>
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-slate-800 leading-relaxed font-medium">
+                              <MathRenderer text={ticket.teacherAnswer || ''} />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="pt-2 border-t border-gray-100 space-y-3">
+                            <div className="space-y-1">
+                              <label className="block text-xs font-bold text-slate-700">
+                                صياغة الإجابة النموذجية (تدعم الرموز والمعادلات الرياضية KaTeX):
+                              </label>
+                              <textarea
+                                value={replyTextMap[ticket.id] || ''}
+                                onChange={(e) => setReplyTextMap(prev => ({ ...prev, [ticket.id]: e.target.value }))}
+                                placeholder="اكتب الشرح التوضيحي للطالب هنا بالتفصيل وبأسلوب مشجع..."
+                                rows={3}
+                                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-medium focus:bg-white focus:border-indigo-500 outline-none transition"
+                              />
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                              <input
+                                type="text"
+                                value={replyAudioMap[ticket.id] || ''}
+                                onChange={(e) => setReplyAudioMap(prev => ({ ...prev, [ticket.id]: e.target.value }))}
+                                placeholder="رابط تسجيل صوتي اختياري (mp3 / audio url)..."
+                                className="w-full sm:w-80 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[11px] focus:bg-white outline-none"
+                              />
+
+                              <button
+                                onClick={() => handleSendTicketReply(ticket.id)}
+                                disabled={isSubmittingReply[ticket.id]}
+                                className="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-teal-600 to-indigo-600 hover:from-teal-500 hover:to-indigo-500 text-white font-black text-xs rounded-xl shadow-md transition active:scale-95 cursor-pointer flex items-center justify-center gap-2 shrink-0 disabled:opacity-50"
+                              >
+                                {isSubmittingReply[ticket.id] ? (
+                                  <>
+                                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                    <span>جاري الإرسال...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Send className="w-3.5 h-3.5" />
+                                    <span>إرسال الرد المعتمد للطالب 🚀</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -2049,6 +2631,28 @@ export const AdminInstructorHub: React.FC<AdminInstructorHubProps> = ({
               </div>
             </div>
 
+            {/* 🛡️ EL MAESTRO AXIS 3: 85% INSTRUCTOR REVENUE LEDGER */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 bg-emerald-50/50 border border-emerald-200/80 rounded-2xl text-xs">
+              <div className="space-y-0.5">
+                <span className="text-[10px] text-emerald-800 font-bold block">إجمالي مبيعات مقرراتك</span>
+                <span className="text-xl font-black text-slate-900 font-mono">
+                  {instructorWallet?.totalEarnings || Math.round(walletBalance * 1.18)} <span className="text-[10px] font-sans">ج.م</span>
+                </span>
+              </div>
+              <div className="space-y-0.5">
+                <span className="text-[10px] text-emerald-800 font-bold block">عمولة المنصة الثابتة (15%)</span>
+                <span className="text-xl font-black text-slate-500 font-mono">
+                  {instructorWallet?.totalEarnings ? Math.round(instructorWallet.totalEarnings * (instructorWallet.platformFeePercent / 100)) : Math.round(walletBalance * 0.15)} <span className="text-[10px] font-sans">ج.م</span>
+                </span>
+              </div>
+              <div className="space-y-0.5">
+                <span className="text-[10px] text-emerald-800 font-bold block">صافي أرباحك الصافية (85%)</span>
+                <span className="text-xl font-black text-emerald-700 font-mono">
+                  {instructorWallet?.availableBalance || walletBalance} <span className="text-[10px] font-sans">ج.م مؤكدة</span>
+                </span>
+              </div>
+            </div>
+
             {/* 🛡️ ADMIN ONLY: WITHDRAWAL REQUESTS APPROVAL TABLE */}
             {isAdmin && (
               <div className="space-y-4 pt-6 border-t border-gray-100">
@@ -2606,11 +3210,11 @@ export const AdminInstructorHub: React.FC<AdminInstructorHubProps> = ({
                   onChange={(e) => setReelsVoice(e.target.value)}
                   className="w-full px-3 py-2 bg-indigo-50/70 border border-indigo-200 rounded-xl text-xs font-bold text-indigo-950 focus:bg-white outline-none cursor-pointer"
                 >
-                  <option value="ar-XA-Chirp3-HD-Fenrir">🌟 فينرير (Google Chirp 3 HD - سينمائي فخم)</option>
-                  <option value="ar-XA-Chirp3-HD-Aoede">🌟 أويدي (Google Chirp 3 HD - نسائي دافئ)</option>
-                  <option value="ar-XA-Chirp3-HD-Puck">🌟 بوك (Google Chirp 3 HD - حماسي وتفاعلي)</option>
-                  <option value="ar-XA-Chirp3-HD-Kore">🌟 كوري (Google Chirp 3 HD - معلمة واضحة)</option>
-                  <option value="ar-XA-Chirp3-HD-Charon">🌟 شارون (Google Chirp 3 HD - أستاذ رزين)</option>
+                  <option value="ar-XA-Chirp3-HD-Fenrir">🌟 صوت كريم (طبيعي وواضح)</option>
+                  <option value="ar-XA-Chirp3-HD-Aoede">🌟 صوت فرح (تعليمي وهادئ)</option>
+                  <option value="ar-XA-Chirp3-HD-Puck">🌟 صوت أحمد (حماسي وتفاعلي)</option>
+                  <option value="ar-XA-Chirp3-HD-Kore">🌟 صوت سارة (شرح مبسط)</option>
+                  <option value="ar-XA-Chirp3-HD-Charon">🌟 صوت أستاذ محمود (وقور ورزين)</option>
                   <option value="ar-SA-HamedNeural">🇸🇦 حامد (فخم ووقور)</option>
                   <option value="ar-EG-ShakirNeural">🇪🇬 شاكر (مصري دافئ ومفصل)</option>
                   <option value="ar-JO-TaimNeural">🇯🇴 تيم (أردني شبابي)</option>
@@ -2729,12 +3333,12 @@ export const AdminInstructorHub: React.FC<AdminInstructorHubProps> = ({
                             className="px-2.5 py-1.5 bg-indigo-50/80 border border-indigo-200 rounded-lg text-xs font-bold text-indigo-950 focus:bg-white outline-none cursor-pointer max-w-[160px] sm:max-w-none"
                             title="اختيار المعلق الصوتي لهذا الفصل"
                           >
-                            <optgroup label="🌟 أصوات Google Cloud Chirp 3 HD">
-                              <option value="ar-XA-Chirp3-HD-Fenrir">🌟 فينرير (فخم وقوي)</option>
-                              <option value="ar-XA-Chirp3-HD-Aoede">🌟 أويدي (نسائي دافئ)</option>
-                              <option value="ar-XA-Chirp3-HD-Puck">🌟 بوك (حماسي وتفاعلي)</option>
-                              <option value="ar-XA-Chirp3-HD-Kore">🌟 كوري (معلمة واضحة)</option>
-                              <option value="ar-XA-Chirp3-HD-Charon">🌟 شارون (أستاذ رزين)</option>
+                            <optgroup label="🌟 أصوات فائقة النقاء (Chirp 3 HD)">
+                              <option value="ar-XA-Chirp3-HD-Fenrir">🌟 صوت كريم (طبيعي وواضح)</option>
+                              <option value="ar-XA-Chirp3-HD-Aoede">🌟 صوت فرح (تعليمي وهادئ)</option>
+                              <option value="ar-XA-Chirp3-HD-Puck">🌟 صوت أحمد (حماسي وتفاعلي)</option>
+                              <option value="ar-XA-Chirp3-HD-Kore">🌟 صوت سارة (شرح مبسط)</option>
+                              <option value="ar-XA-Chirp3-HD-Charon">🌟 صوت أستاذ محمود (وقور ورزين)</option>
                             </optgroup>
                             <optgroup label="🎙️ أصوات طبيعية (Edge Neural)">
                               <option value="ar-SA-HamedNeural">🇸🇦 حامد (سعودي فخم)</option>

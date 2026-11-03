@@ -274,6 +274,11 @@ ${previewText}
 
 6. SUB-TOPICS & CONCEPTS:
    - List the 3-6 internal sub-topics and extracted key terms directly from the text.
+
+7. KINDERGARTEN & EARLY-CHILDHOOD DISCOVERY (KG1, KG2, رياض الأطفال):
+   - For kindergarten (KG/رياض الأطفال) or early primary books:
+     * Discover every distinct Alphabet Letter unit (e.g. "حرف الألف", "حرف الميم", "حرف الباء"), Listening Story ("قصة الاستماع"), Phonics & Phonemic Awareness ("الوعي الصوتي", "الوعي البصري"), and Theme/Unit ("المحور الأول: من أكون", "المحور الثاني: العالم من حولي").
+     * 🚫 NEVER condense an entire 50-100+ page kindergarten booklet into 1 or 2 generic lessons! Extract all distinct interactive educational lessons (typically 8 to 25 distinct chapters).
 `;
 
   try {

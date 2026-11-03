@@ -25,7 +25,7 @@ export const OmniscientStemAiTutor: React.FC<OmniscientStemAiTutorProps> = ({
   const [messages, setMessages] = useState<Array<{ sender: 'user' | 'ai'; text: string; time: string }>>([
     {
       sender: 'ai',
-      text: `مرحباً بك! أنا **المعلم الذكي Osera AI Tutor** لمقرر **(${bookTitle || 'المقرر الدراسي'})**.\n\nأنا جاهز لشرح، تبسيط، والإجابة عن أي استفسار أو مسألة في درس **(${currentChapterTitle || 'هذا الفصل'})**. كيف أساعدك اليوم؟ 💡`,
+      text: `جاهز لمساعدتك في فهم وشرح درس **(${currentChapterTitle || 'هذا الفصل'})** مباشرة. تفضل بسؤالك وسأجيبك فوراً! 💡`,
       time: 'الآن'
     }
   ]);
@@ -37,11 +37,11 @@ export const OmniscientStemAiTutor: React.FC<OmniscientStemAiTutorProps> = ({
     setMessages([
       {
         sender: 'ai',
-        text: `مرحباً بك! أنا **المعلم الذكي Osera AI Tutor** لمقرر **(${bookTitle || 'المقرر الدراسي'})**.\n\nأنا جاهز لشرح، تبسيط، والإجابة عن أي استفسار أو مسألة في درس **(${currentChapterTitle || 'هذا الفصل'})**. كيف أساعدك اليوم؟ 💡`,
+        text: `جاهز لمساعدتك في فهم وشرح درس **(${currentChapterTitle || 'هذا الفصل'})** مباشرة. تفضل بسؤالك وسأجيبك فوراً! 💡`,
         time: 'الآن'
       }
     ]);
-  }, [bookTitle, currentChapterTitle]);
+  }, [currentChapterTitle]);
 
   useEffect(() => {
     if (isOpen) {
@@ -98,6 +98,27 @@ export const OmniscientStemAiTutor: React.FC<OmniscientStemAiTutorProps> = ({
     }
   };
 
+  const metaLower = `${bookTitle || ''} ${currentChapterTitle || ''} ${bookCategory || ''}`.toLowerCase();
+  const isKG = /kg|kindergarten|رياض\s*الأطفال|روضة|حضانة|تمهيدي|أولى\s*ابتدائي|حرف\s|حروف\s|أبجدية/.test(metaLower);
+  const isIslamicOrHumanities = !isKG && /دين|إسلام|قرآن|سورة|تفسير|حديث|فقه|عقيدة|تاريخ|جغرافيا|دراسات|أدب|بلاغة|نحو|شريعة|قانون/.test(metaLower);
+
+  const promptChips = isKG ? [
+    { label: '🎈 احكيلي قصة', prompt: 'احكيلي حكاية قصيرة وممتعة وبسيطة جداً عن موضوع هذا الدرس للأطفال' },
+    { label: '🔤 كيف أنطقها؟', prompt: 'كيف أنطق هذا الحرف بالحركات والأصوات الصحيحة مع كلمات وأمثلة مصورة؟' },
+    { label: '🎮 العب معي لعبة', prompt: 'اقترح لعبة سريعة ومسلية لاكتشاف الحرف وأصواته' },
+    { label: '✨ لخصها لبطل صغير', prompt: 'لخص لي هذا الدرس في كلمات بسيطة وتشجيع لطيف' }
+  ] : isIslamicOrHumanities ? [
+    { label: '📖 التفسير والمعنى', prompt: 'اشرح لي المعنى الإجمالي والمقصود بأسلوب سهل ومباشر' },
+    { label: '💡 العبرة المستفادة', prompt: 'ما هي أهم العبر والقيم العملية المستفادة من هذا الدرس؟' },
+    { label: '❓ أسئلة متوقعة', prompt: 'ما هي أهم الأسئلة المتوقعة مع إجاباتها النموذجية؟' },
+    { label: '📝 تلخيص الدرس', prompt: 'لخص لي عناصر الدرس في نقاط محددة واضحة' }
+  ] : [
+    { label: '💡 بسطهالي بمثال', prompt: '💡 بسطهالي بمثال واقعي من الحياة اليومية' },
+    { label: '📐 خطوات الحل', prompt: 'اشرح لي خطوات حل وتطبيق القوانين الرياضية في هذا الدرس' },
+    { label: '🔥 فخ الامتحان', prompt: 'ما هو أهم فخ أو خطأ شائع يقع فيه الطلاب في هذا الدرس؟' },
+    { label: '📝 ملخص القوانين', prompt: 'لخص لي أهم القوانين والمفاهيم الجوهرية في هذا الدرس' }
+  ];
+
   return (
     <>
       {/* 🌟 COMPACT SLEEK FLOATING TRIGGER */}
@@ -144,30 +165,16 @@ export const OmniscientStemAiTutor: React.FC<OmniscientStemAiTutorProps> = ({
 
           {/* QUICK TOPIC PROMPT CHIPS */}
           <div className="p-2.5 bg-slate-50 border-b border-slate-200 flex items-center gap-1.5 overflow-x-auto scrollbar-none text-[11px] font-bold">
-            <button
-              onClick={() => handleSendMessage('💡 بسطهالي بمثال واقعي من الحياة اليومية')}
-              className="px-2.5 py-1 bg-white border border-slate-200 hover:border-teal-400 text-slate-700 rounded-lg shrink-0 transition"
-            >
-              💡 بسطهالي بمثال
-            </button>
-            <button
-              onClick={() => handleSendMessage('❓ ما هي أسئلة الامتحانات الأكثر توقعاً على هذا الدرس مع الإجابة؟')}
-              className="px-2.5 py-1 bg-white border border-slate-200 hover:border-indigo-400 text-slate-700 rounded-lg shrink-0 transition"
-            >
-              ❓ توقع أسئلة امتحان
-            </button>
-            <button
-              onClick={() => handleSendMessage('📝 لخص لي أهم النقاط والقواعد الجوهرية في هذا الدرس')}
-              className="px-2.5 py-1 bg-white border border-slate-200 hover:border-purple-400 text-slate-700 rounded-lg shrink-0 transition"
-            >
-              📝 تلخيص الدرس
-            </button>
-            <button
-              onClick={() => handleSendMessage('🔍 اشرح لي بالتفصيل الفكرة الأساسية وخطوات تطبيقها')}
-              className="px-2.5 py-1 bg-white border border-slate-200 hover:border-amber-400 text-slate-700 rounded-lg shrink-0 transition"
-            >
-              🔍 شرح مفصل
-            </button>
+            {promptChips.map((chip, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => handleSendMessage(chip.prompt)}
+                className="px-2.5 py-1 bg-white border border-slate-200 hover:border-indigo-400 text-slate-700 hover:text-indigo-900 rounded-lg shrink-0 transition"
+              >
+                {chip.label}
+              </button>
+            ))}
           </div>
 
           {/* CHAT MESSAGES BODY */}

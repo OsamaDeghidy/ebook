@@ -9,7 +9,12 @@ import { sanitizeMathText } from './sanitizeMathText';
  */
 export function sanitizeBookContent(text: string | undefined): string {
   if (!text) return '';
-  let cleaned = text.replace(/\\n/g, '\n').trim();
+  // 0. Protect LaTeX commands (like \neq) by only replacing \n when NOT followed by letters
+  let cleaned = text.replace(/\\n(?![a-zA-Z])/g, '\n').trim();
+
+  // Repair corrupted \neq that became "eq 0" or "b eq 0"
+  cleaned = cleaned.replace(/\b([a-zA-Z0-9]+)\s+eq\s+([0-9]+)/g, '$1 \\neq $2');
+  cleaned = cleaned.replace(/\beq\s+0\b/g, '\\neq 0');
 
   // 1. Strip OCR artifact glyphs and bullet decorators
   cleaned = cleaned.replace(/[▲▼◆◇■□●○★☆►◄]/g, '');

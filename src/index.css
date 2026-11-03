@@ -1,4 +1,10 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;600;700;800&family=Readex+Pro:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
+
+@theme {
+  --font-sans: 'Cairo', 'Readex Pro', 'IBM Plex Sans Arabic', 'Noto Sans Arabic', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Tahoma, Arial, sans-serif;
+  --font-cairo: 'Cairo', 'Readex Pro', 'Noto Sans Arabic', system-ui, sans-serif;
+}
 
 /* 🌟 GLOBAL FONT SCALE: +3 DEGREES ACROSS THE ENTIRE WEBSITE */
 :root {
@@ -17,11 +23,16 @@
   }
 }
 
-body {
-  font-family: 'Cairo', 'Readex Pro', 'Noto Sans Arabic', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+html, body, #root {
+  font-family: 'Cairo', 'Readex Pro', 'IBM Plex Sans Arabic', 'Noto Sans Arabic', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Tahoma, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   line-height: 1.6;
+}
+
+/* Enforce reliable Arabic typography fallback on all text elements */
+body, input, textarea, select, button {
+  font-family: 'Cairo', 'Readex Pro', 'IBM Plex Sans Arabic', 'Noto Sans Arabic', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Tahoma, Arial, sans-serif;
 }
 
 /* Markdown Content Styling Custom Class */
@@ -217,3 +228,39 @@ body {
   }
 }
 
+
+/* 📜 Cognitive Comfort Theme: Warm Ivory Paper (#FDFBF7) */
+.theme-reading-ivory {
+  background-color: #FDFBF7 !important;
+  color: #2D2A26 !important;
+  border-color: #EFE8DC !important;
+  box-shadow: 0 4px 20px -2px rgba(92, 70, 41, 0.06);
+}
+
+.theme-reading-ivory .markdown-body {
+  color: #2D2A26 !important;
+  background-color: transparent !important;
+}
+
+.theme-reading-ivory .markdown-body h1,
+.theme-reading-ivory .markdown-body h2,
+.theme-reading-ivory .markdown-body h3,
+.theme-reading-ivory .markdown-body h4 {
+  color: #1A1815 !important;
+}
+
+.theme-reading-ivory .markdown-body p,
+.theme-reading-ivory .markdown-body li {
+  color: #38342E !important;
+  line-height: 1.85 !important;
+}
+
+.theme-reading-ivory .markdown-body strong {
+  color: #8B4513 !important;
+}
+
+.theme-reading-ivory .markdown-body blockquote {
+  border-right-color: #D4A373 !important;
+  background-color: #FAF4EB !important;
+  color: #4A3E31 !important;
+}

@@ -30,6 +30,9 @@ export function buildEducationalPodcastPrompt(params: {
     contentText: params.chapterContent,
   });
 
+  const metaLower = `${params.bookTitle || ''} ${params.category || ''} ${params.grade_level || ''} ${params.chapterTitle || ''}`.toLowerCase();
+  const isKG = /kg|kindergarten|رياض\s*الأطفال|روضة|حضانة|تمهيدي|أولى\s*ابتدائي|حرف\s|حروف\s|أبجدية/.test(metaLower);
+
   if (isArabic) {
     return `
 أنت مخرج ومحرر بودكاست تعليمي وثقافي رفيع المستوى (Osera Pedagogical Podcast Studio).
@@ -38,19 +41,19 @@ export function buildEducationalPodcastPrompt(params: {
 المهمة:
 إنشاء حوار صوتي تعليمي دافئ، ذكي، وممتع جداً بين مقدمين متميزين:
 1. "كريم": محاور ذكي وفضولي، يمثل عقلية الطالب الشغوف، يطرح أسئلة جوهرية ويبحث عن الفائدة والتطبيقات الواقعية.
-2. "فرح": معلمة وخبيرة تربوية متمكنة، تشرح المفاهيم ببساطة وتضرب أمثلة عملية من واقع الحياة وتبسط فخاخ الامتحانات.
+2. "فرح": معلمة وخبيرة تربوية متمكنة، تشرح المفاهيم ببساطة وتضرب أمثلة عملية من واقع الحياة.
 
 الموضوع: "${params.chapterTitle}"
 مصدر المحتوى:
-${params.chapterContent.substring(0, 3500)}
+${params.chapterContent.substring(0, 20000)}
 
 🌟 قواعد الحوار الصارمة:
-1. 🚫 يُمنع منعاً باتاً تكرار المناداة بالأسماء في بداية كل سطر (مثل "يا كريم" و "يا فرح"). يدخل المتحاوران فوراً في الأفكار والتفاعل العفوي الطبيعي.
-2. 💡 التدرج المنطقي:
+1. 🚫 استئصال الحشو والمجاملات الزائفة: يُمنع منعاً باتاً تكرار المناداة بالأسماء في بداية كل سطر (مثل "يا أستاذتي فرح"، "سؤال عبقري يا كريم"). يدخل المتحاوران فوراً في الأفكار والتفاعل العفوي الطبيعي من اللحظة الأولى.
+${isKG ? `2. 🎈 تخصيص رياض الأطفال والتأسيس: هذا المقرر لأطفال الروضة والصغار! اجعل الحوار كحكاية تمثيلية ممتعة جداً ومبهجة تحاكي عالم الطفل وأصوات الحروف، ومحظور تماماً ذكر كلمة 'امتحان' أو 'قوانين رياضية' أو 'مسائل'.` : `2. 💡 التدرج المنطقي:
    - البداية: ربط الدرس بسؤال مشوق أو مشهد من واقع الحياة.
    - الوسط: تفكيك الفكرة الأساسية مع مثال عملي وتوضيح تريكة أو خطأ يقع فيه معظم الطلاب.
-   - الختام: ملخص في سطرين للقاعدة الذهبية.
-3. ⏱️ اكتب الحوار في 6 إلى 8 تبادلات حوارية مركزة وغنية.
+   - الختام: ملخص في سطرين للقاعدة الذهبية.`}
+3. ⏱️ اكتب حواراً تدريسياً عميقاً وممتعاً يتكون إجبارياً من 12 إلى 16 تبادلاً حوارياً ثرياً (transcript array).
 4. 🎙️ التشكيل اللغوي البسيط على الكلمات المفتاحية لضمان نطق سليم وسلس.
 
 OUTPUT FORMAT (VALID JSON ONLY):
@@ -70,7 +73,7 @@ OUTPUT FORMAT (VALID JSON ONLY):
 You are an elite educational podcast producer (Osera Pedagogical Podcast Studio).
 Topic: "${params.chapterTitle}"
 Content Source:
-${params.chapterContent.substring(0, 3500)}
+${params.chapterContent.substring(0, 20000)}
 
 Create an engaging conversational dialogue between two hosts:
 1. "Alex": Curious, inquisitive learner.
@@ -78,7 +81,7 @@ Create an engaging conversational dialogue between two hosts:
 
 Rules:
 1. NO repetitive name-calling ("Hey Alex", "Hey Farah" on every sentence).
-2. 6-8 rich, natural conversational exchanges breaking down the concepts and exam takeaways.
+2. 12-16 rich, deeply pedagogical conversational exchanges breaking down complex concepts, addressing misconceptions, working through applied examples step-by-step, and synthesizing golden takeaways.
 
 OUTPUT FORMAT (JSON ONLY):
 {

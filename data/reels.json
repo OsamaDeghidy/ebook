@@ -1556,5 +1556,1051 @@
     "completions_count": 45,
     "is_public_teaser": true,
     "created_at": "2026-10-30T10:40:56.901Z"
+  },
+  {
+    "id": "reel-1793696051754",
+    "book_id": "62cbd9ec-52f5-4b50-bea7-b38b10be6fdc",
+    "book_title": "تخصص الحاسب الآلي",
+    "author_name": "خبير المادة",
+    "category": "academic_curriculum",
+    "subcategory": "الحاسب الآلي وتكنولوجيا المعلومات",
+    "thumbnail_url": "",
+    "chapter_id": "ch-62cbd9ec-52f5-4b50-bea7-b38b10be6fdc-4",
+    "chapter_title": "الدرس 4: تخصص الحاسب الآلي (الجزء 4)",
+    "style_type": "chalkboard",
+    "style": "chalkboard",
+    "voice": "ar-XA-Chirp3-HD-Fenrir",
+    "language": "ar",
+    "duration_seconds": 45,
+    "audio_url": "https://ydlzvuutjgelpxueufgn.supabase.co/storage/v1/object/public/book-audios/reel_62cbd9ec-52f5-4b50-bea7-b38b10be6fdc_ch-62cbd9ec-52f5-4b50-bea7-b38b10be6fdc-4_1793696045260.mp3",
+    "narration_script": "لَحْظَةً... هَلْ سَأَلْتَ نَفْسَكَ يَوْماً: كَيْفَ تُحَلُّ أَنْظُمَةُ الْمُعَادلاتِ فِي رُسُومِيَّاتِ الْحَاسِبِ وَالذَّكَاءِ الاصطناعيِّ؟! السِّرُّ هُنَا يَبْدَأُ مِنْ مُحَدِّدِ الْمَصْفُوفَةِ! إِذَا كَانَ الْمُحَدِّدُ يُسَاوِي صِفْراً... فَاعْلَمْ أَنَّ الْمَصْفُوفَةَ مُنْفَرِدَةٌ، وَلَيْسَ لَهَا مَعْكُوسٌ! لِذَلِكَ... احْسُبِ الْمُحَدِّدَ دَائِماً أَوَّلاً قَبْلَ الشُّرُوعِ فِي حِسَابِ الْمَعْكُوسِ؛ لِتُوَفِّرَ وَقْتَكَ، وَتَتَأَكَّدَ مِنْ وُجُودِ حَلٍّ رِيَاضِيٍّ صَحِيحٍ!",
+    "scenes": [
+      {
+        "id": "scene-1",
+        "act": "hook",
+        "title": "سر محدد المصفوفة",
+        "badgeText": "🔥 فكرة محورية",
+        "visualType": "quote",
+        "visualData": {
+          "highlightQuote": "كيف تُحل أنظمة المعادلات في رسوميات الحاسب والذكاء الاصطناعي؟"
+        },
+        "startSec": 0,
+        "endSec": 10
+      },
+      {
+        "id": "scene-2",
+        "act": "concept",
+        "title": "جوهر المصفوفات المنفردة",
+        "badgeText": "🧠 الشرح العميق",
+        "visualType": "bullet_points",
+        "visualData": {
+          "bullets": [
+            "محدد المصفوفة قيمة عددية للمصفوفات المربعة فقط.",
+            "إذا كان المحدد ي等於 صفراً، فهي مصفوفة منفردة بلا معكوس.",
+            "يشير رياضياً إلى وجود اعتماد خطي بين المعادلات."
+          ],
+          "formulaLatex": "det(A) = (a \\cdot d) - (b \\cdot c)",
+          "codeSnippet": "",
+          "imagePrompt": "An academic chalkboard showing matrix determinant calculation with 2x2 grid and mathematical formulas for computer graphics and AI."
+        },
+        "startSec": 10,
+        "endSec": 30
+      },
+      {
+        "id": "scene-3",
+        "act": "takeaway",
+        "title": "القاعدة الذهبية",
+        "badgeText": "🏆 التطبيق والنتيجة",
+        "visualType": "bullet_points",
+        "visualData": {
+          "highlightQuote": "احسب دائماً المحدد أولاً لتوفير الوقت والتأكد من وجود حل!"
+        },
+        "startSec": 30,
+        "endSec": 45
+      }
+    ],
+    "word_timings": [
+      {
+        "word": "لَحْظَةً...",
+        "startMs": 0,
+        "endMs": 800
+      },
+      {
+        "word": "هَلْ",
+        "startMs": 800,
+        "endMs": 1600
+      },
+      {
+        "word": "سَأَلْتَ",
+        "startMs": 1600,
+        "endMs": 2400
+      },
+      {
+        "word": "نَفْسَكَ",
+        "startMs": 2400,
+        "endMs": 3200
+      },
+      {
+        "word": "يَوْماً:",
+        "startMs": 3200,
+        "endMs": 4000
+      },
+      {
+        "word": "كَيْفَ",
+        "startMs": 4000,
+        "endMs": 4800
+      },
+      {
+        "word": "تُحَلُّ",
+        "startMs": 4800,
+        "endMs": 5600
+      },
+      {
+        "word": "أَنْظُمَةُ",
+        "startMs": 5600,
+        "endMs": 6400
+      },
+      {
+        "word": "الْمُعَادلاتِ",
+        "startMs": 6400,
+        "endMs": 7200
+      },
+      {
+        "word": "فِي",
+        "startMs": 7200,
+        "endMs": 8000
+      },
+      {
+        "word": "رُسُومِيَّاتِ",
+        "startMs": 8000,
+        "endMs": 8800
+      },
+      {
+        "word": "الْحَاسِبِ",
+        "startMs": 8800,
+        "endMs": 9600
+      },
+      {
+        "word": "وَالذَّكَاءِ",
+        "startMs": 9600,
+        "endMs": 10400
+      },
+      {
+        "word": "الاصطناعيِّ؟!",
+        "startMs": 10400,
+        "endMs": 11200
+      },
+      {
+        "word": "السِّرُّ",
+        "startMs": 11200,
+        "endMs": 12000
+      },
+      {
+        "word": "هُنَا",
+        "startMs": 12000,
+        "endMs": 12800
+      },
+      {
+        "word": "يَبْدَأُ",
+        "startMs": 12800,
+        "endMs": 13600
+      },
+      {
+        "word": "مِنْ",
+        "startMs": 13600,
+        "endMs": 14400
+      },
+      {
+        "word": "مُحَدِّدِ",
+        "startMs": 14400,
+        "endMs": 15200
+      },
+      {
+        "word": "الْمَصْفُوفَةِ!",
+        "startMs": 15200,
+        "endMs": 16000
+      },
+      {
+        "word": "إِذَا",
+        "startMs": 16000,
+        "endMs": 16800
+      },
+      {
+        "word": "كَانَ",
+        "startMs": 16800,
+        "endMs": 17600
+      },
+      {
+        "word": "الْمُحَدِّدُ",
+        "startMs": 17600,
+        "endMs": 18400
+      },
+      {
+        "word": "يُسَاوِي",
+        "startMs": 18400,
+        "endMs": 19200
+      },
+      {
+        "word": "صِفْراً...",
+        "startMs": 19200,
+        "endMs": 20000
+      },
+      {
+        "word": "فَاعْلَمْ",
+        "startMs": 20000,
+        "endMs": 20800
+      },
+      {
+        "word": "أَنَّ",
+        "startMs": 20800,
+        "endMs": 21600
+      },
+      {
+        "word": "الْمَصْفُوفَةَ",
+        "startMs": 21600,
+        "endMs": 22400
+      },
+      {
+        "word": "مُنْفَرِدَةٌ،",
+        "startMs": 22400,
+        "endMs": 23200
+      },
+      {
+        "word": "وَلَيْسَ",
+        "startMs": 23200,
+        "endMs": 24000
+      },
+      {
+        "word": "لَهَا",
+        "startMs": 24000,
+        "endMs": 24800
+      },
+      {
+        "word": "مَعْكُوسٌ!",
+        "startMs": 24800,
+        "endMs": 25600
+      },
+      {
+        "word": "لِذَلِكَ...",
+        "startMs": 25600,
+        "endMs": 26400
+      },
+      {
+        "word": "احْسُبِ",
+        "startMs": 26400,
+        "endMs": 27200
+      },
+      {
+        "word": "الْمُحَدِّدَ",
+        "startMs": 27200,
+        "endMs": 28000
+      },
+      {
+        "word": "دَائِماً",
+        "startMs": 28000,
+        "endMs": 28800
+      },
+      {
+        "word": "أَوَّلاً",
+        "startMs": 28800,
+        "endMs": 29600
+      },
+      {
+        "word": "قَبْلَ",
+        "startMs": 29600,
+        "endMs": 30400
+      },
+      {
+        "word": "الشُّرُوعِ",
+        "startMs": 30400,
+        "endMs": 31200
+      },
+      {
+        "word": "فِي",
+        "startMs": 31200,
+        "endMs": 32000
+      },
+      {
+        "word": "حِسَابِ",
+        "startMs": 32000,
+        "endMs": 32800
+      },
+      {
+        "word": "الْمَعْكُوسِ؛",
+        "startMs": 32800,
+        "endMs": 33600
+      },
+      {
+        "word": "لِتُوَفِّرَ",
+        "startMs": 33600,
+        "endMs": 34400
+      },
+      {
+        "word": "وَقْتَكَ،",
+        "startMs": 34400,
+        "endMs": 35200
+      },
+      {
+        "word": "وَتَتَأَكَّدَ",
+        "startMs": 35200,
+        "endMs": 36000
+      },
+      {
+        "word": "مِنْ",
+        "startMs": 36000,
+        "endMs": 36800
+      },
+      {
+        "word": "وُجُودِ",
+        "startMs": 36800,
+        "endMs": 37600
+      },
+      {
+        "word": "حَلٍّ",
+        "startMs": 37600,
+        "endMs": 38400
+      },
+      {
+        "word": "رِيَاضِيٍّ",
+        "startMs": 38400,
+        "endMs": 39200
+      },
+      {
+        "word": "صَحِيحٍ!",
+        "startMs": 39200,
+        "endMs": 40000
+      }
+    ],
+    "visual_cards": [
+      {
+        "title": "محدد المصفوفة 2x2",
+        "content": "det(A) = (a \\cdot d - b \\cdot c)",
+        "type": "formula",
+        "startSec": 5,
+        "endSec": 20
+      },
+      {
+        "title": "قاعدة المعكوس",
+        "content": "معكوس المصفوفة موجود فقط إذا كان المحدد لا يساوي صفراً (det(A) ≠ 0).",
+        "type": "diagram",
+        "startSec": 21,
+        "endSec": 35
+      }
+    ],
+    "interactive_quiz": {
+      "question": "مصفوفة مربعة محددها يساوي صفراً (det(A) = 0)، ماذا تعني هذه الحالة رياضياً؟",
+      "options": [
+        "المصفوفة لها معكوس فريد",
+        "المصفوفة منفردة وليس لها معكوس",
+        "المحدد سالب دائماً"
+      ],
+      "correctIndex": 1,
+      "triggerSec": 32,
+      "explanation": "إذا كان محدد المصفوفة يساوي صفراً، فهذا يعني أن المصفوفة منفردة (Singular Matrix) وليس لها معكوس، وتدل على وجود اعتماد خطي بين المعادلات."
+    },
+    "likes_count": 32,
+    "views_count": 182,
+    "completions_count": 46,
+    "is_public_teaser": true,
+    "created_at": "2026-11-03T08:54:11.754Z"
+  },
+  {
+    "id": "reel-1793696101485",
+    "book_id": "62cbd9ec-52f5-4b50-bea7-b38b10be6fdc",
+    "book_title": "تخصص الحاسب الآلي",
+    "author_name": "خبير المادة",
+    "category": "academic_curriculum",
+    "subcategory": "الحاسب الآلي وتكنولوجيا المعلومات",
+    "thumbnail_url": "",
+    "chapter_id": "ch-62cbd9ec-52f5-4b50-bea7-b38b10be6fdc-5",
+    "chapter_title": "الدرس 5: تخصص الحاسب الآلي (الجزء 5)",
+    "style_type": "chalkboard",
+    "style": "chalkboard",
+    "voice": "ar-XA-Chirp3-HD-Fenrir",
+    "language": "ar",
+    "duration_seconds": 45,
+    "audio_url": "https://ydlzvuutjgelpxueufgn.supabase.co/storage/v1/object/public/book-audios/reel_62cbd9ec-52f5-4b50-bea7-b38b10be6fdc_ch-62cbd9ec-52f5-4b50-bea7-b38b10be6fdc-5_1793696092951.mp3",
+    "narration_script": "تَخَيَّلْ مَعِي... كَيْفَ يَتَمَكَّنُ حَاسِبُكَ مِنَ التَّفْكِيرِ وَالتَّخْزِينِ؟! السِّرُّ هُنَا... فِي الدَّوَائِرِ التَّسْلْسُلِيَّةِ وَالقَالِبَاتِ! لَحْظَةً... الدَّامِجُ يَقُومُ بِجَمْعِ الإِشَارَاتِ وَاخْتِيَارِهَا، بَيْنَمَا القَالِبُ يَحْفَظُ بِتاً واحِداً بِدِقَّةٍ مُدْهِشَةٍ! وَقَاعِدَتُنَا الذَّهَبِيَّةُ: الدَّامِجُ يَقْتُصُ وَيَخْتَارُ مِنْ مُتَعَدِّدٍ إِلَى وَاحِدٍ، فَكُنْ مُتَيَقِّظاً لِئَلَّا تَقَعَ فِي الفَخِّ!",
+    "scenes": [
+      {
+        "id": "scene-1",
+        "act": "hook",
+        "title": "معجزة الذاكرة الرقمية",
+        "badgeText": "🔥 فكرة محورية",
+        "visualType": "quote",
+        "visualData": {
+          "highlightQuote": "تَخَيَّلْ مَعِي... كَيْفَ يَتَمَكَّنُ حَاسِبُكَ مِنَ التَّفْكِيرِ وَالتَّخْزِينِ؟!"
+        },
+        "startSec": 0,
+        "endSec": 10
+      },
+      {
+        "id": "scene-2",
+        "act": "concept",
+        "title": "تشريح الدوائر التسلسلية",
+        "badgeText": "🧠 الشرح العميق",
+        "visualType": "bullet_points",
+        "visualData": {
+          "bullets": [
+            "الدَّائِرَةُ التَّسْلْسُلِيَّةُ تَعْتَمِدُ عَلَى الحَالَةِ السَّابِقَةِ لِلتَّخْزِينِ.",
+            "القَالِبُ (Flip-Flop) خَلِيَّةُ تَخْزِينٍ أَسَاسِيَّةٌ تَحْفَظُ بِتاً واحِداً.",
+            "الدَّامِجُ (Multiplexer) يَخْتَارُ إِشَارَةً واحِدَةً مِنْ عِدَّةِ إِشَارَاتٍ."
+          ],
+          "formulaLatex": "N = 2^S",
+          "codeSnippet": "",
+          "imagePrompt": "A highly detailed academic diagram showing digital sequential circuits, multiplexers, and flip-flops on a futuristic chalkboard background."
+        },
+        "startSec": 10,
+        "endSec": 30
+      },
+      {
+        "id": "scene-3",
+        "act": "takeaway",
+        "title": "الخلاصة الذهبية",
+        "badgeText": "🏆 التطبيق والنتيجة",
+        "visualType": "bullet_points",
+        "visualData": {
+          "highlightQuote": "الدَّامِجُ يَجْمَعُ وَيَخْتَارُ مِنْ مُتَعَدِّدٍ إِلَى وَاحِدٍ، وَالمُفَرِّقُ يُوَزِّعُ الإِشَارَةَ!"
+        },
+        "startSec": 30,
+        "endSec": 45
+      }
+    ],
+    "word_timings": [
+      {
+        "word": "تَخَيَّلْ",
+        "startMs": 0,
+        "endMs": 952
+      },
+      {
+        "word": "مَعِي...",
+        "startMs": 952,
+        "endMs": 1905
+      },
+      {
+        "word": "كَيْفَ",
+        "startMs": 1905,
+        "endMs": 2857
+      },
+      {
+        "word": "يَتَمَكَّنُ",
+        "startMs": 2857,
+        "endMs": 3810
+      },
+      {
+        "word": "حَاسِبُكَ",
+        "startMs": 3810,
+        "endMs": 4762
+      },
+      {
+        "word": "مِنَ",
+        "startMs": 4762,
+        "endMs": 5714
+      },
+      {
+        "word": "التَّفْكِيرِ",
+        "startMs": 5714,
+        "endMs": 6667
+      },
+      {
+        "word": "وَالتَّخْزِينِ؟!",
+        "startMs": 6667,
+        "endMs": 7619
+      },
+      {
+        "word": "السِّرُّ",
+        "startMs": 7619,
+        "endMs": 8571
+      },
+      {
+        "word": "هُنَا...",
+        "startMs": 8571,
+        "endMs": 9524
+      },
+      {
+        "word": "فِي",
+        "startMs": 9524,
+        "endMs": 10476
+      },
+      {
+        "word": "الدَّوَائِرِ",
+        "startMs": 10476,
+        "endMs": 11429
+      },
+      {
+        "word": "التَّسْلْسُلِيَّةِ",
+        "startMs": 11429,
+        "endMs": 12381
+      },
+      {
+        "word": "وَالقَالِبَاتِ!",
+        "startMs": 12381,
+        "endMs": 13333
+      },
+      {
+        "word": "لَحْظَةً...",
+        "startMs": 13333,
+        "endMs": 14286
+      },
+      {
+        "word": "الدَّامِجُ",
+        "startMs": 14286,
+        "endMs": 15238
+      },
+      {
+        "word": "يَقُومُ",
+        "startMs": 15238,
+        "endMs": 16190
+      },
+      {
+        "word": "بِجَمْعِ",
+        "startMs": 16190,
+        "endMs": 17143
+      },
+      {
+        "word": "الإِشَارَاتِ",
+        "startMs": 17143,
+        "endMs": 18095
+      },
+      {
+        "word": "وَاخْتِيَارِهَا،",
+        "startMs": 18095,
+        "endMs": 19048
+      },
+      {
+        "word": "بَيْنَمَا",
+        "startMs": 19048,
+        "endMs": 20000
+      },
+      {
+        "word": "القَالِبُ",
+        "startMs": 20000,
+        "endMs": 20952
+      },
+      {
+        "word": "يَحْفَظُ",
+        "startMs": 20952,
+        "endMs": 21905
+      },
+      {
+        "word": "بِتاً",
+        "startMs": 21905,
+        "endMs": 22857
+      },
+      {
+        "word": "واحِداً",
+        "startMs": 22857,
+        "endMs": 23810
+      },
+      {
+        "word": "بِدِقَّةٍ",
+        "startMs": 23810,
+        "endMs": 24762
+      },
+      {
+        "word": "مُدْهِشَةٍ!",
+        "startMs": 24762,
+        "endMs": 25714
+      },
+      {
+        "word": "وَقَاعِدَتُنَا",
+        "startMs": 25714,
+        "endMs": 26667
+      },
+      {
+        "word": "الذَّهَبِيَّةُ:",
+        "startMs": 26667,
+        "endMs": 27619
+      },
+      {
+        "word": "الدَّامِجُ",
+        "startMs": 27619,
+        "endMs": 28571
+      },
+      {
+        "word": "يَقْتُصُ",
+        "startMs": 28571,
+        "endMs": 29524
+      },
+      {
+        "word": "وَيَخْتَارُ",
+        "startMs": 29524,
+        "endMs": 30476
+      },
+      {
+        "word": "مِنْ",
+        "startMs": 30476,
+        "endMs": 31429
+      },
+      {
+        "word": "مُتَعَدِّدٍ",
+        "startMs": 31429,
+        "endMs": 32381
+      },
+      {
+        "word": "إِلَى",
+        "startMs": 32381,
+        "endMs": 33333
+      },
+      {
+        "word": "وَاحِدٍ،",
+        "startMs": 33333,
+        "endMs": 34286
+      },
+      {
+        "word": "فَكُنْ",
+        "startMs": 34286,
+        "endMs": 35238
+      },
+      {
+        "word": "مُتَيَقِّظاً",
+        "startMs": 35238,
+        "endMs": 36190
+      },
+      {
+        "word": "لِئَلَّا",
+        "startMs": 36190,
+        "endMs": 37143
+      },
+      {
+        "word": "تَقَعَ",
+        "startMs": 37143,
+        "endMs": 38095
+      },
+      {
+        "word": "فِي",
+        "startMs": 38095,
+        "endMs": 39048
+      },
+      {
+        "word": "الفَخِّ!",
+        "startMs": 39048,
+        "endMs": 40000
+      }
+    ],
+    "visual_cards": [
+      {
+        "title": "المعادلة الحاكمة",
+        "content": "علاقة خطوط التحكم بعدد المداخل: N = 2^S حيث S هو عدد خطوط التحكم.",
+        "type": "formula",
+        "startSec": 5,
+        "endSec": 20
+      },
+      {
+        "title": "القاعدة الذهبية",
+        "content": "الدامج يختار إشارة واحدة من متعدد (N إلى 1)، بينما المفرق يوزع إشارة واحدة على متعدد (1 إلى N).",
+        "type": "diagram",
+        "startSec": 21,
+        "endSec": 35
+      }
+    ],
+    "interactive_quiz": {
+      "question": "ما هي الوظيفة الأساسية للدامج (Multiplexer) في الدوائر الرقمية؟",
+      "options": [
+        "توزيع إشارة واحدة على عدة مخارج",
+        "اختيار إشارة واحدة من عدة إشارات لتمريرها عبر خط واحد",
+        "تحويل الشفرات الثنائية إلى إشارات تحكم"
+      ],
+      "correctIndex": 1,
+      "triggerSec": 32,
+      "explanation": "الدامج (Multiplexer) يختص باختيار إشارة واحدة من بين عدة إشارات بناءً على إشارة التحكم وتوجيهها لخط واحد."
+    },
+    "likes_count": 32,
+    "views_count": 180,
+    "completions_count": 45,
+    "is_public_teaser": true,
+    "created_at": "2026-11-03T08:55:01.485Z"
+  },
+  {
+    "id": "reel-1793732329628",
+    "book_id": "9bf92f9f-f279-4dd3-b2c2-fcb4db3db4c5",
+    "book_title": "الدراسات الاجتماعية للصف الثاني الإعدادي - الفصل الدراسي الأول",
+    "author_name": "خبير المادة",
+    "category": "academic_curriculum",
+    "subcategory": "التاريخ والجغرافيا",
+    "thumbnail_url": "",
+    "chapter_id": "ch-9bf92f9f-f279-4dd3-b2c2-fcb4db3db4c5-4",
+    "chapter_title": "الدرس الرابع: جغرافيا وتاريخ الوطن العربي - الإطار الطبيعي والبشري",
+    "style_type": "chalkboard",
+    "style": "chalkboard",
+    "voice": "ar-XA-Chirp3-HD-Fenrir",
+    "language": "ar",
+    "duration_seconds": 45,
+    "audio_url": "https://ydlzvuutjgelpxueufgn.supabase.co/storage/v1/object/public/book-audios/reel_9bf92f9f-f279-4dd3-b2c2-fcb4db3db4c5_ch-9bf92f9f-f279-4dd3-b2c2-fcb4db3db4c5-4_1793732321341.mp3",
+    "narration_script": "هَلْ سَأَلْتَ نَفْسَكَ يَوْماً... لِمَاذَا كَانَ وَطَنُنَا الْعَرَبِيُّ مَحَطَّ أَنْظَارِ قُوًى عَالَمِيَّةٍ عَبْرَ التَّارِيخِ؟ لَحْظَةً... السِّرُّ هُنَا! فَهُوَ يَرْبُطُ بَيْنَ قَارَّاتِ الْعَالَمِ الْقَدِيمِ آسْيَا وَأَفْرِيقْيَا، وَيَتَحَكَّمُ فِي مَمَرَّاتٍ مَائِيَّةٍ عَالَمِيَّةٍ حَاسِمَةٍ كَقَنَاةِ السُّوَيسِ وَمَضِيقِ هُرْمُزَ! وَلَيْسَ هَذَا فَحَسْبُ، بَلْ تَجْتَمِعُ فِيهِ وَحْدَةُ اللُّغَةِ وَالثَّقَافَةِ وَالتَّارِيخِ الْمُشْتَرَكِ. إِذًا... مَوْقِعُنَا الْجِغْرَافِيُّ لَيْسَ مُجَرَّدَ خَرِيطَةٍ، بَلْ هُوَ مَسْؤُولِيَّةٌ كُبْرَى لِتَحْقِيقِ التَّنْمِيَةِ الْمُسْتَدَامَةِ!",
+    "scenes": [
+      {
+        "id": "scene-1",
+        "act": "hook",
+        "title": "سر الموقع الجغرافي",
+        "badgeText": "🔥 فكرة محورية",
+        "visualType": "quote",
+        "visualData": {
+          "highlightQuote": "لماذا كان وطننا العربي محط أنظار قوى العالم عبر التاريخ؟"
+        },
+        "startSec": 0,
+        "endSec": 10
+      },
+      {
+        "id": "scene-2",
+        "act": "concept",
+        "title": "الإطار الطبيعي والبشري",
+        "badgeText": "🧠 الشرح العميق",
+        "visualType": "bullet_points",
+        "visualData": {
+          "bullets": [
+            "يربط بين قارات العالم القديم آسيا وأفريقيا",
+            "يتحكم في ممرات مائية هامة كقناة السويس ومضيق هرمز",
+            "يتميز بهوية ثقافية وحضارية مشتركة وتكامل اقتصادي"
+          ],
+          "formulaLatex": "",
+          "codeSnippet": "",
+          "imagePrompt": "An academic 3D map of the Arab world highlighting its strategic location between Asia and Africa with vital waterways highlighted."
+        },
+        "startSec": 10,
+        "endSec": 30
+      },
+      {
+        "id": "scene-3",
+        "act": "takeaway",
+        "title": "المسؤولية والتنمية",
+        "badgeText": "🏆 التطبيق والنتيجة",
+        "visualType": "bullet_points",
+        "visualData": {
+          "highlightQuote": "الموقع الجغرافي المميز يحمل مسؤوليات كبرى للحفاظ على الأمن القومي والتنمية المستدامة."
+        },
+        "startSec": 30,
+        "endSec": 45
+      }
+    ],
+    "word_timings": [
+      {
+        "word": "هَلْ",
+        "startMs": 0,
+        "endMs": 678
+      },
+      {
+        "word": "سَأَلْتَ",
+        "startMs": 678,
+        "endMs": 1356
+      },
+      {
+        "word": "نَفْسَكَ",
+        "startMs": 1356,
+        "endMs": 2034
+      },
+      {
+        "word": "يَوْماً...",
+        "startMs": 2034,
+        "endMs": 2712
+      },
+      {
+        "word": "لِمَاذَا",
+        "startMs": 2712,
+        "endMs": 3390
+      },
+      {
+        "word": "كَانَ",
+        "startMs": 3390,
+        "endMs": 4068
+      },
+      {
+        "word": "وَطَنُنَا",
+        "startMs": 4068,
+        "endMs": 4746
+      },
+      {
+        "word": "الْعَرَبِيُّ",
+        "startMs": 4746,
+        "endMs": 5424
+      },
+      {
+        "word": "مَحَطَّ",
+        "startMs": 5424,
+        "endMs": 6102
+      },
+      {
+        "word": "أَنْظَارِ",
+        "startMs": 6102,
+        "endMs": 6780
+      },
+      {
+        "word": "قُوًى",
+        "startMs": 6780,
+        "endMs": 7458
+      },
+      {
+        "word": "عَالَمِيَّةٍ",
+        "startMs": 7458,
+        "endMs": 8136
+      },
+      {
+        "word": "عَبْرَ",
+        "startMs": 8136,
+        "endMs": 8814
+      },
+      {
+        "word": "التَّارِيخِ؟",
+        "startMs": 8814,
+        "endMs": 9492
+      },
+      {
+        "word": "لَحْظَةً...",
+        "startMs": 9492,
+        "endMs": 10169
+      },
+      {
+        "word": "السِّرُّ",
+        "startMs": 10169,
+        "endMs": 10847
+      },
+      {
+        "word": "هُنَا!",
+        "startMs": 10847,
+        "endMs": 11525
+      },
+      {
+        "word": "فَهُوَ",
+        "startMs": 11525,
+        "endMs": 12203
+      },
+      {
+        "word": "يَرْبُطُ",
+        "startMs": 12203,
+        "endMs": 12881
+      },
+      {
+        "word": "بَيْنَ",
+        "startMs": 12881,
+        "endMs": 13559
+      },
+      {
+        "word": "قَارَّاتِ",
+        "startMs": 13559,
+        "endMs": 14237
+      },
+      {
+        "word": "الْعَالَمِ",
+        "startMs": 14237,
+        "endMs": 14915
+      },
+      {
+        "word": "الْقَدِيمِ",
+        "startMs": 14915,
+        "endMs": 15593
+      },
+      {
+        "word": "آسْيَا",
+        "startMs": 15593,
+        "endMs": 16271
+      },
+      {
+        "word": "وَأَفْرِيقْيَا،",
+        "startMs": 16271,
+        "endMs": 16949
+      },
+      {
+        "word": "وَيَتَحَكَّمُ",
+        "startMs": 16949,
+        "endMs": 17627
+      },
+      {
+        "word": "فِي",
+        "startMs": 17627,
+        "endMs": 18305
+      },
+      {
+        "word": "مَمَرَّاتٍ",
+        "startMs": 18305,
+        "endMs": 18983
+      },
+      {
+        "word": "مَائِيَّةٍ",
+        "startMs": 18983,
+        "endMs": 19661
+      },
+      {
+        "word": "عَالَمِيَّةٍ",
+        "startMs": 19661,
+        "endMs": 20339
+      },
+      {
+        "word": "حَاسِمَةٍ",
+        "startMs": 20339,
+        "endMs": 21017
+      },
+      {
+        "word": "كَقَنَاةِ",
+        "startMs": 21017,
+        "endMs": 21695
+      },
+      {
+        "word": "السُّوَيسِ",
+        "startMs": 21695,
+        "endMs": 22373
+      },
+      {
+        "word": "وَمَضِيقِ",
+        "startMs": 22373,
+        "endMs": 23051
+      },
+      {
+        "word": "هُرْمُزَ!",
+        "startMs": 23051,
+        "endMs": 23729
+      },
+      {
+        "word": "وَلَيْسَ",
+        "startMs": 23729,
+        "endMs": 24407
+      },
+      {
+        "word": "هَذَا",
+        "startMs": 24407,
+        "endMs": 25085
+      },
+      {
+        "word": "فَحَسْبُ،",
+        "startMs": 25085,
+        "endMs": 25763
+      },
+      {
+        "word": "بَلْ",
+        "startMs": 25763,
+        "endMs": 26441
+      },
+      {
+        "word": "تَجْتَمِعُ",
+        "startMs": 26441,
+        "endMs": 27119
+      },
+      {
+        "word": "فِيهِ",
+        "startMs": 27119,
+        "endMs": 27797
+      },
+      {
+        "word": "وَحْدَةُ",
+        "startMs": 27797,
+        "endMs": 28475
+      },
+      {
+        "word": "اللُّغَةِ",
+        "startMs": 28475,
+        "endMs": 29153
+      },
+      {
+        "word": "وَالثَّقَافَةِ",
+        "startMs": 29153,
+        "endMs": 29831
+      },
+      {
+        "word": "وَالتَّارِيخِ",
+        "startMs": 29831,
+        "endMs": 30508
+      },
+      {
+        "word": "الْمُشْتَرَكِ.",
+        "startMs": 30508,
+        "endMs": 31186
+      },
+      {
+        "word": "إِذًا...",
+        "startMs": 31186,
+        "endMs": 31864
+      },
+      {
+        "word": "مَوْقِعُنَا",
+        "startMs": 31864,
+        "endMs": 32542
+      },
+      {
+        "word": "الْجِغْرَافِيُّ",
+        "startMs": 32542,
+        "endMs": 33220
+      },
+      {
+        "word": "لَيْسَ",
+        "startMs": 33220,
+        "endMs": 33898
+      },
+      {
+        "word": "مُجَرَّدَ",
+        "startMs": 33898,
+        "endMs": 34576
+      },
+      {
+        "word": "خَرِيطَةٍ،",
+        "startMs": 34576,
+        "endMs": 35254
+      },
+      {
+        "word": "بَلْ",
+        "startMs": 35254,
+        "endMs": 35932
+      },
+      {
+        "word": "هُوَ",
+        "startMs": 35932,
+        "endMs": 36610
+      },
+      {
+        "word": "مَسْؤُولِيَّةٌ",
+        "startMs": 36610,
+        "endMs": 37288
+      },
+      {
+        "word": "كُبْرَى",
+        "startMs": 37288,
+        "endMs": 37966
+      },
+      {
+        "word": "لِتَحْقِيقِ",
+        "startMs": 37966,
+        "endMs": 38644
+      },
+      {
+        "word": "التَّنْمِيَةِ",
+        "startMs": 38644,
+        "endMs": 39322
+      },
+      {
+        "word": "الْمُسْتَدَامَةِ!",
+        "startMs": 39322,
+        "endMs": 40000
+      }
+    ],
+    "visual_cards": [
+      {
+        "title": "الأهمية الإستراتيجية",
+        "content": "التحكم في طرق التجارة العالمية والممرات المائية مثل قناة السويس ومضيق باب المندب وهرمز.",
+        "type": "formula",
+        "startSec": 5,
+        "endSec": 20
+      },
+      {
+        "title": "التكامل البشري",
+        "content": "وحدة اللغة والدين والتاريخ المشترك والطاقات الشبابية الهائلة التي تعزز التعاون العربي المشترك.",
+        "type": "diagram",
+        "startSec": 21,
+        "endSec": 35
+      }
+    ],
+    "interactive_quiz": {
+      "question": "ما هو المضيق الذي يتحكم في الملاحة ويربط الخليج العربي بخليج عمان؟",
+      "options": [
+        "مضيق هرمز",
+        "مضيق باب المندب",
+        "قناة السويس"
+      ],
+      "correctIndex": 0,
+      "triggerSec": 32,
+      "explanation": "مضيق هرمز يقع بين عيران وعمان ويتحكم في مدخل الخليج العربي، وهو أحد أهم الممرات الإستراتيجية في الوطن العربي."
+    },
+    "likes_count": 32,
+    "views_count": 182,
+    "completions_count": 45,
+    "is_public_teaser": true,
+    "created_at": "2026-11-03T18:58:49.628Z"
   }
 ]
