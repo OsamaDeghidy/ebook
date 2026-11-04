@@ -4,6 +4,9 @@ export interface SyllabusLessonBlueprint {
   lesson_order: number;
   lesson_title: string;
   unit_title?: string;
+  start_page?: number;
+  end_page?: number;
+  lesson_type?: string;
   character_start?: number;
   character_end?: number;
   page_estimate?: string;
@@ -49,6 +52,9 @@ const blueprintResponseSchema = {
           lesson_order: { type: Type.INTEGER, description: "Strict sequential 1-based index from page 1 to the end" },
           lesson_title: { type: Type.STRING, description: "Exact authentic title of the lesson as written in the booklet" },
           unit_title: { type: Type.STRING, description: "Parent unit title if available" },
+          start_page: { type: Type.INTEGER, description: "Printed book page number where this lesson begins in the TOC" },
+          end_page: { type: Type.INTEGER, description: "Book page number where this lesson ends before the next lesson" },
+          lesson_type: { type: Type.STRING, description: "Type: reading, poetry, grammar, lab, or unit" },
           sub_topics: {
             type: Type.ARRAY,
             items: { type: Type.STRING },
@@ -104,19 +110,24 @@ function normalizeForSearch(text: string): string {
  */
 function detectTocBoundary(text: string): number {
   if (!text) return 0;
-  const sample = text.substring(0, 6000);
+  const sample = text.substring(0, 15000);
   
   // Check for Table of Contents header keywords
-  const tocMatch = sample.match(/(?:فهرس|المحتويات|جدول الدروس|محتويات المنهج|دليل المنهج)/i);
+  const tocMatch = sample.match(/(?:فهرس|المحتويات|جدول الدروس|محتويات المنهج|دليل المنهج|خطة توزيع|table\s*of\s*contents)/i);
   if (!tocMatch) return 0;
 
-  // Find where the actual content begins
   const tocIdx = tocMatch.index || 0;
-  const afterToc = sample.indexOf("\n\n", tocIdx + 800);
-  if (afterToc !== -1 && afterToc < 5000) {
+  // Look for the start of actual body content (Unit 1 or Lesson 1 in body, after TOC listing)
+  const bodyStartMatch = sample.substring(tocIdx + 300).match(/(?:الوحدة الأولى|المحور الأول|الفصل الأول|الموضوع الأول|unit\s*1|chapter\s*1)/i);
+  if (bodyStartMatch && bodyStartMatch.index !== undefined) {
+    return tocIdx + 300 + bodyStartMatch.index;
+  }
+
+  const afterToc = sample.indexOf("\n\n", tocIdx + 1200);
+  if (afterToc !== -1 && afterToc < 10000) {
     return afterToc;
   }
-  return Math.min(2500, Math.floor(sample.length / 2));
+  return Math.min(3500, Math.floor(sample.length / 2));
 }
 
 /**
@@ -279,6 +290,16 @@ ${previewText}
    - For kindergarten (KG/رياض الأطفال) or early primary books:
      * Discover every distinct Alphabet Letter unit (e.g. "حرف الألف", "حرف الميم", "حرف الباء"), Listening Story ("قصة الاستماع"), Phonics & Phonemic Awareness ("الوعي الصوتي", "الوعي البصري"), and Theme/Unit ("المحور الأول: من أكون", "المحور الثاني: العالم من حولي").
      * 🚫 NEVER condense an entire 50-100+ page kindergarten booklet into 1 or 2 generic lessons! Extract all distinct interactive educational lessons (typically 8 to 25 distinct chapters).
+
+8. 📖 MANDATORY TABLE OF CONTENTS & PAGE NUMBER EXTRACTION (P0):
+   - You MUST read the Table of Contents (الفهرس / دليل المحتويات / خطة توزيع المنهج) and extract the exact printed page number for every lesson as 'start_page'.
+   - 'end_page' MUST be the page number preceding the next lesson's start_page.
+   - Example from ministry syllabus:
+     * Lesson 1: "نص استماع سيدة المقاومة المصرية" -> start_page: 11, end_page: 14.
+     * Lesson 2: "نص قراءة العبور إلى المستقبل حرب أكتوبر" -> start_page: 15, end_page: 33.
+     * Lesson 3: "نص قراءة من صقور الوطنية" -> start_page: 34, end_page: 43.
+     * Lesson 4: "نص شعري مصر التي في خاطري" -> start_page: 44, end_page: 56.
+   - If printed page numbers are not explicitly stated, estimate realistic sequential page ranges across the book.
 `;
 
   try {
@@ -306,27 +327,27 @@ ${previewText}
     const rawLessons: any[] = Array.isArray(parsed.lessons) && parsed.lessons.length > 0 ? parsed.lessons : [];
 
     const normalizedDoc = normalizeForSearch(extractedText);
-    const tocBoundary = detectTocBoundary(extractedText);
+    const tocBoundary = Math.max(detectTocBoundary(extractedText), 0);
 
-    // Step 1: Find start position for each detected lesson
+    // Step 1: Chronological Monotonic Location (Preserve Canonical Curriculum Order)
+    // NEVER sort lessons by startOffset. The LLM detected rawLessons in the official syllabus order (1, 2, 3...)
     const locatedLessons: Array<{
       raw: any;
       startOffset: number;
     }> = [];
 
-    let currentOffset = tocBoundary;
+    let monotonicCursor = tocBoundary;
     for (let i = 0; i < rawLessons.length; i++) {
       const l = rawLessons[i];
-      let pos = findLessonStartPosition(l, extractedText, normalizedDoc, currentOffset, tocBoundary);
+      // Search forward from current monotonic cursor to prevent matching prior reviews or TOC mentions
+      let pos = findLessonStartPosition(l, extractedText, normalizedDoc, monotonicCursor, tocBoundary);
       
-      // If not found after current offset, search from beginning of body
-      if (pos === -1 && currentOffset > tocBoundary) {
-        pos = findLessonStartPosition(l, extractedText, normalizedDoc, tocBoundary, tocBoundary);
-      }
-
-      // If still not found, estimate proportionally
-      if (pos === -1) {
-        pos = Math.floor((i / rawLessons.length) * extractedText.length);
+      // If not found ahead of cursor, check if it occurs after tocBoundary (without rolling back before current lesson)
+      if (pos === -1 || pos < monotonicCursor) {
+        // Fallback: estimate position between monotonicCursor and the end of document
+        const remainingLessons = rawLessons.length - i;
+        const remainingChars = Math.max(0, extractedText.length - monotonicCursor);
+        pos = monotonicCursor + Math.floor(remainingChars / Math.max(1, remainingLessons + 1));
       }
 
       locatedLessons.push({
@@ -334,35 +355,39 @@ ${previewText}
         startOffset: pos
       });
 
-      if (pos > currentOffset) {
-        currentOffset = pos;
-      }
+      // Advance cursor monotonically for the next lesson
+      monotonicCursor = Math.max(monotonicCursor, pos + 250);
     }
 
-    // Step 2: STRICTLY SORT all lessons by their actual appearance offset in the document
-    locatedLessons.sort((a, b) => a.startOffset - b.startOffset);
-
-    // Step 3: Slice contiguous, complete raw text slices for each lesson
+    // Step 2: Slice contiguous, complete raw text slices for each lesson in STRICT CANONICAL ORDER
     const mappedLessons: SyllabusLessonBlueprint[] = locatedLessons.map((item, idx) => {
       const l = item.raw;
       const startPos = Math.max(0, item.startOffset);
       const nextItem = locatedLessons[idx + 1];
-      const endPos = nextItem ? Math.max(startPos + 100, nextItem.startOffset) : extractedText.length;
+      const endPos = nextItem && nextItem.startOffset > startPos 
+        ? nextItem.startOffset 
+        : (idx === locatedLessons.length - 1 ? extractedText.length : Math.min(extractedText.length, startPos + 5000));
 
       let lessonRawText = extractedText.substring(startPos, endPos).trim();
 
-      // Ensure snippet is sufficiently comprehensive (at least 150 chars or proportional slice)
-      if (lessonRawText.length < 150) {
+      // Ensure snippet is sufficiently comprehensive (at least 200 chars or proportional slice)
+      if (lessonRawText.length < 200) {
         const sliceSize = Math.floor(extractedText.length / Math.max(1, locatedLessons.length));
         const pStart = idx * sliceSize;
         const pEnd = idx === locatedLessons.length - 1 ? extractedText.length : (idx + 1) * sliceSize;
         lessonRawText = extractedText.substring(pStart, pEnd).trim();
       }
 
+      const startPg = Number(l.start_page) || (idx * 5 + 1);
+      const endPg = Number(l.end_page) || Math.max(startPg + 3, (idx + 1) * 5);
+
       return {
-        lesson_order: idx + 1, // Re-assign strict 1, 2, 3... order
+        lesson_order: idx + 1, // Strict sequential 1-based order
         lesson_title: (l.lesson_title || `الدرس ${idx + 1}`).trim(),
         unit_title: l.unit_title || undefined,
+        start_page: startPg,
+        end_page: endPg,
+        lesson_type: l.lesson_type || undefined,
         character_start: startPos,
         character_end: endPos,
         sub_topics: Array.isArray(l.sub_topics) && l.sub_topics.length > 0 ? l.sub_topics : ["الشرح والمفاهيم", "التطبيقات والتدريبات"],
@@ -372,7 +397,7 @@ ${previewText}
       };
     });
 
-    console.log(`[Document Blueprint] Successfully discovered and sequentially ordered ${mappedLessons.length} lessons from page 1 to end.`);
+    console.log(`[Document Blueprint] Successfully generated ${mappedLessons.length} lessons in strict canonical syllabus sequence.`);
 
     return {
       book_title: (parsed.book_title || metadata.fileName || "المقرر التعليمي المعتمد").trim(),

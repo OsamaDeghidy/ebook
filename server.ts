@@ -30,7 +30,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { PDFParse } from "pdf-parse";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
-import { parseDocumentBuffer, extractPdfTextViaVisionPages } from "./server/services/documentParser";
+import { parseDocumentBuffer, extractPdfTextViaVisionPages, extractPdfPageRange } from "./server/services/documentParser";
 import { buildMasterPedagogicalPrompt, evaluatePedagogicalChunking, deduplicateChapterTitles } from "./server/services/pedagogicalChunker";
 import { extractDocumentBlueprint, getPendingLessons, markLessonsCompleted, DocumentSyllabusBlueprint, SyllabusLessonBlueprint } from "./server/services/documentBlueprint";
 import { buildGroundedBatchPrompt } from "./server/services/groundedLessonBuilder";
@@ -41,6 +41,7 @@ import { buildEducationalQuizPrompt, buildComprehensiveExamPrompt, Comprehensive
 import { detectTeacherPersona } from "./server/services/teacherPersonas";
 import { buildInteractiveExplanationPrompt } from "./server/services/interactiveExplanationV2";
 import { buildCurriculumMindMapPrompt } from "./server/services/curriculumMindMap";
+import { generateLessonActivity, detectActivityArchetype, GeneratedActivity } from "./server/services/activityEngine";
 
 dotenv.config();
 
@@ -1654,6 +1655,7 @@ async function runBackgroundEbookConversion(
 
     let contents: any[] = [];
     let extractedText = "";
+    let savedLocalFile = "";
     let isScannedVisionPdf = false;
     let scannedTotalPages = 0;
     let scannedLastPage = 0;
@@ -1729,6 +1731,16 @@ async function runBackgroundEbookConversion(
       const buffer = Buffer.from(fileBase64, "base64");
       const sizeMB = (buffer.length / (1024 * 1024)).toFixed(1);
       extractedText = "";
+
+      // 💾 Persist local cache copy of uploaded file to prevent asset loss
+      try {
+        const safeName = `${Date.now()}-${(effectiveFileName || "uploaded_doc").replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+        const localDest = path.join(PERSISTENT_UPLOADS_DIR, safeName);
+        fs.writeFileSync(localDest, buffer);
+        savedLocalFile = localDest;
+      } catch (saveErr) {
+        console.warn("[Job Worker] Local persistent upload caching error:", saveErr);
+      }
 
       job.progressStep = `جاري فحص واستخراج محتوى المذكرة (${sizeMB} ميجابايت)...`;
       job.progressPercent = 25;
@@ -1838,6 +1850,31 @@ async function runBackgroundEbookConversion(
     if (initialBatch.length > 0 && syllabusBlueprint) {
       job.progressStep = `توليد الدفعة الأولى من الدروس (${initialBatch.length} دروس بتفاصيلها ونصوصها الأصيلة)...`;
       job.progressPercent = 65;
+
+      // 🎯 TARGETED JIT PAGE INGESTION FOR INITIAL BATCH
+      const activeSourceUrl = fileUrl || savedLocalFile;
+      if (activeSourceUrl) {
+        for (const l of initialBatch) {
+          if (l.start_page && (!l.raw_text_snippet || l.raw_text_snippet.length < 500)) {
+            try {
+              const { buffer } = await resolveCloudOrLocalFileBuffer(activeSourceUrl);
+              if (buffer) {
+                const pageText = await extractPdfPageRange(
+                  buffer,
+                  l.start_page,
+                  l.end_page || l.start_page + 6,
+                  async (params) => generateContentWithRetry(ai, params, ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite-preview", "gemini-3-flash-preview"])
+                );
+                if (pageText && pageText.length > 80) {
+                  l.raw_text_snippet = pageText;
+                }
+              }
+            } catch (err) {
+              console.warn(`[Initial Batch Ingestion] Warning for lesson ${l.lesson_title}:`, err);
+            }
+          }
+        }
+      }
 
       const pedagogicalGuardrails = await fetchPedagogicalGuardrails({
         subject: category || syllabusBlueprint.book_title || "عام",
@@ -2055,6 +2092,15 @@ async function runBackgroundEbookConversion(
     finalizedEbook.pregeneration_status = 'completed';
     finalizedEbook.pregeneration_percent = 100;
     finalizedEbook.tags = academicTags;
+    // 🏛️ SOVEREIGN ASSET ATTACHMENT: Persist blueprint, original text, and source file URL
+    if (syllabusBlueprint) {
+      finalizedEbook.blueprint = syllabusBlueprint;
+    }
+    if (extractedText) {
+      finalizedEbook.original_text = extractedText;
+      finalizedEbook.raw_full_text = extractedText;
+    }
+    finalizedEbook.source_file_url = fileUrl || savedLocalFile || (finalizedEbook as any).source_file_url || "";
 
     ebooks.push(finalizedEbook);
     saveEbooks(ebooks, finalizedEbook); // Persist to JSON db & sync target book to Supabase
@@ -3248,6 +3294,102 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
     grade_level: (ebook as any).grade_level
   });
 
+  // 🩺 SELF-HEALING ASSET LOCATOR: If blueprint is missing, recover source document from cache/storage
+  if (!ebook.blueprint || !ebook.original_text) {
+    try {
+      console.log(`[Expand Chapters Self-Healing] Attempting source asset discovery for book: ${ebook.title}...`);
+      let recoveredBuffer: Buffer | null = null;
+      let recoveredFileName = "";
+
+      // 1. Try source_file_url on ebook
+      if (ebook.source_file_url) {
+        const res = await resolveCloudOrLocalFileBuffer(ebook.source_file_url);
+        if (res.buffer) {
+          recoveredBuffer = res.buffer;
+          recoveredFileName = res.resolvedFileName || "source_doc.pdf";
+        }
+      }
+
+      // 2. If not found, search in PERSISTENT_UPLOADS_DIR and data/source-books
+      if (!recoveredBuffer) {
+        const searchDirs = [PERSISTENT_UPLOADS_DIR, path.join(process.cwd(), "data", "source-books")];
+        const titleNormalized = ebook.title.toLowerCase().replace(/[^a-zA-Z0-9\u0600-\u06FF]/g, "");
+        const isScience = /علوم|science/.test(ebook.title.toLowerCase() + (ebook.category || ""));
+        const isIct = /حاسب|ict|تكنولوجيا/.test(ebook.title.toLowerCase() + (ebook.category || ""));
+        const isMath = /رياض|math/.test(ebook.title.toLowerCase() + (ebook.category || ""));
+
+        for (const dir of searchDirs) {
+          if (fs.existsSync(dir)) {
+            const files = fs.readdirSync(dir);
+            for (const f of files) {
+              const fLower = f.toLowerCase();
+              if (
+                (isScience && (fLower.includes("science") || fLower.includes("علوم"))) ||
+                (isIct && (fLower.includes("ict") || fLower.includes("حاسب"))) ||
+                (isMath && (fLower.includes("math") || fLower.includes("رياض"))) ||
+                fLower.includes(titleNormalized.substring(0, 8))
+              ) {
+                const fullPath = path.join(dir, f);
+                try {
+                  recoveredBuffer = fs.readFileSync(fullPath);
+                  recoveredFileName = f;
+                  ebook.source_file_url = fullPath;
+                  console.log(`[Expand Chapters Self-Healing] Matched cached source file: ${fullPath} (${(recoveredBuffer.length / 1048576).toFixed(1)}MB)`);
+                  break;
+                } catch (e) {}
+              }
+            }
+          }
+          if (recoveredBuffer) break;
+        }
+      }
+
+      // 3. If recovered, parse and generate canonical blueprint
+      if (recoveredBuffer) {
+        let extracted = "";
+        try {
+          const parsed = await parseDocumentBuffer(recoveredBuffer, "application/pdf", recoveredFileName);
+          extracted = parsed.text;
+        } catch (e) {}
+
+        if (!extracted || extracted.length < 350) {
+          const visionRes = await extractPdfTextViaVisionPages(
+            recoveredBuffer,
+            async (params) => generateContentWithRetry(ai, params, ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite-preview", "gemini-3-flash-preview"]),
+            { startPage: 1, maxPagesToScan: 14, includeTocEndPages: true }
+          );
+          if (visionRes.text && visionRes.text.length > 200) {
+            extracted = visionRes.text;
+          }
+        }
+
+        if (extracted && extracted.length > 100) {
+          ebook.original_text = extracted;
+          ebook.raw_full_text = extracted;
+          const recoveredBp = await extractDocumentBlueprint(
+            extracted,
+            {
+              fileName: ebook.title,
+              category: ebook.category,
+              grade_level: (ebook as any).grade_level,
+              academic_system: (ebook as any).academic_system,
+              language: (ebook as any).language
+            },
+            async (params) => generateContentWithRetry(ai, params, ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite-preview", "gemini-3-flash-preview"])
+          );
+          // Mark already completed chapters as completed
+          const completedCount = currentChapters.length;
+          const completedOrders = Array.from({ length: completedCount }, (_, i) => i + 1);
+          ebook.blueprint = markLessonsCompleted(recoveredBp, completedOrders);
+          saveEbooks(ebooks, ebook);
+          console.log(`[Expand Chapters Self-Healing] Blueprint healed and saved! ${ebook.blueprint.lessons.length} total lessons mapped.`);
+        }
+      }
+    } catch (healErr) {
+      console.warn("[Expand Chapters Self-Healing] Warning:", healErr);
+    }
+  }
+
   // Check for pending lessons in syllabus blueprint
   let pendingLessons: SyllabusLessonBlueprint[] = ebook.blueprint ? getPendingLessons(ebook.blueprint, batchSize) : [];
 
@@ -3310,6 +3452,32 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
 
     if (pendingLessons.length > 0) {
       console.log(`[Expand Chapters] Generating grounded micro-batch for ${pendingLessons.length} pending lessons...`);
+
+      // 🎯 TARGETED JIT PAGE INGESTION:
+      // If the lesson has start_page and sourceFileUrl exists, extract authentic pages on-demand!
+      for (const l of pendingLessons) {
+        if (sourceFileUrl && l.start_page && (!l.raw_text_snippet || l.raw_text_snippet.length < 500)) {
+          try {
+            console.log(`[Targeted Ingestion] Fetching exact pages ${l.start_page}..${l.end_page || l.start_page + 6} for "${l.lesson_title}"...`);
+            const { buffer } = await resolveCloudOrLocalFileBuffer(sourceFileUrl);
+            if (buffer) {
+              const targetedText = await extractPdfPageRange(
+                buffer,
+                l.start_page,
+                l.end_page || l.start_page + 6,
+                async (params) => generateContentWithRetry(ai, params, ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite-preview", "gemini-3-flash-preview"])
+              );
+              if (targetedText && targetedText.length > 80) {
+                l.raw_text_snippet = targetedText;
+                console.log(`[Targeted Ingestion] Successfully extracted ${targetedText.length} characters of authentic curriculum text for ${l.lesson_title}.`);
+              }
+            }
+          } catch (tErr) {
+            console.warn(`[Targeted Ingestion] Warning for lesson ${l.lesson_title}:`, tErr);
+          }
+        }
+      }
+
       const pedagogicalGuardrails = await fetchPedagogicalGuardrails({
         subject: ebook.category || ebook.title,
         grade_level: (ebook as any).grade_level
@@ -3360,17 +3528,19 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
         }
       }
 
+      const nextOrder = currentChapters.length + 1;
+      const cleanGrade = (ebook as any).grade_level || 'المرحلة المقررة';
+
       if (!remainingSlice) {
-        remainingSlice = `المقرر: ${ebook.title} - تابع محاور المنهج للدرس رقم ${currentChapters.length + 1} لمرحلة ${(ebook as any).grade_level || 'العامة'}. استكمل المفاهيم التعليمية المقررة التالية بعمق ودقة بيداغوجية.`;
+        remainingSlice = `الدرس ${nextOrder} من مقرر ${ebook.title} المعتمد لمرحلة ${cleanGrade}. يركز المحتوى بدقة وأصالة على شرح النظريات والمفاهيم العلمية والتطبيقية المقررة لهذا الترتيب الدراسي وفق المنهج الوطني دون أي استطراد عام.`;
       }
 
-      const nextOrder = currentChapters.length + 1;
       const syntheticLesson: SyllabusLessonBlueprint = {
         lesson_order: nextOrder,
         lesson_title: `${ebook.title} - الدرس ${nextOrder}`,
         raw_text_snippet: remainingSlice,
         status: "pending",
-        sub_topics: ["الشرح المفاهيمي", "الأمثلة التطبيقية", "التقييم"]
+        sub_topics: ["المفاهيم والنصوص الأساسية", "التطبيقات والشروحات المقررة", "التقييم وسر التفوق"]
       };
 
       pendingLessons = [syntheticLesson];
@@ -3507,7 +3677,9 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(ebook.id));
       if (isUuid) {
         await supabase.from('books').update({
-          chapters: ebook.chapters
+          chapters: ebook.chapters,
+          blueprint: ebook.blueprint,
+          original_text: (ebook as any).original_text
         }).eq('id', ebook.id);
       }
     } catch (dbErr) {
@@ -3859,6 +4031,160 @@ app.get("/api/v2/interactive-explanation/:bookId/:chapterId?", (req, res) => {
   }
 
   res.json({ success: false, message: "No saved explanation found." });
+});
+
+// ========================================================
+// 🧪 PEDAGOGICAL GENERATIVE ACTIVITIES & APPLICATIONS ENGINE
+// ========================================================
+
+// 1. Generate or Regenerate Activity for a Chapter
+app.post("/api/activities/generate", async (req, res) => {
+  try {
+    const { bookId, chapterId, title, content, category, grade_level, preferredArchetype, forceRegenerate = false } = req.body;
+    if (!bookId || !chapterId) {
+      return res.status(400).json({ error: "معرّف الكتاب ومعرّف الفصل مطلوبان لتوليد النشاط التطبيقي." });
+    }
+
+    let book = ebooks.find(b => b.id === bookId);
+    if (!book) {
+      try {
+        const { data: dbBook } = await supabase.from("books").select("*").eq("id", bookId).maybeSingle();
+        if (dbBook) book = dbBook;
+      } catch (e) {}
+    }
+    if (!book) return res.status(404).json({ error: "الكتاب غير موجود." });
+
+    const chapter = (book.chapters || []).find((c: any) => c.id === chapterId);
+    if (!chapter) return res.status(404).json({ error: "الفصل غير موجود." });
+
+    // Cache hit check
+    const existing = chapter.interactive_activity || (chapter as any).interactiveActivity;
+    if (existing && !forceRegenerate) {
+      return res.json({ success: true, activity: existing, cached: true });
+    }
+
+    const ai = getAiInstance();
+    const effectiveTitle = title || chapter.title || "الدرس";
+    const effectiveContent = content || chapter.content || chapter.originalContent || "";
+    const effectiveCategory = category || book.category || "";
+    const effectiveGrade = grade_level || (book as any).grade_level || "";
+
+    const activity = await generateLessonActivity(
+      (params, modelChain) => generateContentWithRetry(ai, params, modelChain),
+      {
+        bookId,
+        chapterId,
+        title: effectiveTitle,
+        content: effectiveContent,
+        category: effectiveCategory,
+        grade_level: effectiveGrade,
+        preferredArchetype
+      }
+    );
+
+    // Save to chapter in memory, ebooks-db.json and Supabase
+    chapter.interactive_activity = activity;
+    (chapter as any).interactiveActivity = activity;
+    saveEbooks(ebooks);
+
+    try {
+      await supabase.from("books").update({ chapters: book.chapters }).eq("id", book.id);
+    } catch (e) {
+      console.warn("[Activity Engine] Supabase activity save notice:", e);
+    }
+
+    res.json({ success: true, activity, cached: false });
+  } catch (err: any) {
+    console.error("[Activity Engine] Generation error:", err);
+    res.status(500).json({ error: "فشل توليد النشاط التعليمي: " + (err.message || String(err)) });
+  }
+});
+
+// 2. GET saved activity for a chapter
+app.get("/api/activities/:bookId/:chapterId", (req, res) => {
+  const { bookId, chapterId } = req.params;
+  const book = ebooks.find(b => b.id === bookId);
+  if (!book) return res.status(404).json({ error: "الكتاب غير موجود." });
+
+  const chapter = (book.chapters || []).find((c: any) => c.id === chapterId);
+  if (!chapter) return res.status(404).json({ error: "الفصل غير موجود." });
+
+  const activity = chapter.interactive_activity || (chapter as any).interactiveActivity;
+  if (!activity) {
+    return res.json({ success: false, message: "لا يوجد نشاط محفوظ لهذا الفصل بعد." });
+  }
+
+  res.json({ success: true, activity });
+});
+
+// 3. Submit activity score, update grade & pass/fail status
+app.post("/api/activities/:bookId/:chapterId/submit", async (req, res) => {
+  try {
+    const { bookId, chapterId } = req.params;
+    const { userScore, totalPoints, answers, timeSpentSeconds, studentId = "student-1" } = req.body;
+
+    const book = ebooks.find(b => b.id === bookId);
+    if (!book) return res.status(404).json({ error: "الكتاب غير موجود." });
+
+    const chapter = (book.chapters || []).find((c: any) => c.id === chapterId);
+    if (!chapter) return res.status(404).json({ error: "الفصل غير موجود." });
+
+    const activity = chapter.interactive_activity || (chapter as any).interactiveActivity;
+    if (activity) {
+      const score = Math.max(0, Math.min(Number(userScore) || 0, activity.totalPoints || 10));
+      const percentage = (score / (activity.totalPoints || 10)) * 100;
+      const isPassed = percentage >= (activity.passPercentage || 70);
+
+      activity.userScore = score;
+      activity.isPassed = isPassed;
+      activity.completedAt = new Date().toISOString();
+      activity.attemptsCount = (activity.attemptsCount || 0) + 1;
+
+      saveEbooks(ebooks);
+
+      try {
+        await supabase.from("books").update({ chapters: book.chapters }).eq("id", book.id);
+      } catch (e) {}
+
+      // Telemetry log
+      try {
+        const telemetryEntry = {
+          timestamp: new Date().toISOString(),
+          studentId,
+          bookId,
+          chapterId,
+          eventType: "activity_submission",
+          score,
+          totalPoints: activity.totalPoints || 10,
+          percentage,
+          isPassed,
+          archetype: activity.archetype,
+          timeSpentSeconds: timeSpentSeconds || 0
+        };
+        const telemetryPath = path.join(process.cwd(), "data", "student_telemetry.json");
+        if (fs.existsSync(telemetryPath)) {
+          const content = fs.readFileSync(telemetryPath, "utf8");
+          const arr = JSON.parse(content || "[]");
+          arr.push(telemetryEntry);
+          fs.writeFileSync(telemetryPath, JSON.stringify(arr, null, 2), "utf8");
+        }
+      } catch (e) {}
+
+      return res.json({
+        success: true,
+        userScore: score,
+        totalPoints: activity.totalPoints || 10,
+        percentage,
+        isPassed,
+        attemptsCount: activity.attemptsCount
+      });
+    }
+
+    res.json({ success: true, userScore, isPassed: (userScore / (totalPoints || 10)) >= 0.7 });
+  } catch (err: any) {
+    console.error("[Activity Engine] Submit error:", err);
+    res.status(500).json({ error: "فشل تسجيل نتيجة النشاط: " + err.message });
+  }
 });
 
 // ========================================================

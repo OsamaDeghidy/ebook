@@ -43,8 +43,11 @@ export function buildGroundedBatchPrompt(params: {
   // Track 4: Social Studies, History & Geography
   const isSocialStudies = !isKindergarten && !isComputerScience && !isArabicOrLanguages && /دراسات|تاريخ|جغرافيا|social\s*studies|مواطنة|تربية\s*وطنية|جغرافية/.test(metaLower);
 
-  // Track 5: STEM (Mathematics, Physics, Chemistry, Biology, General Science)
-  const isStem = !isKindergarten && !isComputerScience && !isArabicOrLanguages && !isSocialStudies && /رياضيات|ماث|math|فيزياء|physics|كيمياء|chemistry|جبر|هندسة|تفاضل|تكامل|حساب|علوم|science|احصاء|إحصاء/.test(metaLower);
+  // Track 5: Pure Mathematics & Geometry
+  const isMath = !isKindergarten && !isComputerScience && !isArabicOrLanguages && !isSocialStudies && /رياضيات|ماث|math|جبر|هندسة|تفاضل|تكامل|حساب|احصاء|إحصاء|مثلثات|trigonometry|algebra|geometry|calculus/.test(metaLower);
+
+  // Track 6: Natural Sciences (Physics, Chemistry, Biology, General Science)
+  const isScience = !isKindergarten && !isComputerScience && !isArabicOrLanguages && !isSocialStudies && !isMath && /علوم|science|فيزياء|physics|كيمياء|chemistry|أحياء|biology|جيولوجيا|geology/.test(metaLower);
 
   let pedagogicalStructurePrompt = "";
 
@@ -179,37 +182,66 @@ export function buildGroundedBatchPrompt(params: {
    - \`### 💡 كبسولة التفوق والمقارنة الشاملة\`
      (مقارنة ملخصة في جدول Markdown بين المعركتين، أو الإقليمين المناخيين، أو الدولتين لتثبيت الحفظ ليلة الامتحان).
 `;
-  } else if (isStem) {
+  } else if (isMath) {
     pedagogicalStructurePrompt = `
-5. FIVE MANDATORY PEDAGOGICAL PILLARS (STEM ACADEMIC RIGOR & ZERO LAZINESS):
-   Each chapter's 'content' field MUST be an extensive, master-crafted educational chapter in GitHub Flavored Markdown:
-   - \`## [اسم الدرس الأصلي المعتمد]\`
+5. MANDATORY MATHEMATICS & RIGOROUS PROBLEM-SOLVING ARCHITECTURE:
+   🚫 STRICT BAN on trivial toy math ($x=3, y=5, x+y=5$) for Prep and Secondary stages!
+   All problems, definitions, and theorems MUST reflect the authentic academic grade level (${grade_level || 'Prep/Sec'}) and be directly grounded in the provided source text.
+
+   Each chapter's 'content' field MUST strictly follow this structured math architecture:
+   - \`## [اسم الدرس الرياضي الأصلي المعتمد]\`
 
    - \`> ### 📜 نص المذكرة الأصلي المعتمد\`
-     (عرض الفقرة أو النص الأصلي الكامل المستخرج من المذكرة دون حذف أو اختصار، ووضعه داخل صندوق اقتباس موثق)
+     (عرض التعريفات أو النظريات أو المسائل كما وردت في المذكرة المرفوعة بدقة وأمانة)
 
-   - \`### 🔍 التشريح العلمي وتفكيك المعنى\`
-     (كتابة فقرتين كاملتين ودسمتين تشرحان "لماذا وكيف" بالتفصيل والبرهان لكل فكرة ومفهوم فرعي في الدرس، مع ربطها بالأسباب والعلل والواقع)
+   - \`### 🔍 المفهوم الرياضي والتأسيس المنطقي\`
+     (تفكيك المعنى الرياضي بعمق: لماذا وضع العلماء هذا المفهوم، وكيف نربطه بالمنطق والأشكال الهندسية أو التطبيقات الحياتية)
 
-   - \`### 📚 معجم القواعد والمصطلحات الحاكمة\`
-     (تفكيك دقيق لكافة المصطلحات والقوانين مع ذكر وحدات القياس والشروط الرياضية الحاكمة)
+   - \`### 📐 النظريات والقوانين الحاكمة (Theorems & Mathematical Laws)\`
+     (صياغة النظريات والقوانين بترميز LaTeX نقي واضح داخل كتل رياضية $...$ أو $$...$$ مع ذكر الشروط والقيود الرياضية بدقة)
 
-   - \`### 📐 المسائل التدريبية والحلول النموذجية (منظومة المسائل الثلاثية الإلزامية المتدرجة)\`
-      (إلزامي صارم: تقديم 3 مسائل نموذجية متدرجة تغطي صلب الدرس:
-       * المسألة 1 (التأسيسية المباشرة): لتثبيت القاعدة وقراءة الرموز والتطبيق الأولي المباشر.
-       * المسألة 2 (الربط والتحليل): فكرة مركبة تجمع بين مفهومين في الدرس أو حالة ربط بين متغيرين.
-       * المسألة 3 (فخ الامتحان وسر التفوق): مسألة تحتوي على مغالطة شائعة أو حالة خاصة يقع فيها أغلب الطلاب.
+   - \`### 🎯 منظومة المسائل المتدرجة والحلول النموذجية (تأسيس -> ربط -> مهارات عليا)\`
+     (إلزامي صارم: تقديم 3 مسائل رياضية نموذجية حقيقية مناسبة لمرحلة ${grade_level || 'الإعدادي والثانوي'}:
+      * المسألة 1 (تطبيق مباشر لتثبيت القاعدة): قياس فهم التعريف أو القانون.
+      * المسألة 2 (مسألة ربط وتفكير مركب): دمج قاعدتين أو خطوات جبرية وهندسية متتالية.
+      * المسألة 3 (مسألة مهارات عليا وفخ امتحاني): حالة خاصة تتطلب انتباهاً رياضياً دقيقاً مثل القسمة على صفر أو شروط المجالات والجذور.
 
-       كل مسألة من المسائل الثلاث تبدأ بفقرة:
-       \`#### 💭 كيف فكرنا في الحل؟ ولماذا اخترنا هذا القانون تحديداً؟\`
-       يتبعها فوراً الهيكل الرباعي الصارم للحل:
-       1. المعطيات والتحويلات: استخراج المتغيرات وضبط الوحدات للنظام الدولي SI.
-       2. القانون الحاكم: كتابة الصيغة الرياضية بترميز LaTeX نقي.
-       3. خطوات التعويض والتحليل الجبري: تعويض رقمي مفصل خطوة بخطوة.
-       4. الناتج النهائي والتمييز: القيمة النهائية بوضوح مع تمييز وحدة القياس المناسبة).
+      كل مسألة تتبع هذا الهيكل المنهجي الصارم:
+      1. المعطيات والمطلوب (Given & Required).
+      2. القانون أو النظرية المستخدمة (Theorems / Rules).
+      3. خطوات الحل والبرهان الجبري/الهندسي خطوة بخطوة بالتفصيل.
+      4. الناتج النهائي مع التمييز).
 
-   - \`### 💡 مصيدة الامتحان والقاعدة الذهبية\`
-     (توضيح الفخ الذي يقع فيه معظم الطلاب في هذا الدرس تحديداً وكيف يتجنبه ليضمن الدرجة النهائية، مع كبسولة ذهبية للحل السريع).
+   - \`### 💡 كبسولة سر التفوق ومصائد الامتحانات الرياضية\`
+     (أشهر الأخطاء الشائعة التي يقع فيها الطلاب في هذا الدرس: مثل إشارات السالب والموجب، إهمال أحد الحلين في المعادلات التربيعية، أو مغالطات الفترات والجذور).
+`;
+  } else if (isScience) {
+    pedagogicalStructurePrompt = `
+5. MANDATORY NATURAL SCIENCES ARCHITECTURE (PHYSICS, CHEMISTRY, BIOLOGY):
+   🚫 STRICT BAN on fabricated algebraic equations (like $A \\times B = C$ or meaningless numbers) on descriptive chemical or biological topics!
+   Natural science is rooted in: PHENOMENA, LAB EXPERIMENTS, OBSERVATIONS, AND REAL CHEMICAL/PHYSICAL EQUATIONS.
+
+   Each chapter's 'content' field MUST strictly follow this empirical scientific structure:
+   - \`## [اسم الدرس العلمي الأصلي المعتمد]\`
+
+   - \`> ### 📜 نص المذكرة الأصلي المعتمد\`
+     (عرض النص أو التعريفات العلمية كما وردت في المذكرة المرفوعة دون تحريف)
+
+   - \`### 🔍 التفسير والتشريح العلمي للظاهرة (Scientific Inquiry & Concepts)\`
+     (تفكيك علمي رصين يجيب عن: ماذا يحدث؟ ولماذا يحدث؟ مع ذكر أسباب الظاهرة الطبيعية أو التفاعل الكيميائي)
+
+   - \`### 🧪 التجارب المعملية والمشاهدات التطبيقية (Hands-on Lab Experiments)\`
+     (عرض تجربة عملية معملية حقيقية مقررة في المنهج):
+     * **الأدوات والمواد:** (قائمة محددة بالأدوات المعملية).
+     * **خطوات العمل:** (تسلسل إجرائي علمي واضح).
+     * **المشاهدة والملاحظة:** (ماذا يرى الطالب بالعين المجردة أو التغير الحادث).
+     * **الاستنتاج والمعادلة:** (القاعدة العلمية المستنبطة أو المعادلة الكيميائية الرمزية الموزونة مثل: $2\\text{Na} + 2\\text{H}_2\\text{O} \\rightarrow 2\\text{NaOH} + \\text{H}_2\\uparrow$).
+
+   - \`### 📊 التطبيقات الحسابية والقوانين الفيزيائية\`
+     (فقط إذا كان الدرس يحتوي على قوانين فيزيائية واقعية مثل: السرعة، الكثافة، الضغط، التردد، العجلة - مع تطبيق قانون فيزيائي حقيقي بوحدات النظام الدولي SI، وممنوع منعاً باتاً اختراع قوانين وهمية).
+
+   - \`### ⚡ تصحيح المفاهيم العلمية المغلوطة وفخاخ الامتحانات\`
+     (توضيح اللبس الشائع بين المفاهيم: مثل الفرق بين الوزن والكتلة، أو التبخر والغليان، مع تلخيص مركّز لأهم علل وأسئلة 'علل لما يأتي' الخاصة بهذا الدرس).
 `;
   } else {
     pedagogicalStructurePrompt = `

@@ -353,6 +353,88 @@ export async function extractPdfTextViaVisionPages(
 }
 
 /**
+ * Targeted Page-Range Extractor for Specific Lessons
+ * Renders only the exact pages assigned to a lesson (e.g. pages 15 to 22)
+ * and extracts authentic lesson text, vocabulary, exercises, and grammar rules.
+ */
+export async function extractPdfPageRange(
+  buffer: Buffer,
+  startPage: number,
+  endPage: number,
+  generateFn: (params: any) => Promise<any>
+): Promise<string> {
+  const safeStart = Math.max(1, startPage);
+  // Cap at 10 pages maximum per single lesson request to guarantee speed & avoid timeout
+  const safeEnd = Math.max(safeStart, Math.min(endPage, safeStart + 9));
+  const pagesToRender: number[] = [];
+  for (let p = safeStart; p <= safeEnd; p++) {
+    pagesToRender.push(p);
+  }
+
+  console.log(`[Targeted Page Range] Extracting specific pages [${pagesToRender.join(", ")}] for lesson...`);
+
+  let pdfParser: PDFParse | null = null;
+  try {
+    const uint8Data = (buffer instanceof Uint8Array && !Buffer.isBuffer(buffer))
+      ? buffer
+      : new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+    pdfParser = new PDFParse(uint8Data as any);
+
+    const shotResult = await pdfParser.getScreenshot({
+      partial: pagesToRender,
+      scale: 0.85,
+    } as any);
+
+    const renderedPages: any[] = shotResult?.pages || [];
+    if (renderedPages.length === 0) return "";
+
+    const parts: any[] = [];
+    for (const pageObj of renderedPages) {
+      let base64Png = "";
+      if (pageObj.dataUrl && typeof pageObj.dataUrl === "string") {
+        base64Png = pageObj.dataUrl.replace(/^data:image\/\w+;base64,/, "");
+      } else if (pageObj.data) {
+        base64Png = Buffer.from(pageObj.data).toString("base64");
+      }
+      if (base64Png) {
+        parts.push({
+          inlineData: {
+            mimeType: "image/png",
+            data: base64Png,
+          },
+        });
+      }
+    }
+
+    parts.push({
+      text: `أنت محرك قراءة واستخراج مناهج تعليمية موجه وفائق الدقة (Precision Curriculum Extractor).
+المطلوب استخراج النصوص الحرفية الكاملة من هذه الصفحات المخصصة للدرس (الصفحات: ${pagesToRender.join("، ")}):
+1. نص الدرس الأصلي الكامل (سواء كان نص قراءة، أو نص شعري بأبياته الشعرية، أو قصة استماع، أو تجربة علمية، أو نظريات رياضية).
+2. معاني المفردات والمضادات والتراكيب المذكورة في هوامش أو جداول الصفحات.
+3. القواعد النحوية أو الإملائية أو القوانين المشروحة في هذه الصفحات.
+4. التدريبات والأنشطة والأسئلة الواردة في نهاية الصفحات.
+اكتب النص بدقة وأمانة علمية تامة دون تلخيص أو تأليف من خارج الصفحات.`,
+    });
+
+    const res = await generateFn({
+      contents: [{ parts }],
+      config: {
+        temperature: 0.1,
+      },
+    });
+
+    return normalizeExtractedText(res?.text || "");
+  } catch (err: any) {
+    console.warn(`[Targeted Page Range] Warning for pages ${safeStart}..${safeEnd}:`, err?.message || err);
+    return "";
+  } finally {
+    if (pdfParser) {
+      try { await pdfParser.destroy(); } catch (e) {}
+    }
+  }
+}
+
+/**
  * Recursive Pedagogical Text Splitter
  * Splits long text at natural semantic boundaries (Units, Chapters, Headings, Paragraphs)
  */
