@@ -105,7 +105,7 @@ export function isMeaningfulExtractedText(text: string): boolean {
  */
 export function detectReversedOrBrokenArabic(text: string): boolean {
   if (!text || text.length < 80) return false;
-  const sample = text.substring(0, 8000);
+  const sample = text.substring(0, 10000);
   
   // 1. Isolated single Arabic letters followed by spaces: e.g. "ع ي ت و ت ه ن"
   const isolatedLetters = sample.match(/(?:^|\s)[\u0621-\u064A][\u064B-\u065F\u0670]?(?=\s|$)/g) || [];
@@ -113,17 +113,24 @@ export function detectReversedOrBrokenArabic(text: string): boolean {
   
   if (words.length >= 15) {
     const isolatedRatio = isolatedLetters.length / words.length;
-    // In normal Arabic, single-letter words (only 'و' and rarely 'ف') account for < 10% of words.
-    // If > 20% of words are single isolated Arabic letters, it's a corrupted disconnected glyph stream.
-    if (isolatedRatio > 0.20) {
+    // In standard Arabic, isolated single-letter words (only 'و' and rarely 'ف') account for < 5%.
+    // If > 12% of words are single isolated Arabic letters, it's a corrupted disconnected glyph stream.
+    if (isolatedRatio > 0.12) {
       return true;
     }
   }
 
-  // 2. 4 or more consecutive single Arabic letters separated by spaces:
-  // e.g. "ق . ت ر ق ل أ و م خ" or "ع ي ت و ت ه ن"
-  const consecutiveIsolated = sample.match(/(?:[\u0621-\u064A][\u064B-\u065F\u0670]?\s+){4,}/g);
-  if (consecutiveIsolated && consecutiveIsolated.length >= 2) {
+  // 2. 3 or more consecutive single Arabic letters separated by spaces:
+  // e.g. "ق ت ر" or "ع ي ت و ت ه ن"
+  const consecutiveIsolated = sample.match(/(?:[\u0621-\u064A][\u064B-\u065F\u0670]?\s+){3,}/g);
+  if (consecutiveIsolated && consecutiveIsolated.length >= 1) {
+    return true;
+  }
+
+  // 3. Reversed common Arabic educational words (typical of Adobe InDesign / Ministry PDFs reversed encoding)
+  // e.g. "ةرازو" (وزارة), "ةيبرتلا" (التربية), "ميلعتلا" (التعليم), "يساردلا" (الدراسي), "فصلا" (الصف), "سردلا" (الدرس), "ةغللا" (اللغة)
+  const reversedIndicators = sample.match(/\b(?:ةرازو|ةيبرتلا|ميلعتلا|يساردلا|فصلا|سردلا|ةغللا|لولأا|يناثلا|ةطشنلأا)\b/g);
+  if (reversedIndicators && reversedIndicators.length >= 2) {
     return true;
   }
 

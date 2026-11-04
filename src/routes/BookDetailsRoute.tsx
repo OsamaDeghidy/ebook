@@ -718,6 +718,7 @@ export default function BookDetailsRoute({
   const handleExpandChapters = async () => {
     if (!book) return;
     setIsExpandingChapters(true);
+    const nextChapterNum = (book.chapters?.length || 0) + 1;
     try {
       const res = await fetch(`/api/ebooks/${book.id}/expand-chapters`, {
         method: 'POST',
@@ -735,9 +736,17 @@ export default function BookDetailsRoute({
         try {
           await supabase.from('books').update({ chapters: updatedChapters }).eq('id', book.id);
         } catch (e) {}
-        showToast(`تم استكمال وتوليد فصل تعليمي جديد بنجاح!`, 'success');
+
+        const newCh = data.newChapters[0];
+        if (newCh?.id) {
+          setActiveChapterId(newCh.id);
+          try {
+            window.history.replaceState(null, '', `?chapter=${newCh.id}`);
+          } catch (e) {}
+        }
+        showToast(`تم استكمال وتوليد (${newCh?.title || `الفصل ${nextChapterNum}`}) بنجاح!`, 'success');
       } else {
-        showToast(data.message || 'تم استعراض جميع فصول المستند المتاحة بنجاح.', 'info');
+        showToast(data.message || 'تم استعراض وتغطية فصول المستند المتاحة بنجاح.', 'info');
       }
     } catch (err: any) {
       showToast('حدث خطأ أثناء استكمال الفصول: ' + err.message, 'error');
@@ -1287,7 +1296,7 @@ export default function BookDetailsRoute({
                     {isExpandingChapters ? (
                       <>
                         <RefreshCw className="w-4 h-4 animate-spin text-teal-600" />
-                        <span>جاري استكمال الفصول...</span>
+                        <span>جاري استخراج وتحليل الفصل رقم {(book.chapters?.length || 0) + 1}...</span>
                       </>
                     ) : (
                       <>
@@ -1430,7 +1439,7 @@ export default function BookDetailsRoute({
                     {isExpandingChapters ? (
                       <>
                         <RefreshCw className="w-4 h-4 animate-spin text-teal-600" />
-                        <span>جاري استكمال الفصول...</span>
+                        <span>جاري استخراج وتحليل الفصل رقم {(book.chapters?.length || 0) + 1}...</span>
                       </>
                     ) : (
                       <>

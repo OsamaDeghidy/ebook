@@ -208,5 +208,50 @@
     "quizAttempts": [],
     "isCompleted": false,
     "lastActive": "2026-11-03T19:04:17.464Z"
+  },
+  {
+    "studentId": "std_curr",
+    "studentName": "طالب المنصة",
+    "studentEmail": "",
+    "bookId": "active_book",
+    "bookTitle": "",
+    "chapterId": "ch-49907773-22ee-4a22-90fe-46af08667344-1",
+    "chapterTitle": "محاولة تصنيف العناصر",
+    "activeReadingSeconds": 58,
+    "audioListenPercentage": 32,
+    "quizScore": null,
+    "quizAttempts": [],
+    "isCompleted": false,
+    "lastActive": "2026-11-04T13:01:16.025Z"
+  },
+  {
+    "studentId": "std_curr",
+    "studentName": "طالب المنصة",
+    "studentEmail": "",
+    "bookId": "active_book",
+    "bookTitle": "",
+    "chapterId": "ch-49907773-22ee-4a22-90fe-46af08667344-5",
+    "chapterTitle": "العلوم - الصف الثاني الإعدادي - الفصل الدراسي الأول - الدرس 5",
+    "activeReadingSeconds": 27,
+    "audioListenPercentage": 15,
+    "quizScore": null,
+    "quizAttempts": [],
+    "isCompleted": false,
+    "lastActive": "2026-11-04T12:20:48.591Z"
+  },
+  {
+    "studentId": "std_curr",
+    "studentName": "طالب المنصة",
+    "studentEmail": "",
+    "bookId": "active_book",
+    "bookTitle": "",
+    "chapterId": "ch-49907773-22ee-4a22-90fe-46af08667344-6",
+    "chapterTitle": "الدرس 6: العلوم - الصف الثاني الإعدادي - الفصل الدراسي الأول",
+    "activeReadingSeconds": 113,
+    "audioListenPercentage": 63,
+    "quizScore": null,
+    "quizAttempts": [],
+    "isCompleted": true,
+    "lastActive": "2026-11-04T12:22:56.016Z"
   }
 ]

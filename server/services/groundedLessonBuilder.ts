@@ -31,11 +31,20 @@ export function buildGroundedBatchPrompt(params: {
 
   const metaLower = `${bookTitle} ${category || ''} ${grade_level || ''} ${lessons.map(l => l.lesson_title).join(' ')}`.toLowerCase();
   
-  // Track 1: Early Childhood / Kindergarten / Foundation (KG1, KG2, Primary 1-3, nursery, letters, phonics)
+  // Track 1: Early Childhood / Kindergarten / Foundation
   const isKindergarten = /kg|kindergarten|رياض\s*الأطفال|روضة|حضانة|تمهيدي|أولى\s*ابتدائي|الصف\s*الأول\s*الابتدائي|الثاني\s*الابتدائي|الثالث\s*الابتدائي|تأسيس|حروف\s|أبجدية|حرف\s/.test(metaLower);
 
-  // Track 2: STEM (Mathematics, Physics, Chemistry, Engineering, Computer Science coding)
-  const isStem = !isKindergarten && /رياضيات|ماث|math|فيزياء|physics|كيمياء|chemistry|جبر|هندسة|تفاضل|تكامل|حساب|علوم|science|خوارزمي|برمجة|احصاء|إحصاء/.test(metaLower);
+  // Track 2: Computer Science, ICT & Programming
+  const isComputerScience = !isKindergarten && /حاسب|كمبيوتر|تكنولوجيا\s*المعلومات|ict|برمجة|خوارزمي|ذكاء\s*اصطناعي|computer|coding|python|scratch|office|excel|access|شبكات|قواعد\s*بيانات|ويب|web/.test(metaLower);
+
+  // Track 3: Arabic Language, English & Languages
+  const isArabicOrLanguages = !isKindergarten && !isComputerScience && /عربي|لغة\s*عربية|نحو|بلاغة|نصوص|قراءة|أدب|إملاء|مطالعة|تعبير|صرف|english|french|deutsch|لغات|لغة\s*أجنبية/.test(metaLower);
+
+  // Track 4: Social Studies, History & Geography
+  const isSocialStudies = !isKindergarten && !isComputerScience && !isArabicOrLanguages && /دراسات|تاريخ|جغرافيا|social\s*studies|مواطنة|تربية\s*وطنية|جغرافية/.test(metaLower);
+
+  // Track 5: STEM (Mathematics, Physics, Chemistry, Biology, General Science)
+  const isStem = !isKindergarten && !isComputerScience && !isArabicOrLanguages && !isSocialStudies && /رياضيات|ماث|math|فيزياء|physics|كيمياء|chemistry|جبر|هندسة|تفاضل|تكامل|حساب|علوم|science|احصاء|إحصاء/.test(metaLower);
 
   let pedagogicalStructurePrompt = "";
 
@@ -50,7 +59,7 @@ export function buildGroundedBatchPrompt(params: {
    - \`## [اسم الدرس أو الحرف الأصلي]\`
 
    - \`> ### 📜 نص المذكرة الأصلي المعتمد\`
-     (عرض نص الدرس أو الحرف أو الأنشطة كما وردت في المذكرة المستخرجة بدقة وأمانة دون اختصار)
+     (عرض نص الدرس أو الحرف أو الأنشطة كما وردت في المذكرة بدقة وأمانة دون اختصار)
 
    - \`### 🎈 حكاية ممتعة واكتشاف بصري\`
      (قصة طفولية واقعية ومشوقة جداً تدور حول الحرف أو المفهوم من بيئة الطفل، غنية بالإيموجي الملونة والمواقف المحببة)
@@ -64,12 +73,111 @@ export function buildGroundedBatchPrompt(params: {
 
    - \`### 🎮 ألعاب وتحديات بصرية للعباقرة الصغار\`
      (ألعاب تفاعلية طفولية خفيفة بدون مصطلحات جافة:
-      1. لعبة "أين يختبئ الحرف؟": ابحث عن الحرف في الكلمات التالية وضع حوله دائرة ملونة.
+      1. لعبة "أين يختبئ الحرف؟": ابحث عن الحرف في الكلمات التالية.
       2. لعبة "صل الصوت بالصورة": ربط صوت الحرف بالصورة المناسبة.
       3. لعبة "صائد الكلمات اللذيذة": مساعدة الشخصية في جمع الكلمات التي تبدأ بالحرف)
 
    - \`### 🌟 همسة ذهبية للبطل الصغير\`
-     (تشجيع تربوي محبب وجميل للطفل، مع نصيحة ذكية للتفريق اللطيف بين الأصوات، مثل الفرق بين صوت الألف المفتوحة والمضمومة، دون أي ذكر لكلمة امتحان أو فخ).
+     (تشجيع تربوي محبب وجميل للطفل، مع نصيحة ذكية للتفريق اللطيف بين الأصوات، دون أي ذكر لكلمة امتحان أو فخ).
+`;
+  } else if (isComputerScience) {
+    pedagogicalStructurePrompt = `
+5. MANDATORY COMPUTER SCIENCE & ICT PRACTICAL ARCHITECTURE (ZERO FLUFF & ZERO NARRATIVE ESSAYS):
+   🚫 STRICT BAN on long, abstract narrative essays! Computer Science is a HANDS-ON, ACTION-ORIENTED discipline!
+   Every concept must translate into actionable UI steps, commands, or code.
+
+   Each chapter's 'content' field MUST strictly follow this practical lab structure:
+   - \`## [اسم الدرس أو المهارة التقنية الأصلية المعتمدة]\`
+
+   - \`> ### 📜 نص المذكرة الأصلي المعتمد\`
+     (عرض الخطوات والمفاهيم كما وردت في المذكرة بدقة وأمانة)
+
+   - \`### 🎯 الهدف الإجرائي والبيئة البرمجية / التقنية\`
+     (تحديد النتيجة العملية الملموسة التي سينجزها الطالب بنهاية الدرس + المتطلبات والبرامج المستخدمة: مثل Scratch, Python, HTML, Excel, Windows OS)
+
+   - \`### 🛠️ المسار العملي التطبيقي (خطوة بخطوة بالصور والأزرار)\`
+     (شرح خطوات التنفيذ بنظام القوائم والمسارات الدقيقة:
+      1. افتح قائمة [File] ثم اختر [New Project].
+      2. انقر على أداة [...] واضبط الخاصية [Value] على [...].
+      3. اضغط على مفتاح الاختصار [Ctrl + S] للحفظ.
+      مع إبراز المسارات الدقيقة في صناديق كود أو مسارات مميزة: \`القائمة > الخيار > الإجراء\`)
+
+   - \`### 💻 شفرة الكود / الكتل البرمجية والأوامر (Interactive Code & Scripting)\`
+     (عرض الأكواد البرمجية داخل Markdown Code Blocks منسقة مع تعليقات توضيحية بالعربية تشرح وظيفة كل سطر برمجياً):
+     \`\`\`python
+     # مثال عملي لتطبيق المفهوم في الدرس
+     \`\`\`
+
+   - \`### 🧪 معمل التحدي البرمجي (Hands-on Lab Exercise)\`
+     (مشروع عملي مصغر يطلب من الطالب تنفيذه على جهازه فوراً لحل مشكلة واقعية، مع إرشادات التحقق الذاتي من صحة التنفيذ).
+
+   - \`### ⚡ فخاخ تقنية وأخطاء تشغيلية شائعة (Troubleshooting Guide)\`
+     (أشهر الأخطاء التي تظهر للمبتدئين: مثل أخطاء المسارات Syntax Errors، نسيان الحفظ، مشاكل الترميز UTF-8، وكيفية تصحيحها فوراً).
+`;
+  } else if (isArabicOrLanguages) {
+    pedagogicalStructurePrompt = `
+5. MANDATORY ARABIC LANGUAGE & LINGUISTIC PEDAGOGICAL STRUCTURE (TABULAR RIGOR & RHETORICAL ANALYSIS):
+   🚫 STRICT BAN on mixing grammar with poetry or treating linguistic analysis as generic prose!
+   Arabic requires tabular vocabulary, poetic stanzas formatting, and structural grammar parsing.
+
+   Each chapter's 'content' field MUST follow this master linguistic structure:
+   - \`## [اسم النص القرائي / الشعري أو الدرس النحوي الأصلي المعتمد]\`
+
+   - \`> ### 📜 نص المذكرة الأصلي المعتمد\`
+     (عرض النص الأدبي أو الآيات أو القواعد النحوية كما وردت في المذكرة الأصلية بالتشكيل الصحيح)
+
+   - \`### 📖 معجم المفردات والتراكيب اللغوية (جدول المعاني والمضادات والجموع الإلزامي)\`
+     (إلزامي: توليد جدول Markdown محكم ومشكول لجميع الكلمات الصعبة الواردة في الدرس):
+     | الكلمة | معناها وسياقها | المضاد | المفرد / الجمع |
+     | :--- | :--- | :--- | :--- |
+     | ... | ... | ... | ... |
+
+   - \`### 🎨 التذوق البلاغي والجمالي (للأدب والنصوص الشعرية والقرائية)\`
+     (تحليل الجماليات البلاغية بأسلوب منهجي دقيق):
+     * **الألوان البيانية:** التشبيه، الاستعارة، الكناية وسر جمالها (التوضيح، التشخيص، التجسيم).
+     * **المحسنات البديعية:** الطباق، الجناس، السجع وأثرها الموسيقي.
+     * **الأساليب ودلالاتها:** أساليب التوكيد، والأساليب الإنشائية (أمر، نهي، استفهام، نداء) والغرض البلاغي لكل أسلوب.
+
+   - \`### 📐 القواعد النحوية والإعراب التطبيقي (منظومة التحليل النحوي)\`
+     1. **الشاهد والمثال:** تقديم الجملة المحورية.
+     2. **القاعدة المستنبطة:** صياغة القانون النحوي بوضوح تام.
+     3. **جدول الإعراب النموذجي الإلزامي:**
+        | الكلمة | الموقع الإعرابي | الحالة الإعرابية | العلامة والسبب |
+        | :--- | :--- | :--- | :--- |
+        | ... | ... | ... | ... |
+
+   - \`### 🔥 فخ امتحاني وإعرابي شائع (مصيدة الدرجات النحوية)\`
+     (تنبيه على اللبس بين الكلمات المتشابهة: مثل الفرق بين التمييز والحال، أو المفعول به والمفعول لأجله، أو كان الناقصة والتامة).
+`;
+  } else if (isSocialStudies) {
+    pedagogicalStructurePrompt = `
+5. MANDATORY SOCIAL STUDIES & GEOGRAPHY PEDAGOGICAL STRUCTURE (CAUSALITY NETWORK & EXAM REASONING):
+   🚫 STRICT BAN on unorganized storytelling! Social studies is built on: CAUSALITY (الأسباب والنتائج) + GEOGRAPHICAL CONTEXT.
+
+   Each chapter's 'content' field MUST strictly follow this analytical structure:
+   - \`## [اسم الدرس التاريخي أو الجغرافي الأصلي المعتمد]\`
+
+   - \`> ### 📜 نص المذكرة الأصلي المعتمد\`
+     (عرض فقرة الدرس كما وردت في المذكرة المدرسية دون تحريف)
+
+   - \`### 🗺️ الإطار المكاني والزماني (الموقع والخريطة / التسلسل التاريخي)\`
+     (تحديد الموقع الجغرافي، الحدود، المظاهر الطبيعية، أو الخط الزمني لترتيب الأحداث التاريخية من الأقدم للأحدث)
+
+   - \`### 🔗 شبكة السببية التاريخية والجغرافية (الأسباب -> الأحداث -> النتائج)\`
+     (تفكيك الدرس في شكل متوالية تحليلية واضحة):
+     * **المقدمات والأسباب:** العوامل الاقتصادية أو السياسية أو الطبيعية التي أدت للحدث أو الظاهرة.
+     * **سير الأحداث والمحاور الرئيسية:** الوقائع والقرارات الفاصلة.
+     * **الآثار والنتائج المترتبة:** التغيرات الدائمة على المجتمع أو البيئة.
+
+   - \`### ❓ بنك أسئلة الفهم والتعليل الامتحاني الإلزامي (بم تفسر؟ / ما النتائج؟)\`
+     (تقديم الإجابات النموذجية المفصلة للأنماط الامتحانية التالية):
+     * **بم تفسر؟** (1-2 سؤال مع ذكر كافة الأسباب المعتمدة بالترقيم).
+     * **ما النتائج المترتبة على؟** (1-2 سؤال مع توضيح الأثر المباشر والبعيد).
+     * **دلل تاريخياً / جغرافياً على صحة العبارة:** (تقديم الدليل المادي الملموس).
+     * **ماذا يحدث إذا؟** (تفكير افتراضي يقيس استيعاب القواعد).
+
+   - \`### 💡 كبسولة التفوق والمقارنة الشاملة\`
+     (مقارنة ملخصة في جدول Markdown بين المعركتين، أو الإقليمين المناخيين، أو الدولتين لتثبيت الحفظ ليلة الامتحان).
 `;
   } else if (isStem) {
     pedagogicalStructurePrompt = `
@@ -105,26 +213,26 @@ export function buildGroundedBatchPrompt(params: {
 `;
   } else {
     pedagogicalStructurePrompt = `
-5. FIVE MANDATORY PEDAGOGICAL PILLARS (HUMANITIES, LITERATURE, RELIGION & SOCIAL STUDIES):
+5. FIVE MANDATORY PEDAGOGICAL PILLARS (HUMANITIES, LITERATURE, RELIGION & PHILOSOPHY):
    Each chapter's 'content' field MUST be an extensive, master-crafted educational chapter in GitHub Flavored Markdown:
    - \`## [اسم الدرس أو النص القرائي/الشرعي الأصلي المعتمد]\`
 
    - \`> ### 📜 نص المذكرة الأصلي المعتمد\`
-     (عرض الآيات الكريمة أو النص القرائي أو الفقرة التاريخية/الفكرية الكاملة المستخرجة من المذكرة)
+     (عرض الآيات الكريمة أو النص القرائي أو الفقرة الفكرية الكاملة المستخرجة من المذكرة)
 
    - \`### 🔍 تفكيك الأفكار والتحليل السياقي والمفاهيمي\`
-     (تحليل سياقي وموضوعي متكامل ومفصل: شرح أسباب النزول أو الظروف التاريخية أو البعد الفكري، مع تفكيك دلالات التراكيب والمعاني الجوهرية بأسلوب تربوي ممتع)
+     (تحليل سياقي وموضوعي متكامل ومفصل: شرح أسباب النزول أو البعد الفكري، مع تفكيك دلالات التراكيب والمعاني الجوهرية)
 
    - \`### 📚 معجم المفردات والمفاهيم اللغوية والفكرية\`
      (جدول غني بالكلمات والتراكيب الجديدة ومعانيها في سياقها، مع ذكر المرادفات والأضداد، وتوضيح المصطلحات المفتاحية)
 
    - \`### 🎯 التدريبات التطبيقية وأسئلة الفهم الاستيعابي المتدرجة\`
-     * التدريب 1 (الفهم المباشر والمعنى الإجمالي): أسئلة استخراجية تثبت فهم النص وظواهره.
+     * التدريب 1 (الفهم المباشر والمعنى الإجمالي): أسئلة استخراجية تثبت فهم النص.
      * التدريب 2 (التحليل والاستنتاج والعبر): أسئلة ربط وتفكير تتناول الدلالات غير المباشرة والحكمة المستفادة.
-     * التدريب 3 (التذوق البلاغي والتفكير الناقد): إبراز الجماليات البلاغية والأساليب أو المقارنات الفكرية، مع تقديم الإجابة النموذجية التربوية المفصلة لكل سؤال.
+     * التدريب 3 (التدبر والتفكير الناقد): إبراز الجماليات والمقارنات الفكرية مع الإجابة النموذجية.
 
    - \`### 💡 الدروس المستفادة والكبسولة التوجيهية الذهبية\`
-     (القيم الأخلاقية، المبادئ التوجيهية، والتطبيقات الواقعية في حياة الطالب، مع التنبيه على الفروق اللغوية الدقيقة).
+     (القيم الأخلاقية، المبادئ التوجيهية، والتطبيقات الواقعية في حياة الطالب).
 `;
   }
 
@@ -177,8 +285,10 @@ ${pedagogicalGuardrails ? `${pedagogicalGuardrails}\n` : ''}
 
 ${pedagogicalStructurePrompt}
 
-6. NO DASHED MARKDOWN TABLES:
-   - 🚫 NEVER use markdown pipe tables with dashed rows (\`| ---: |\`). Format tables as clean text cards or bulleted key-value lists.
+6. CLEAN MARKDOWN TABLES FOR VOCABULARY & GRAMMAR:
+   - When presenting vocabulary dictionaries, grammar parsing tables (جدول الإعراب), or feature comparisons, format them as clean, well-aligned GitHub Flavored Markdown pipe tables:
+     | الكلمة | المعنى السياقي | المضاد | الجمع / المفرد |
+     | :--- | :--- | :--- | :--- |
 
 7. ACCURATE BLOOM QUIZZES & GROUNDED FLASHCARDS:
    - Generate 4 to 6 diagnostic quiz questions per chapter directly referencing the source text.
