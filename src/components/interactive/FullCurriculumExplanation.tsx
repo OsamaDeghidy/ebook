@@ -41,7 +41,7 @@ export const FullCurriculumExplanation: React.FC<FullCurriculumExplanationProps>
   const lastLoadedSrcRef = useRef<string>('');
 
   const currentChapter = chapters[activeChapterIndex] || chapters[0];
-  const explanation = currentChapter?.interactive_explanation || null;
+  const explanation = currentChapter?.interactive_explanation || (currentChapter as any)?.interactiveExplanation || null;
   const timeline = useMemo(() => explanation?.timeline || [], [explanation]);
   const currentStep = useMemo(() => timeline[currentStepIndex] || timeline[0] || null, [timeline, currentStepIndex]);
 
@@ -50,7 +50,7 @@ export const FullCurriculumExplanation: React.FC<FullCurriculumExplanationProps>
 
   // Count how many chapters have generated interactive explanations
   const readyChaptersCount = useMemo(() => {
-    return chapters.filter(c => Boolean(c.interactive_explanation)).length;
+    return chapters.filter(c => Boolean(c.interactive_explanation || (c as any)?.interactiveExplanation)).length;
   }, [chapters]);
 
   // Restore last saved course position
@@ -126,7 +126,7 @@ export const FullCurriculumExplanation: React.FC<FullCurriculumExplanationProps>
     try {
       for (let i = 0; i < chapters.length; i++) {
         const ch = chapters[i];
-        if (!ch.interactive_explanation) {
+        if (!ch.interactive_explanation && !(ch as any)?.interactiveExplanation) {
           setBatchProgress({
             current: i + 1,
             total: chapters.length,
@@ -382,7 +382,7 @@ export const FullCurriculumExplanation: React.FC<FullCurriculumExplanationProps>
             <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
               {chapters.map((ch, idx) => {
                 const isSelected = idx === activeChapterIndex;
-                const isReady = Boolean(ch.interactive_explanation);
+                const isReady = Boolean(ch.interactive_explanation || (ch as any)?.interactiveExplanation);
 
                 return (
                   <button

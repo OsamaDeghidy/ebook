@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   Search, Filter, BookOpen, Star, Sparkles, ExternalLink, Play, HelpCircle,
   Plus, Shield, Eye, EyeOff, Trash2, Layers, GraduationCap, Calendar, Edit3, Tag,
-  ShoppingCart, CheckCircle2, Bookmark, Flame, Radio, Zap, Clock, Award, Heart, TrendingUp, School, Building2, X, ChevronDown
+  ShoppingCart, CheckCircle2, Bookmark, Flame, Radio, Zap, Clock, Award, Heart, TrendingUp, School, Building2, X, ChevronDown, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { MarketplaceBook, BookCategory, UserRole } from '../types';
 import { EditBookModal } from './EditBookModal';
@@ -73,6 +73,18 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
   
   // DEFAULT SORTING: Newest to Oldest (من الأحدث للأقدم)
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'popular' | 'rating' | 'price_low' | 'price_high'>('newest');
+
+  // 📄 SMART PAGINATION ENGINE (12 items per page)
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 12;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    searchQuery, selectedCategory, selectedEducationLevel, selectedAcademicSystem,
+    selectedSubcategory, selectedGradeLevel, selectedSemester, selectedAcademicYear,
+    selectedTag, costFilter, hasQuizFilter, hasMediaFilter, minRating, sortBy, mainViewTab, quickFilter
+  ]);
 
   // Sync tab with URL query parameter on mount or change
   useEffect(() => {
@@ -277,6 +289,22 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
     selectedSemester, selectedAcademicYear, selectedTag, costFilter, minRating,
     hasQuizFilter, searchQuery, sortBy
   ]);
+
+  // Pagination derived data
+  const totalPages = Math.max(1, Math.ceil(filteredBooks.length / ITEMS_PER_PAGE));
+  const paginatedBooks = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredBooks.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredBooks, currentPage]);
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage < 1 || newPage > totalPages) return;
+    setCurrentPage(newPage);
+    const anchor = document.getElementById('marketplace-grid-anchor');
+    if (anchor) {
+      anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   // 🔍 Arabic-Friendly Fuzzy Search Algorithm for Title Typo Correction
   const fuzzySuggestion = useMemo(() => {
@@ -634,76 +662,9 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
               </select>
               <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute top-2.5 right-2 pointer-events-none" />
             </div>
-          </div>
-        </div>
-
-        {/* ROW 3: QUICK ATTRIBUTE PILLS + RESULTS COUNT */}
-        <div className="space-y-2 pb-1">
-          {/* Quick Stage Taxonomy Selector (El Maestro Axis 5) */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-            {[
-              { id: 'all', label: 'كافة المراحل 📚' },
-              { id: 'kg', label: 'رياض أطفال 🎨' },
-              { id: 'primary', label: 'ابتدائي 🎒' },
-              { id: 'prep', label: 'إعدادي 📐' },
-              { id: 'sec', label: 'ثانوي 🎓' },
-              { id: 'uni', label: 'جامعي 🏛️' },
-            ].map((stg) => {
-              const isSelected = 
-                (stg.id === 'all' && selectedGradeLevel === 'all') ||
-                (stg.id === 'kg' && selectedGradeLevel === 'رياض الأطفال') ||
-                (stg.id === 'primary' && selectedGradeLevel === 'المرحلة الابتدائية') ||
-                (stg.id === 'prep' && selectedGradeLevel === 'المرحلة الإعدادية') ||
-                (stg.id === 'sec' && selectedGradeLevel === 'المرحلة الثانوية') ||
-                (stg.id === 'uni' && selectedGradeLevel === 'المرحلة الجامعية');
-              return (
-                <button
-                  key={stg.id}
-                  onClick={() => {
-                    if (stg.id === 'all') setSelectedGradeLevel('all');
-                    else if (stg.id === 'kg') setSelectedGradeLevel('رياض الأطفال');
-                    else if (stg.id === 'primary') setSelectedGradeLevel('المرحلة الابتدائية');
-                    else if (stg.id === 'prep') setSelectedGradeLevel('المرحلة الإعدادية');
-                    else if (stg.id === 'sec') setSelectedGradeLevel('المرحلة الثانوية');
-                    else if (stg.id === 'uni') setSelectedGradeLevel('المرحلة الجامعية');
-                  }}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer shrink-0 ${
-                    isSelected
-                      ? 'bg-indigo-900 text-white shadow-xs font-black ring-2 ring-indigo-500/30'
-                      : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-                  }`}
-                >
-                  <span>{stg.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 scrollbar-none">
-            <div className="flex items-center gap-1.5">
-              {[
-                { id: 'all', label: 'الكل' },
-                { id: 'free', label: 'المجانية 🆓' },
-                { id: 'paid', label: 'المدفوعة 💎' },
-                { id: 'certified', label: 'معتمد 🛡️' },
-                { id: 'ai_interactive', label: 'تفاعلي بالـ AI ⚡' },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setQuickFilter(tab.id as any)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer shrink-0 ${
-                    quickFilter === tab.id
-                      ? 'bg-slate-900 text-white shadow-xs font-black'
-                      : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-                  }`}
-                >
-                  <span>{tab.label}</span>
-                </button>
-              ))}
-            </div>
-
-            <div className="text-[11px] text-slate-500 font-bold whitespace-nowrap shrink-0">
-              المعروض: <strong className="text-teal-700">{filteredBooks.length}</strong> من {books.length}
+            {/* Compact Count Badge */}
+            <div className="flex items-center px-3 py-2 bg-slate-100 text-slate-700 text-xs font-black rounded-xl shrink-0 whitespace-nowrap">
+              <span>المعروض: <strong className="text-teal-700">{filteredBooks.length}</strong> من {books.length}</span>
             </div>
           </div>
         </div>
@@ -752,8 +713,10 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {filteredBooks.map(book => (
+          <>
+            <div id="marketplace-grid-anchor" className="scroll-mt-24" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {paginatedBooks.map(book => (
                 <div
                   key={book.id}
                   onClick={() => onLaunchBook(book)}
@@ -960,7 +923,74 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                 </div>
               ))}
             </div>
-          )}
+
+            {/* 📄 SMART PAGINATION CONTROLS */}
+            {filteredBooks.length > ITEMS_PER_PAGE && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-5 pb-2 border-t border-slate-200">
+                <div className="text-xs font-bold text-slate-500">
+                  عرض <strong className="text-slate-900 font-black">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</strong> إلى <strong className="text-slate-900 font-black">{Math.min(currentPage * ITEMS_PER_PAGE, filteredBooks.length)}</strong> من إجمالي <strong className="text-teal-700 font-black">{filteredBooks.length}</strong> مقرر
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  {/* Previous Page */}
+                  <button
+                    type="button"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="px-3.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition disabled:opacity-35 disabled:cursor-not-allowed flex items-center gap-1 cursor-pointer shadow-2xs"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                    <span>السابق</span>
+                  </button>
+
+                  {/* Numbered Page Buttons */}
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => {
+                      if (
+                        totalPages > 6 &&
+                        pageNum !== 1 &&
+                        pageNum !== totalPages &&
+                        Math.abs(pageNum - currentPage) > 1
+                      ) {
+                        if (pageNum === 2 || pageNum === totalPages - 1) {
+                          return <span key={pageNum} className="px-1 text-slate-400 text-xs font-bold select-none">...</span>;
+                        }
+                        return null;
+                      }
+
+                      const isActive = pageNum === currentPage;
+                      return (
+                        <button
+                          key={pageNum}
+                          type="button"
+                          onClick={() => handlePageChange(pageNum)}
+                          className={`w-8 h-8 rounded-xl text-xs font-black transition flex items-center justify-center cursor-pointer ${
+                            isActive
+                              ? 'bg-slate-900 text-white shadow-xs'
+                              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Next Page */}
+                  <button
+                    type="button"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="px-3.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition disabled:opacity-35 disabled:cursor-not-allowed flex items-center gap-1 cursor-pointer shadow-2xs"
+                  >
+                    <span>التالي</span>
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
         </div>
 
       {/* MOBILE FILTER DRAWER MODAL */}

@@ -200,7 +200,7 @@ const markdownComponents = {
             <span className="text-lg">📜</span>
             <span>نص المذكرة الأصلي المعتمد (المصدر النصي الموثق)</span>
           </div>
-          <div className="text-xs sm:text-sm font-serif leading-relaxed text-slate-800">
+          <div className="text-xs sm:text-sm font-serif leading-relaxed text-slate-800 [&_strong:first-child]:hidden [&_p:first-child>strong:first-child]:hidden [&_p:first-child]:inline-block">
             {children}
           </div>
         </div>

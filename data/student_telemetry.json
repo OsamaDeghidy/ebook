@@ -192,7 +192,7 @@
     "quizScore": null,
     "quizAttempts": [],
     "isCompleted": true,
-    "lastActive": "2026-11-03T19:03:25.858Z"
+    "lastActive": "2026-11-03T19:13:04.856Z"
   },
   {
     "studentId": "std_curr",
@@ -202,11 +202,11 @@
     "bookTitle": "",
     "chapterId": "ch-9bf92f9f-f279-4dd3-b2c2-fcb4db3db4c5-4",
     "chapterTitle": "الدرس الرابع: جغرافيا وتاريخ الوطن العربي - الإطار الطبيعي والبشري",
-    "activeReadingSeconds": 31,
-    "audioListenPercentage": 17,
+    "activeReadingSeconds": 33,
+    "audioListenPercentage": 18,
     "quizScore": null,
     "quizAttempts": [],
     "isCompleted": false,
-    "lastActive": "2026-11-03T19:03:53.172Z"
+    "lastActive": "2026-11-03T19:04:17.464Z"
   }
 ]

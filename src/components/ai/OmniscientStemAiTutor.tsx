@@ -22,10 +22,25 @@ export const OmniscientStemAiTutor: React.FC<OmniscientStemAiTutorProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [question, setQuestion] = useState('');
+
+  const metaLower = `${bookTitle || ''} ${currentChapterTitle || ''} ${bookCategory || ''}`.toLowerCase();
+  const isKG = /kg|kindergarten|رياض\s*الأطفال|روضة|حضانة|تمهيدي|أولى\s*ابتدائي|حرف\s|حروف\s|أبجدية/.test(metaLower);
+  const isIslamicOrHumanities = !isKG && /دين|إسلام|قرآن|سورة|تفسير|حديث|فقه|عقيدة|تاريخ|جغرافيا|دراسات|أدب|بلاغة|نحو|شريعة|قانون|سياسة|فلسفة|مكيافيلي|الأمير|سيرة/.test(metaLower);
+
+  const getGreeting = () => {
+    if (isKG) {
+      return `أهلاً يا بطل! 🎈 جاهز لمساعدتك في فهم واكتشاف درس **(${currentChapterTitle || 'هذا الفصل'})** بأبسط وأمتع طريقة! تفضل بسؤالك.`;
+    }
+    if (isIslamicOrHumanities) {
+      return `جاهز لمساعدتك في فهم وتحليل درس **(${currentChapterTitle || 'هذا الفصل'})** وتوضيح المعاني والمقاصد مباشرة. تفضل بسؤالك! 💡`;
+    }
+    return `جاهز لمساعدتك في فهم وشرح درس **(${currentChapterTitle || 'هذا الفصل'})** وحل المسائل مباشرة. تفضل بسؤالك وسأجيبك فوراً! 💡`;
+  };
+
   const [messages, setMessages] = useState<Array<{ sender: 'user' | 'ai'; text: string; time: string }>>([
     {
       sender: 'ai',
-      text: `جاهز لمساعدتك في فهم وشرح درس **(${currentChapterTitle || 'هذا الفصل'})** مباشرة. تفضل بسؤالك وسأجيبك فوراً! 💡`,
+      text: getGreeting(),
       time: 'الآن'
     }
   ]);
@@ -37,11 +52,11 @@ export const OmniscientStemAiTutor: React.FC<OmniscientStemAiTutorProps> = ({
     setMessages([
       {
         sender: 'ai',
-        text: `جاهز لمساعدتك في فهم وشرح درس **(${currentChapterTitle || 'هذا الفصل'})** مباشرة. تفضل بسؤالك وسأجيبك فوراً! 💡`,
+        text: getGreeting(),
         time: 'الآن'
       }
     ]);
-  }, [currentChapterTitle]);
+  }, [currentChapterTitle, bookTitle]);
 
   useEffect(() => {
     if (isOpen) {
@@ -98,10 +113,6 @@ export const OmniscientStemAiTutor: React.FC<OmniscientStemAiTutorProps> = ({
     }
   };
 
-  const metaLower = `${bookTitle || ''} ${currentChapterTitle || ''} ${bookCategory || ''}`.toLowerCase();
-  const isKG = /kg|kindergarten|رياض\s*الأطفال|روضة|حضانة|تمهيدي|أولى\s*ابتدائي|حرف\s|حروف\s|أبجدية/.test(metaLower);
-  const isIslamicOrHumanities = !isKG && /دين|إسلام|قرآن|سورة|تفسير|حديث|فقه|عقيدة|تاريخ|جغرافيا|دراسات|أدب|بلاغة|نحو|شريعة|قانون/.test(metaLower);
-
   const promptChips = isKG ? [
     { label: '🎈 احكيلي قصة', prompt: 'احكيلي حكاية قصيرة وممتعة وبسيطة جداً عن موضوع هذا الدرس للأطفال' },
     { label: '🔤 كيف أنطقها؟', prompt: 'كيف أنطق هذا الحرف بالحركات والأصوات الصحيحة مع كلمات وأمثلة مصورة؟' },
@@ -118,6 +129,18 @@ export const OmniscientStemAiTutor: React.FC<OmniscientStemAiTutorProps> = ({
     { label: '🔥 فخ الامتحان', prompt: 'ما هو أهم فخ أو خطأ شائع يقع فيه الطلاب في هذا الدرس؟' },
     { label: '📝 ملخص القوانين', prompt: 'لخص لي أهم القوانين والمفاهيم الجوهرية في هذا الدرس' }
   ];
+
+  const inputPlaceholder = isKG
+    ? "اسأل سؤالك البسيط هنا يا بطل... 🎈"
+    : isIslamicOrHumanities
+    ? "اكتب سؤالك، استفسارك، أو الفكرة التي تريد توضيحها..."
+    : "اكتب سؤالك، مسألتك، أو معادلتك هنا...";
+
+  const loadingText = isKG
+    ? "المعلم الذكي يجهز إجابة ممتعة وبسيطة..."
+    : isIslamicOrHumanities
+    ? "المعلم الأكاديمي يراجع المعاني ويجهز الشرح..."
+    : "المعلم الذكي يقوم بتحليل وفحص المعادلات والقوانين...";
 
   return (
     <>
@@ -202,7 +225,7 @@ export const OmniscientStemAiTutor: React.FC<OmniscientStemAiTutorProps> = ({
             {isLoading && (
               <div className="flex items-center gap-2 p-3 bg-white border border-slate-200 rounded-2xl w-fit text-xs text-slate-500">
                 <RefreshCw className="w-3.5 h-3.5 animate-spin text-teal-600" />
-                <span>المعلم الذكي يقوم بتحليل وفحص المعادلات والقوانين...</span>
+                <span>{loadingText}</span>
               </div>
             )}
             <div ref={chatBottomRef} />
@@ -220,7 +243,7 @@ export const OmniscientStemAiTutor: React.FC<OmniscientStemAiTutorProps> = ({
               type="text"
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
-              placeholder="اكتب سؤالك، مسألتك، أو معادلتك هنا..."
+              placeholder={inputPlaceholder}
               className="flex-1 px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:bg-white outline-none"
             />
 

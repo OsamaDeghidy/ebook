@@ -189,20 +189,37 @@ export const CurriculumMindMap: React.FC<CurriculumMindMapProps> = ({
 
   // Group nodes by chapters for the interactive tree
   const chapterGroups = useMemo(() => {
-    if (!mindmapData?.nodes) return [];
-    
-    const rootNode = mindmapData.nodes.find(n => n.level === 'root' || n.id === 'root') || {
-      id: 'root',
-      label: book.title,
-      description: mindmapData.summary || 'المقرر الدراسي الشامل',
-      level: 'root' as const,
-      parentId: null
-    };
+    const rawNodes = mindmapData?.nodes || [];
+    const chapterNodes = rawNodes.filter(n => n.level === 'chapter' || (n.parentId === 'root' && n.id !== 'root'));
 
-    const chapterNodes = mindmapData.nodes.filter(n => n.level === 'chapter' || (n.parentId === 'root' && n.id !== 'root'));
+    // Resilient fallback: If no chapter nodes were parsed but book has chapters, build graceful branches
+    if (chapterNodes.length === 0 && Array.isArray(book.chapters) && book.chapters.length > 0) {
+      return book.chapters.map((ch, idx) => ({
+        chapterNode: {
+          id: ch.id || `ch-${idx + 1}`,
+          label: ch.title || `الفصل ${idx + 1}`,
+          level: 'chapter' as const,
+          description: ch.summary || 'المفاهيم والدروس التعليمية المقررة لهذا الفصل.',
+          parentId: 'root',
+          order: idx + 1
+        },
+        index: idx + 1,
+        concepts: [
+          {
+            id: `c-${ch.id || idx}-1`,
+            label: `مفاهيم ومحاور ${ch.title}`,
+            parentId: ch.id || `ch-${idx + 1}`,
+            level: 'concept' as const,
+            description: ch.summary || 'المفاهيم والعناصر الجوهرية المقررة لهذا الفصل الدراسي.'
+          }
+        ]
+      }));
+    }
+
+    if (chapterNodes.length === 0) return [];
     
     return chapterNodes.map((chNode, idx) => {
-      const concepts = mindmapData.nodes.filter(n => n.parentId === chNode.id || n.chapterTitle === chNode.label);
+      const concepts = rawNodes.filter(n => n.parentId === chNode.id || n.chapterTitle === chNode.label);
       return {
         chapterNode: chNode,
         index: idx + 1,
@@ -218,7 +235,7 @@ export const CurriculumMindMap: React.FC<CurriculumMindMapProps> = ({
         ]
       };
     });
-  }, [mindmapData, book.title]);
+  }, [mindmapData, book.title, book.chapters]);
 
   // Filtered concepts for search
   const filteredNodes = useMemo(() => {

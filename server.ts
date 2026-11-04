@@ -3615,6 +3615,22 @@ app.post("/api/v2/generate-interactive-explanation", async (req, res) => {
     let book = bookId ? ebooks.find(b => b.id === bookId) : null;
 
     if (book) {
+      // ⚡ INSTANT CACHE HIT CHECK (Zero LLM Latency & Persistent State)
+      if (!req.body.forceRegenerate) {
+        if (mode === "full_curriculum_explanation" && (book as any).curriculum_explanation?.timeline?.length) {
+          console.log(`[Interactive Explanation V2] Instant cache hit for full curriculum: "${book.title}"`);
+          return res.json({ success: true, explanation: (book as any).curriculum_explanation, cached: true });
+        }
+        if (chapterId && chapterId !== "curriculum") {
+          const ch = (book.chapters || []).find((c: any) => c.id === chapterId);
+          const existingExplanation = ch?.interactive_explanation || (ch as any)?.interactiveExplanation;
+          if (existingExplanation?.timeline?.length) {
+            console.log(`[Interactive Explanation V2] Instant cache hit for chapter: "${ch.title}"`);
+            return res.json({ success: true, explanation: existingExplanation, cached: true });
+          }
+        }
+      }
+
       if (mode === "full_curriculum_explanation") {
         if (!resolvedContent) {
           resolvedContent = (book.chapters || []).map((c: any, i: number) => `الفصل ${i + 1}: ${c.title}\n${c.content || c.summary || ""}`).join("\n\n---\n\n");
@@ -3720,6 +3736,22 @@ app.post("/api/v2/generate-interactive-explanation", async (req, res) => {
 
     // Persist permanently to book (both locally and on Supabase cloud database)
     if (book) {
+      // ⚡ INSTANT CACHE HIT CHECK (Zero LLM Latency & Persistent State)
+      if (!req.body.forceRegenerate) {
+        if (mode === "full_curriculum_explanation" && (book as any).curriculum_explanation?.timeline?.length) {
+          console.log(`[Interactive Explanation V2] Instant cache hit for full curriculum: "${book.title}"`);
+          return res.json({ success: true, explanation: (book as any).curriculum_explanation, cached: true });
+        }
+        if (chapterId && chapterId !== "curriculum") {
+          const ch = (book.chapters || []).find((c: any) => c.id === chapterId);
+          const existingExplanation = ch?.interactive_explanation || (ch as any)?.interactiveExplanation;
+          if (existingExplanation?.timeline?.length) {
+            console.log(`[Interactive Explanation V2] Instant cache hit for chapter: "${ch.title}"`);
+            return res.json({ success: true, explanation: existingExplanation, cached: true });
+          }
+        }
+      }
+
       if (mode === "full_curriculum_explanation") {
         book.curriculum_explanation = payload;
       } else if (chapterId) {
@@ -4831,9 +4863,9 @@ ${selectedText ? `النص أو المسألة المحددة:\n"""\n${selectedT
 سؤال أو طلب الطالب:
 "${question || "اشرح لي هذا المفهوم ببساطة"}"
 
-🚨 ضوابط الإجابة الفورية الصارمة ومكافحة التشتت (ZERO-FLUFF & ANTI-HALLUCINATION):
-1. 🚫 حظر التحيات والمقدمات الإنشائية: ادخل في صلب الإجابة مباشرة من السطر الأول! ممنوع منعاً باتاً كتابة: "أهلاً بك"، "مرحباً"، "عزيزي الطالب"، "بصفتي مرشدك"، "يسعدني الإجابة"، أو "في رحاب مقررك".
-2. 🚫 الحظر المطلق لاقتباس أو ذكر أسماء مقررات سابقة: ممنوع تماماً ذكر أي اسم كتاب سابق مثل "(أنك الله.. رحلة إلى السماء السابعة)" أو أي عنوان آخر غير مرتبط بالدرس الحالي! التزم حصراً بسياق درس: "${effectiveChapterTitle}".
+🚨 ضوابط الإجابة الفورية الصارمة ومكافحة التشتت (ZERO-FLUFF & DIRECT ACADEMIC TUTORING):
+1. 🚫 ادخل في صلب الإجابة الأكاديمية مباشرة من السطر الأول دون أي تحيات أو مقدمات إنشائية.
+2. 🎯 التزام مطلق وحصري بموضوع درس: "${effectiveChapterTitle}" ومقرر: "${effectiveBookTitle}".
 3. 🎯 التبسيط والإيجاز: اشرح المفهوم بلغة عربية فصحى مبسطة وواضحة جداً وفي نقاط محددة. إذا طُلب مثال واقعي، اضرب مثالاً ملموساً واحداً وواضحاً فوراً.
 
 إرشادات التخصص والرد الذكي الصارم:
@@ -4864,9 +4896,13 @@ ${selectedText ? `النص أو المسألة المحددة:\n"""\n${selectedT
       }
     });
 
+    let cleanAnswer = (response.text || "").trim();
+    // Post-filter any remaining generic greetings or out-of-context intro lines
+    cleanAnswer = cleanAnswer.replace(/^(?:أهلاً بك|مرحباً بك|عزيزي الطالب|في رحاب مقررك|بصفتي مرشدك)[^\n]*\n+/i, '').trim();
+
     res.json({
       success: true,
-      answer: response.text || "تم تحليل وتوضيح المفهوم الأكاديمي بنجاح."
+      answer: cleanAnswer || "تم تحليل وتوضيح المفهوم الأكاديمي بنجاح."
     });
   } catch (error: any) {
     console.error("Academic tutor error:", error);
