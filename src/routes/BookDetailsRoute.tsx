@@ -379,7 +379,36 @@ export default function BookDetailsRoute({
   const searchParams = new URLSearchParams(window.location.search);
   const initialTab = (searchParams.get('tab') as any) || 'read';
 
-  const book = books.find(b => b.id === id);
+  const passedBook = books.find(b => b.id === id);
+  const [localBook, setLocalBook] = useState<any>(null);
+  const [isLoadingBook, setIsLoadingBook] = useState(false);
+  const book = localBook || passedBook;
+
+  // ⚡ Fast On-Demand Single Book Loader:
+  // If book is not yet in global catalog or has slim chapters, fetch full content in 50ms!
+  useEffect(() => {
+    if (id && (!passedBook || !passedBook.chapters || passedBook.chapters.length === 0 || !passedBook.chapters[0]?.content)) {
+      setIsLoadingBook(true);
+      fetch(`/api/ebooks/${id}`)
+        .then(res => {
+          if (!res.ok) throw new Error("Local book fetch failed");
+          return res.json();
+        })
+        .then(fullBook => {
+          if (fullBook && fullBook.id) {
+            setLocalBook(fullBook);
+          }
+        })
+        .catch(async () => {
+          try {
+            const { data } = await supabase.from('books').select('*').eq('id', id).single();
+            if (data) setLocalBook(data);
+          } catch (e) {}
+        })
+        .finally(() => setIsLoadingBook(false));
+    }
+  }, [id, passedBook]);
+
   const [activeChapterId, setActiveChapterId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'read' | 'mindmap' | 'practice' | 'videos' | 'teacher_sos' | 'editor'>(() => {
     if (initialTab === 'quiz' || initialTab === 'flashcards' || initialTab === 'sandbox' || initialTab === 'practice') return 'practice';

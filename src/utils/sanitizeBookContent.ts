@@ -1,16 +1,77 @@
 import { sanitizeMathText } from './sanitizeMathText';
 
 /**
+ * يقوم باكتشاف وإصلاح الجداول المكسورة الناتجة عن LLM:
+ * 1. تفكيك الصفوف المتلاصقة | | إلى أسطر منفصلة |\n|
+ * 2. حقن سطر الفواصل الإلزامي |---|---| إذا سقط من الذكاء الاصطناعي
+ */
+export function repairMarkdownTables(markdown: string): string {
+  if (!markdown || !markdown.includes('|')) return markdown;
+
+  // 1. تفكيك الصفوف المدمجة في نفس السطر (مثل | 1 u || النيوترون |)
+  let text = markdown.replace(/\|\s*\|\s*/g, '|\n| ');
+
+  // 2. إصلاح غياب سطر الفواصل بين الرأس والبيانات
+  const lines = text.split('\n');
+  const repaired: string[] = [];
+  let inTable = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+    const isTableRow = trimmed.startsWith('|') && trimmed.endsWith('|');
+
+    if (!isTableRow) {
+      inTable = false;
+      repaired.push(line);
+      continue;
+    }
+
+    if (!inTable) {
+      inTable = true;
+      repaired.push(line);
+      const nextLine = lines[i + 1]?.trim() || '';
+      const isDivider = /^\|(?:\s*:?-+:?\s*\|)+$/.test(nextLine);
+
+      // إذا لم يكن السطر التالي سطر فواصل، نقوم بتوليده وحقنه فوراً للرأس فقط
+      if (!isDivider && nextLine.startsWith('|')) {
+        const columnCount = (line.match(/\|/g) || []).length - 1;
+        if (columnCount > 0) {
+          const dividerRow = '|' + Array(columnCount).fill(' :--- |').join('');
+          repaired.push(dividerRow);
+        }
+      }
+    } else {
+      repaired.push(line);
+    }
+  }
+
+  return repaired.join('\n');
+}
+
+/**
  * Sanitizes educational book content:
  * - Strips OCR / scanning artifacts (▲, ▼, ◆, ◇, ■, □, ●, ○, ★, ☆, ►, ◄)
- * - Strips parenthetical side notes / exam tags like (دور أول 2022), (امتحان 2021)
+ * - Repairs broken markdown tables via repairMarkdownTables
+ * - Strips fill-in-the-blank dotted trails e.g. "........"
  * - Converts math words to symbols and LaTeX via sanitizeMathText
  * - Strips dangling raw hash tags, broken table dashes, stray asterisks, and page number markers
  */
 export function sanitizeBookContent(text: string | undefined): string {
   if (!text) return '';
-  // 0. Protect LaTeX commands (like \neq) by only replacing \n when NOT followed by letters
-  let cleaned = text.replace(/\\n(?![a-zA-Z])/g, '\n').trim();
+  // 0. Normalize Windows line endings and protect LaTeX commands (like \neq)
+  let cleaned = text.replace(/\r\n/g, '\n').replace(/\\n(?![a-zA-Z])/g, '\n').trim();
+
+  // 0.1 🛡️ STRIP AI CONVERSATIONAL PREAMBLES & META-INTRODUCTIONS
+  cleaned = cleaned.replace(/^(?:بصفتي|أقدم لك|إليك محتوى|بناءً?\s*على التوجيهات|فيما يلي|هذا هو|مرحباً)[^\n]*\n+/gmi, '');
+  cleaned = cleaned.replace(/^.*?(?:بصفتي المحرر والموثق الرقمي الأمين|وفقاً للتوجيهات المحددة|أقدم لك محتوى الشرح)[^\n]*\n+/gmi, '');
+
+  // 0.2 🛠️ REPAIR BROKEN MARKDOWN TABLES
+  cleaned = repairMarkdownTables(cleaned);
+
+  // 0.3 🛡️ STRIP WORKSHEET EXAM BLANKS & TRAILING DOTS e.g. "............"
+  cleaned = cleaned.replace(/[ \t]*[\.·•]{3,}[ \t]*/g, ' ');
+  cleaned = cleaned.replace(/_{3,}/g, '');
 
   // Repair corrupted \neq that became "eq 0" or "b eq 0"
   cleaned = cleaned.replace(/\b([a-zA-Z0-9]+)\s+eq\s+([0-9]+)/g, '$1 \\neq $2');
@@ -71,7 +132,8 @@ export function sanitizeBookContent(text: string | undefined): string {
   cleaned = cleaned.replace(/^[ \t]*\|?[-:\s|]{3,}\|?[ \t]*$/gm, '');
 
   // 8.1 Strip solitary dot, bullet, or stray punctuation lines (e.g., "." or "•" or "·")
-  cleaned = cleaned.replace(/^[ \t]*[\.·•\-–—*#\u2022\u2023\u25E6\u2043\u2219][ \t]*$/gm, '');
+  cleaned = cleaned.replace(/^[ \t\u00A0\u200B\uFEFF]*[\.·•\-–—*#\u2022\u2023\u25E6\u2043\u2219][ \t\u00A0\u200B\uFEFF]*$/gm, '');
+  cleaned = cleaned.replace(/^\s*[\.·•]\s*$/gm, '');
 
   // 8.2 Strip introductory lesson objectives checklist when redundant with lesson body
   cleaned = cleaned.replace(/^[#\s]*أهداف الدرس[:\s]+في نهاية الدرس يجب أن يكون[\s\S]*?(?=\n#{1,3}|\n\n[^\*\-\d]|$)/gmi, '');

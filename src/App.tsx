@@ -271,7 +271,11 @@ function AppContent() {
 
   const fetchSupabaseCatalog = async () => {
     try {
-      const { data, error } = await supabase.from('books').select('*').order('created_at', { ascending: false });
+      // ⚡ High-Performance Catalog Select: Only fetch lightweight metadata (skip heavy full chapter markdown / original_text)
+      const { data, error } = await supabase
+        .from('books')
+        .select('id, title, description, author_name, category, subcategory, education_level, academic_system, grade_level, semester, academic_year, price, is_external, external_url, preview_video_url, is_published, thumbnail_url, rating, reviews_count, created_at, tags')
+        .order('created_at', { ascending: false });
       
       if (!error && data) {
         const formatted: MarketplaceBook[] = data.map((b: any) => {
@@ -297,7 +301,7 @@ function AppContent() {
 
           return {
             ...b,
-            author_name: b.author_name || 'د. كريم كامل',
+            author_name: b.author_name || 'خبير المادة',
             category: b.category || 'digital_book',
             education_level,
             academic_system,

@@ -103,11 +103,11 @@ const MATHEMATICS_RULES: STEMLexiconRule[] = [
   { pattern: /\\emptyset|∅/g, replacement: " الْمَجْمُوعَةُ الْخَالِيَةُ فَاي " },
   { pattern: /\\lor|∨/g, replacement: " أَوْ " },
   { pattern: /\\land|∧/g, replacement: " وَ " },
-  { pattern: /\\mathbb\{R\}|ℝ|\bح\b/g, replacement: " مَجْمُوعَةُ الأَعْدَادِ الْحَقِيقِيَّةِ ح " },
-  { pattern: /\\mathbb\{Q\}'|ℚ'|\bن['’َ]\b/g, replacement: " مَجْمُوعَةُ الأَعْدَادِ غَيْرِ النِّسْبِيَّةِ ن شَرْطَة " },
-  { pattern: /\\mathbb\{Q\}|ℚ|\bن\b/g, replacement: " مَجْمُوعَةُ الأَعْدَادِ النِّسْبِيَّةِ ن " },
-  { pattern: /\\mathbb\{Z\}|ℤ|\bص\b/g, replacement: " مَجْمُوعَةُ الأَعْدَادِ الصَّحِيحَةِ ص " },
-  { pattern: /\\mathbb\{N\}|ℕ|\bط\b/g, replacement: " مَجْمُوعَةُ الأَعْدَادِ الطَّبِيعِيَّةِ ط " },
+  { pattern: /\\mathbb\{R\}|ℝ|(?<=مجموعة\s+|المجموعة\s+|[∈∉⊂⊄]\s*)ح(?![^\s،.!\$\)])/g, replacement: " مَجْمُوعَةُ الأَعْدَادِ الْحَقِيقِيَّةِ ح " },
+  { pattern: /\\mathbb\{Q\}'|ℚ'|(?<=مجموعة\s+|المجموعة\s+|[∈∉⊂⊄]\s*)ن['’َ](?![^\s،.!\$\)])/g, replacement: " مَجْمُوعَةُ الأَعْدَادِ غَيْرِ النِّسْبِيَّةِ ن شَرْطَة " },
+  { pattern: /\\mathbb\{Q\}|ℚ|(?<=مجموعة\s+|المجموعة\s+|[∈∉⊂⊄]\s*)ن(?![^\s،.!\$\)])/g, replacement: " مَجْمُوعَةُ الأَعْدَادِ النِّسْبِيَّةِ ن " },
+  { pattern: /\\mathbb\{Z\}|ℤ|(?<=مجموعة\s+|المجموعة\s+|[∈∉⊂⊄]\s*)ص(?![^\s،.!\$\)])/g, replacement: " مَجْمُوعَةُ الأَعْدَادِ الصَّحِيحَةِ ص " },
+  { pattern: /\\mathbb\{N\}|ℕ|(?<=مجموعة\s+|المجموعة\s+|[∈∉⊂⊄]\s*)ط(?![^\s،.!\$\)])/g, replacement: " مَجْمُوعَةُ الأَعْدَادِ الطَّبِيعِيَّةِ ط " },
   { pattern: /\\mid/g, replacement: " حَيْثُ " },
   { pattern: /-\\infty|-∞/g, replacement: " سَالِب مَا لَا نِهَايَة " },
   { pattern: /\\infty|∞/g, replacement: " مُوجَب مَا لَا نِهَايَة " },
@@ -127,9 +127,11 @@ const MATHEMATICS_RULES: STEMLexiconRule[] = [
   { pattern: /\\sim|∼/g, replacement: " يُشَابِه " },
   { pattern: /\\pi|π/g, replacement: " بَاي أَوْ ط " },
   { pattern: /\\theta|θ/g, replacement: " ثِيتَا " },
-  { pattern: /\\sin\b|(?<![a-zA-Z])جا(?![a-zA-Z])/g, replacement: " جَيْبُ الزَّاوِيَةِ جَا " },
-  { pattern: /\\cos\b|(?<![a-zA-Z])جتا(?![a-zA-Z])/g, replacement: " جَيْبُ تَمَامِ الزَّاوِيَةِ جَتَا " },
-  { pattern: /\\tan\b|(?<![a-zA-Z])ظا(?![a-zA-Z])/g, replacement: " ظِلُّ الزَّاوِيَةِ ظَا " },
+
+  // Strict Arabic Boundaries for Trigonometric Functions (Prevents corrupting words like "نظام", "مجال", "مظاهر")
+  { pattern: /\\sin\b|(?<![\u0600-\u06FFa-zA-Z0-9])جا(?=[\s\(]+[A-Za-z0-9\u0600-\u06FF]|[\$\)])/g, replacement: " جَيْبُ الزَّاوِيَةِ جَا " },
+  { pattern: /\\cos\b|(?<![\u0600-\u06FFa-zA-Z0-9])جتا(?=[\s\(]+[A-Za-z0-9\u0600-\u06FF]|[\$\)])/g, replacement: " جَيْبُ تَمَامِ الزَّاوِيَةِ جَتَا " },
+  { pattern: /\\tan\b|(?<![\u0600-\u06FFa-zA-Z0-9])ظا(?=[\s\(]+[A-Za-z0-9\u0600-\u06FF]|[\$\)])/g, replacement: " ظِلُّ الزَّاوِيَةِ ظَا " },
 
   // Inequalities & Comparison
   { pattern: /([A-Za-z0-9\u0600-\u06FF]+)\s*(?:\\ge|≥)\s*([A-Za-z0-9\u0600-\u06FF]+)/g, replacement: " $1 أَكْبَرُ مِنْ أَوْ يُسَاوِي $2 " },
@@ -140,9 +142,96 @@ const MATHEMATICS_RULES: STEMLexiconRule[] = [
 ];
 
 /**
- * 💻 Computer Science & Digital Architecture Lexicon
+ * ⚡ Physics & Educational SI Measurement Units Lexicon (Egyptian & International Curricula)
+ */
+const PHYSICS_AND_UNITS_RULES: STEMLexiconRule[] = [
+  // Speeds & Accelerations
+  { pattern: /\b(?:m\/s\^2|m\/s²|م\/ث\^2|م\/ث²)\b/gi, replacement: " مِتْرٌ لِكُلِّ ثَانِيَةٍ مُرَبَّعَةٍ " },
+  { pattern: /\b(?:m\/s|م\/ث)\b/gi, replacement: " مِتْرٌ لِكُلِّ ثَانِيَةٍ " },
+  { pattern: /\b(?:km\/h|كم\/س)\b/gi, replacement: " كِيلُومِتْرٌ لِكُلِّ سَاعَةٍ " },
+  { pattern: /\b(?:cm\/s|سم\/ث)\b/gi, replacement: " سَنْتِيمِتْرٌ لِكُلِّ ثَانِيَةٍ " },
+
+  // Distance, Area, Volume
+  { pattern: /\b(?:km\^3|كم³)\b/gi, replacement: " كِيلُومِتْرٌ مُكَعَّبٌ " },
+  { pattern: /\b(?:m\^3|م³)\b/gi, replacement: " مِتْرٌ مُكَعَّبٌ " },
+  { pattern: /\b(?:cm\^3|سم³)\b/gi, replacement: " سَنْتِيمِتْرٌ مُكَعَّبٌ " },
+  { pattern: /\b(?:mm\^3|مم³)\b/gi, replacement: " مِلِّيمِتْرٌ مُكَعَّبٌ " },
+  { pattern: /\b(?:km\^2|كم²)\b/gi, replacement: " كِيلُومِتْرٌ مُرَبَّعٌ " },
+  { pattern: /\b(?:m\^2|م²)\b/gi, replacement: " مِتْرٌ مُرَبَّعٌ " },
+  { pattern: /\b(?:cm\^2|سم²)\b/gi, replacement: " سَنْتِيمِتْرٌ مُرَبَّعٌ " },
+  { pattern: /\b(?:mm\^2|مم²)\b/gi, replacement: " مِلِّيمِتْرٌ مُرَبَّعٌ " },
+  { pattern: /(?<=\d|\s)(?:km|كم)(?=[\s\.,،؛]|$)/gi, replacement: " كِيلُومِتْر " },
+  { pattern: /(?<=\d|\s)(?:cm|سم)(?=[\s\.,،؛]|$)/gi, replacement: " سَنْتِيمِتْر " },
+  { pattern: /(?<=\d|\s)(?:mm|مم)(?=[\s\.,،؛]|$)/gi, replacement: " مِلِّيمِتْر " },
+  { pattern: /(?<=\d\s*)(?:m|م)(?=[\s\.,،؛]|$)/gi, replacement: " مِتْر " },
+
+  // Mass, Force, Work & Energy
+  { pattern: /(?<=\d|\s)(?:kg|كجم|كغم)(?=[\s\.,،؛]|$)/gi, replacement: " كِيلُوجْرَام " },
+  { pattern: /(?<=\d|\s)(?:g|جم|جرام)(?=[\s\.,،؛]|$)/gi, replacement: " جْرَام " },
+  { pattern: /(?<=\d|\s)(?:N|نيوتن)(?=[\s\.,،؛]|$)/gi, replacement: " نِيُوتِن " },
+  { pattern: /(?<=\d|\s)(?:J|جول)(?=[\s\.,،؛]|$)/gi, replacement: " جُول " },
+  { pattern: /(?<=\d|\s)(?:W|واط|وات)(?=[\s\.,،؛]|$)/gi, replacement: " وَاط " },
+  { pattern: /\b(?:kW|كيلو\s*واط|كيلو\s*وات)\b/gi, replacement: " كِيلُو وَاط " },
+  { pattern: /\b(?:kWh|كيلو\s*واط\s*ساعة)\b/gi, replacement: " كِيلُو وَاط سَاعَة " },
+
+  // Electricity & Magnetism
+  { pattern: /(?<=\d|\s)(?:A|أمبير|امبير)(?=[\s\.,،؛]|$)/gi, replacement: " أَمْبِير " },
+  { pattern: /(?<=\d|\s)(?:V|فولت)(?=[\s\.,،؛]|$)/gi, replacement: " فُولْت " },
+  { pattern: /(?<=\d|\s)(?:Ω|أوم|اوم)(?=[\s\.,،؛]|$)/gi, replacement: " أُوم " },
+  { pattern: /(?<=\d|\s)(?:C|كولوم)(?=[\s\.,،؛]|$)/gi, replacement: " كُولُوم " },
+  { pattern: /(?<=\d|\s)(?:T|تسلا)(?=[\s\.,،؛]|$)/gi, replacement: " تِسْلَا " },
+  { pattern: /(?<=\d|\s)(?:Hz|هرتز)(?=[\s\.,،؛]|$)/gi, replacement: " هِرْتِز " },
+  { pattern: /\b(?:kHz|كيلو\s*هرتز)\b/gi, replacement: " كِيلُو هِرْتِز " },
+  { pattern: /\b(?:MHz|ميجا\s*هرتز)\b/gi, replacement: " مِيجَا هِرْتِز " },
+  { pattern: /\b(?:GHz|جيجا\s*هرتز)\b/gi, replacement: " جِيجَا هِرْتِز " },
+
+  // Pressure & Temperature
+  { pattern: /(?<=\d|\s)(?:Pa|باسكال)(?=[\s\.,،؛]|$)/gi, replacement: " بَاسْكَال " },
+  { pattern: /(?<=\d|\s)(?:bar|بار)(?=[\s\.,،؛]|$)/gi, replacement: " بَار " },
+  { pattern: /(?<=\d|\s)(?:atm|ض\.ج|ضغط\s*جوي)(?=[\s\.,،؛]|$)/gi, replacement: " ضَغْط جَوِّي " },
+  { pattern: /(?:°C|°م|درجة\s*مئوية|درجة\s*سيليزية)/gi, replacement: " دَرَجَة سِيلِيزِيَّة مِئَوِيَّة " },
+  { pattern: /(?<=\d|\s)(?:K|كلفن)(?=[\s\.,،؛]|$)/gi, replacement: " كِلْفِن " }
+];
+
+/**
+ * 💻 Computer Science, Networking & Digital Architecture Lexicon
  */
 const COMPUTER_SCIENCE_RULES: STEMLexiconRule[] = [
+  // Hardware & Processing
+  { pattern: /\bCPU\b/g, replacement: " وِحْدَةُ الْمُعَالَجَةِ الْمَرْكَزِيَّةِ سِي بِي يُو " },
+  { pattern: /\bGPU\b/g, replacement: " مُعَالِجُ الرُّسُومِيَّاتِ جِي بِي يُو " },
+  { pattern: /\bRAM\b/g, replacement: " ذَاكِرَةُ الْوُصُولِ الْعَشْوَائِيِّ رَام " },
+  { pattern: /\bROM\b/g, replacement: " ذَاكِرَةُ الْقِرَاءَةِ فَقَطْ رُوم " },
+  { pattern: /\bMotherboard\b/gi, replacement: " اللَّوْحَةُ الأُمُّ " },
+  { pattern: /\bALU\b/g, replacement: " وِحْدَةُ الْحِسَابِ وَالْمَنْطِقِ " },
+  { pattern: /\bControl\s*Unit\b/gi, replacement: " وِحْدَةُ التَّحَكُّمِ " },
+
+  // Storage Units (Bits & Bytes)
+  { pattern: /(?<=\d|\s)\bTB\b/g, replacement: " تِيرَا بَايْت " },
+  { pattern: /(?<=\d|\s)\bGB\b/g, replacement: " جِيجَا بَايْت " },
+  { pattern: /(?<=\d|\s)\bMB\b/g, replacement: " مِيجَا بَايْت " },
+  { pattern: /(?<=\d|\s)\bKB\b/g, replacement: " كِيلُو بَايْت " },
+  { pattern: /(?<=\d|\s)\bBytes?\b/gi, replacement: " بَايْت " },
+  { pattern: /(?<=\d|\s)\bBits?\b/gi, replacement: " بَت " },
+
+  // Networks & Web
+  { pattern: /\bIP(?:\s*Address)?\b/gi, replacement: " عُنْوَانُ بُرُوتُوكُولِ الإِنْتَرْنِتْ آي بِي " },
+  { pattern: /\bURL\b/g, replacement: " رَابِطُ الْمَوْقِعِ يُو آرْ إِلْ " },
+  { pattern: /\bHTTP\b/g, replacement: " بُرُوتُوكُولُ إِتْش تِي تِي بِي " },
+  { pattern: /\bHTTPS\b/g, replacement: " بُرُوتُوكُولُ إِتْش تِي تِي بِي إِسْ الآمِن " },
+  { pattern: /\bHTML\b/g, replacement: " لُغَةُ إِتْش تِي إِمْ إِلْ لِتَصْمِيمِ الصَّفَحَاتِ " },
+  { pattern: /\bCSS\b/g, replacement: " سِي إِسْ إِسْ لِتَنْسِيقِ الْمَوَاقِعِ " },
+  { pattern: /\bLAN\b/g, replacement: " الشَّبَكَةُ الْمَحَلِّيَّةُ لَان " },
+  { pattern: /\bWAN\b/g, replacement: " الشَّبَكَةُ الْوَاسِعَةُ وَان " },
+  { pattern: /\bWLAN\b/g, replacement: " الشَّبَكَةُ اللَّاسِلْكِيَّةُ دَبْلِيُو لَان " },
+  { pattern: /\bWi-?Fi\b/gi, replacement: " شَبَكَةُ الْوَايْ فَاي اللَّاسِلْكِيَّة " },
+  { pattern: /\bDNS\b/g, replacement: " خَادِمُ أَسْمَاءِ النِّطَاقَاتِ دِي إِنْ إِسْ " },
+  { pattern: /\bDHCP\b/g, replacement: " بُرُوتُوكُولُ تَوْزِيعِ الْعَنَاوِينِ دِي إِتْش سِي بِي " },
+  { pattern: /\bOS\b/g, replacement: " نِظَامُ التَّشْغِيلِ " },
+  { pattern: /\bGUI\b/g, replacement: " وَاجِهَةُ الْمُسْتَخْدِمِ الرُّسُومِيَّةُ جِي يُو آي " },
+  { pattern: /\bCLI\b/g, replacement: " وَاجِهَةُ سَطْرِ الأَوَامِرِ " },
+
+  // Logic Gates & Architectures
   { pattern: /\bHalf\s*Adder\b/gi, replacement: " نِصْفُ الْجَامِع " },
   { pattern: /\bFull\s*Adder\b/gi, replacement: " الْجَامِعُ الْكَامِل " },
   { pattern: /\bCombinational(?:\s*Circuits?)?\b/gi, replacement: " الدَّوَائِرُ التَّجْمِيعِيَّة " },
@@ -183,12 +272,17 @@ export function transpileSTEMToSpokenArabic(input: string): string {
     spoken = spoken.replace(rule.pattern, rule.replacement as any);
   }
 
-  // 3. Apply Computer Science rules
+  // 3. Apply Physics & Units rules
+  for (const rule of PHYSICS_AND_UNITS_RULES) {
+    spoken = spoken.replace(rule.pattern, rule.replacement as any);
+  }
+
+  // 4. Apply Computer Science rules
   for (const rule of COMPUTER_SCIENCE_RULES) {
     spoken = spoken.replace(rule.pattern, rule.replacement as any);
   }
 
-  // 4. Clean stray LaTeX math delimiters: $, $$, \text{...}, \mathbf{...}
+  // 5. Clean stray LaTeX math delimiters: $, $$, \text{...}, \mathbf{...}
   spoken = spoken.replace(/\\text\{([^{}]+)\}/g, "$1");
   spoken = spoken.replace(/\\mathbf\{([^{}]+)\}/g, "$1");
   spoken = spoken.replace(/\\mathit\{([^{}]+)\}/g, "$1");

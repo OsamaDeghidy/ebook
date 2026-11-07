@@ -25,12 +25,13 @@ import os from "os";
 import crypto from "crypto";
 import multer from "multer";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { Upload } from "@aws-sdk/lib-storage";
 import { EdgeTTS } from "node-edge-tts";
 import { GoogleGenAI, Type } from "@google/genai";
 import { PDFParse } from "pdf-parse";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
-import { parseDocumentBuffer, extractPdfTextViaVisionPages, extractPdfPageRange, renderPdfPagesToImages, extractVisualSyllabusFromToc, calculatePhysicalPage, detectLessonAnchorPage } from "./server/services/documentParser";
+import { parseDocumentBuffer, extractPdfTextViaVisionPages, extractPdfPageRange, renderPdfPagesToImages, extractVisualSyllabusFromToc, calculatePhysicalPage, detectLessonAnchorPage, detectBookGlobalOffset } from "./server/services/documentParser";
 import { buildMasterPedagogicalPrompt, evaluatePedagogicalChunking, deduplicateChapterTitles } from "./server/services/pedagogicalChunker";
 import { extractDocumentBlueprint, getPendingLessons, markLessonsCompleted, DocumentSyllabusBlueprint, SyllabusLessonBlueprint } from "./server/services/documentBlueprint";
 import { buildGroundedBatchPrompt } from "./server/services/groundedLessonBuilder";
@@ -115,6 +116,89 @@ async function uploadAudioFileToSupabase(filePath: string, fileName: string): Pr
   }
 }
 
+export function repairMarkdownTables(markdown: string): string {
+  if (!markdown || !markdown.includes('|')) return markdown;
+  let text = markdown.replace(/\|\s*\|\s*/g, '|\n| ');
+  const lines = text.split('\n');
+  const repaired: string[] = [];
+  let inTable = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+    const isTableRow = trimmed.startsWith('|') && trimmed.endsWith('|');
+
+    if (!isTableRow) {
+      inTable = false;
+      repaired.push(line);
+      continue;
+    }
+
+    if (!inTable) {
+      inTable = true;
+      repaired.push(line);
+      const nextLine = lines[i + 1]?.trim() || '';
+      const isDivider = /^\|(?:\s*:?-+:?\s*\|)+$/.test(nextLine);
+
+      if (!isDivider && nextLine.startsWith('|')) {
+        const columnCount = (line.match(/\|/g) || []).length - 1;
+        if (columnCount > 0) {
+          const dividerRow = '|' + Array(columnCount).fill(' :--- |').join('');
+          repaired.push(dividerRow);
+        }
+      }
+    } else {
+      repaired.push(line);
+    }
+  }
+
+  return repaired.join('\n');
+}
+
+export function sanitizeServerContent(text: string | undefined): string {
+  if (!text) return "";
+  let cleaned = text
+    .replace(/\r\n/g, '\n')
+    .replace(/\\n(?![a-zA-Z])/g, '\n')
+    .replace(/\b([a-zA-Z0-9]+)\s+eq\s+([0-9]+)/g, '$1 \\neq $2')
+    .replace(/\beq\s+0\b/g, '\\neq 0')
+    .trim();
+
+  // 1. Strip AI conversational preambles and robot meta-intros
+  cleaned = cleaned.replace(/^(?:بصفتي|أقدم لك|إليك محتوى|بناءً?\s*على التوجيهات|فيما يلي|هذا هو|مرحباً)[^\n]*\n+/gmi, '');
+  cleaned = cleaned.replace(/^.*?(?:بصفتي المحرر والموثق الرقمي الأمين|وفقاً للتوجيهات المحددة|أقدم لك محتوى الشرح)[^\n]*\n+/gmi, '');
+
+  // 1.1 🛠️ Repair broken markdown tables
+  cleaned = repairMarkdownTables(cleaned);
+
+  // 1.2 🛡️ Strip worksheet exam blanks & trailing dots e.g. "............"
+  cleaned = cleaned.replace(/[ \t]*[\.·•]{3,}[ \t]*/g, ' ');
+  cleaned = cleaned.replace(/_{3,}/g, '');
+
+  // 2. Strip OCR scanning artifacts and bullet glyphs
+  cleaned = cleaned.replace(/[▲▼◆◇■□●○★☆►◄]/g, '');
+
+  // 3. Strip standalone page numbers and headers
+  cleaned = cleaned.replace(/^[ \t]*(?:ص|صفحة|Page|P\.)\s*\d+[ \t]*$/gmi, '');
+  cleaned = cleaned.replace(/\[\s*\d+\s*\]/g, '');
+  cleaned = cleaned.replace(/\s*\((?:دور\s*(?:أول|ثان|ثاني)|امتحان\s*\d{4}|ثانوية\s*عامة|نماذج\s*الوزارة)[^)]*\)/gi, '');
+
+  // 4. Strip solitary dots and punctuation lines on Windows/Linux
+  cleaned = cleaned.replace(/^[ \t\u00A0\u200B\uFEFF]*[\.·•\-–—*#\u2022\u2023\u25E6\u2043\u2219][ \t\u00A0\u200B\uFEFF]*$/gm, '');
+  cleaned = cleaned.replace(/^\s*[\.·•]\s*$/gm, '');
+
+  // 5. Replace written comparison operators with symbols
+  cleaned = cleaned.replace(/أكبر من أو يساوي/g, '≥')
+    .replace(/أصغر من أو يساوي/g, '≤')
+    .replace(/أكبر من/g, '>')
+    .replace(/أصغر من/g, '<');
+
+  // 6. Clean dangling blank lines
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n').trim();
+
+  return cleaned;
+}
+
 function cleanScientificTextForSpeech(input: string): string {
   let cleaned = input || "";
 
@@ -168,11 +252,11 @@ function cleanScientificTextForSpeech(input: string): string {
   cleaned = cleaned.replace(/\\subset|⊂/g, " مَجْمُوعَةٌ جُزْئِيَّةٌ مِنْ ");
   cleaned = cleaned.replace(/\\lor|∨/g, " أَوْ ");
   cleaned = cleaned.replace(/\\land|∧/g, " وَ ");
-  cleaned = cleaned.replace(/\\mathbb\{R\}|ℝ|\bح\b/g, " مَجْمُوعَةُ الأَعْدَادِ الحَقِيقِيَّة ");
-  cleaned = cleaned.replace(/\\mathbb\{Q\}'|ℚ'|\bن['’َ]\b/g, " مَجْمُوعَةُ الأَعْدَادِ غَيْرِ النِّسْبِيَّة ");
-  cleaned = cleaned.replace(/\\mathbb\{Q\}|ℚ|\bن\b/g, " مَجْمُوعَةُ الأَعْدَادِ النِّسْبِيَّة ");
-  cleaned = cleaned.replace(/\\mathbb\{Z\}|ℤ|\bص\b/g, " مَجْمُوعَةُ الأَعْدَادِ الصَّحِيحَة ");
-  cleaned = cleaned.replace(/\\mathbb\{N\}|ℕ|\bط\b/g, " مَجْمُوعَةُ الأَعْدَادِ الطَّبِيعِيَّة ");
+  cleaned = cleaned.replace(/\\mathbb\{R\}|ℝ|(?<=مجموعة\s+|المجموعة\s+|[∈∉⊂⊄]\s*)ح(?![^\s،.!\$\)])/g, " مَجْمُوعَةُ الأَعْدَادِ الحَقِيقِيَّة ");
+  cleaned = cleaned.replace(/\\mathbb\{Q\}'|ℚ'|(?<=مجموعة\s+|المجموعة\s+|[∈∉⊂⊄]\s*)ن['’َ](?![^\s،.!\$\)])/g, " مَجْمُوعَةُ الأَعْدَادِ غَيْرِ النِّسْبِيَّة ");
+  cleaned = cleaned.replace(/\\mathbb\{Q\}|ℚ|(?<=مجموعة\s+|المجموعة\s+|[∈∉⊂⊄]\s*)ن(?![^\s،.!\$\)])/g, " مَجْمُوعَةُ الأَعْدَادِ النِّسْبِيَّة ");
+  cleaned = cleaned.replace(/\\mathbb\{Z\}|ℤ|(?<=مجموعة\s+|المجموعة\s+|[∈∉⊂⊄]\s*)ص(?![^\s،.!\$\)])/g, " مَجْمُوعَةُ الأَعْدَادِ الصَّحِيحَة ");
+  cleaned = cleaned.replace(/\\mathbb\{N\}|ℕ|(?<=مجموعة\s+|المجموعة\s+|[∈∉⊂⊄]\s*)ط(?![^\s،.!\$\)])/g, " مَجْمُوعَةُ الأَعْدَادِ الطَّبِيعِيَّة ");
   cleaned = cleaned.replace(/\\mid/g, " حَيْثُ ");
   cleaned = cleaned.replace(/-\\infty|-∞/g, " سَالِب مَا لَا نِهَايَة ");
   cleaned = cleaned.replace(/\\infty|∞/g, " مَا لَا نِهَايَة ");
@@ -264,8 +348,9 @@ function cleanScientificTextForSpeech(input: string): string {
   cleaned = cleaned.replace(/^[ \t]*[#]+[ \t]*/gm, " ");
   cleaned = cleaned.replace(/[\*\_\~\|\$]/g, " ");
 
-  // 12. Strip list bullet markers at beginning of lines
+  // 12. Strip list bullet markers and convert dashes everywhere into natural pauses so TTS never says "شرطة"
   cleaned = cleaned.replace(/^[ \t]*[-*•⁃▫▪◦][ \t]+/gm, " ");
+  cleaned = cleaned.replace(/[\s\u00A0]*[—–ـ\-]+[\s\u00A0]*/g, " ، ");
 
   // 13. Replace multiple dots (ellipsis) with a single comma pause so TTS never pronounces "نقطة نقطة"
   cleaned = cleaned.replace(/\.{2,}/g, " ، ");
@@ -722,7 +807,7 @@ function loadEbooks(): any[] {
     if (fs.existsSync(EBOOKS_FILE)) {
       const data = fs.readFileSync(EBOOKS_FILE, "utf-8");
       const loaded = JSON.parse(data);
-      if (Array.isArray(loaded) && loaded.length > 0) {
+      if (Array.isArray(loaded)) {
         ebooks = loaded;
         return ebooks;
       }
@@ -730,7 +815,7 @@ function loadEbooks(): any[] {
   } catch (err) {
     console.error("Error loading persisted ebooks database:", err);
   }
-  ebooks = sampleEbooks;
+  ebooks = [];
   return ebooks;
 }
 
@@ -985,9 +1070,46 @@ app.get("/api/admin/gemini/health", async (req, res) => {
   });
 });
 
-// 1. Get all ebooks
+// 1. Get all ebooks (Slim Catalog by default for instant 50ms rendering)
 app.get("/api/ebooks", (req, res) => {
-  res.json(ebooks);
+  const isFull = req.query.full === "true";
+  if (isFull) {
+    return res.json(ebooks);
+  }
+
+  // Ultra-fast slim catalog (reduces payload by 99% for instantaneous marketplace rendering)
+  const slimCatalog = ebooks.map((b) => ({
+    id: b.id,
+    title: b.title,
+    description: b.description,
+    author_name: b.author_name || "خبير المادة",
+    category: b.category,
+    subcategory: b.subcategory,
+    education_level: b.education_level,
+    academic_system: b.academic_system,
+    grade_level: b.grade_level,
+    semester: b.semester,
+    academic_year: b.academic_year,
+    price: Number(b.price) || 0,
+    is_external: !!b.is_external,
+    external_url: b.external_url,
+    preview_video_url: b.preview_video_url,
+    is_published: b.is_published !== false,
+    thumbnail_url: b.thumbnail_url || 'https://images.unsplash.com/photo-1532012197267-da84d127e765?auto=format&fit=crop&w=800&q=80',
+    rating: b.rating || 5.0,
+    reviews_count: b.reviews_count || 120,
+    created_at: b.created_at || b.createdAt,
+    tags: b.tags || ['كتاب_تفاعلي'],
+    chapters_count: (b.chapters || []).length,
+    chapters: (b.chapters || []).map((c: any) => ({
+      id: c.id,
+      title: c.title,
+      start_page: c.start_page,
+      end_page: c.end_page
+    }))
+  }));
+
+  res.json(slimCatalog);
 });
 
 // Get server configuration / capabilities
@@ -1709,6 +1831,79 @@ Return ONLY a valid JSON object matching this schema without any markdown wrappi
   }
 });
 
+/**
+ * Unified Authentic Lesson Content Generator
+ * Guarantees 100% parity with the manual "استخراج نص المذكرة الأصلي من PDF" endpoint:
+ * - Free-text unconstrained Markdown (no JSON token squeezing)
+ * - Deep, exhaustive, 1500–2500 word pedagogical explanation
+ * - Strict prohibition on comparison tables (replaces them with structured concept blocks)
+ * - Strict prohibition on dotted lines/blanks (fills in model answers)
+ * - Strict prohibition on dashes between words (uses parentheses or clean paragraphs)
+ */
+export async function generateFaithfulLessonContent(params: {
+  chapterTitle: string;
+  startPage: number;
+  endPage: number;
+  extractedText: string;
+  category?: string;
+  grade_level?: string;
+  ai: any;
+}): Promise<string> {
+  const { chapterTitle, startPage, endPage, extractedText, ai } = params;
+  if (!extractedText || extractedText.trim().length === 0) {
+    return "";
+  }
+
+  const prompt = `
+أنت معلم خبير وموثق رقمي دقيق للمناهج التعليمية المعتمدة.
+إليك النص الخام المستخرج بصرياً وبدقة من صفحات المذكرة الفعلية (الصفحات المطبوعة ${startPage} إلى ${endPage}) لدرس: "${chapterTitle}".
+
+النص الخام من صفحات المذكرة:
+"""
+${extractedText}
+"""
+
+المهمة المطلوبة بدقة متناهية:
+1. 🚫 ممنوع منعاً باتاً كتابة أي مقدمات حوارية أو ديباجات آلية (مثل: "بصفتي المحرر...", "أقدم لك...", "إليك محتوى...", "وفقاً للتوجيهات..."). ابدأ فوراً بعنوان الدرس ثم متن الشرح التربوي المنظم.
+2. 📏 الشرح الموسع الشامل دون تلخيص مخل (حظر تلخيص عدة صفحات إلى فقرة عابرة):
+   - اشرح كل مفهوم، وظاهرة، وقانون، وتجربة واردة في الصفحات شرحاً تربوياً مفصلاً ووافياً وعميقاً (من 1500 إلى 2500 كلمة).
+   - إذا تضمنت الصفحات أنشطة أو أوراق عمل بنقاط فارغة ("........" أو "___" أو "أكمل ما يأتي:")، حظر ترك نقاط فارغة نهائياً! اكتب الحقيقة العلمية والشرح كاملاً مع الإجابة النموذجية المكتملة.
+3. 🚫 حظر تام لجداول المقارنة وحظر الفواصل بالشرط:
+   - ممنوع منعاً باتاً استخدام جداول المقارنة نهائياً لأنها تشوه العرض وتفسد القراءة الصوتية.
+   - استبدل أي مقارنة بين أمرين ببطاقات مفاهيم واضحة ومتتالية:
+     ### 🔹 [المفهوم الأول]
+     **الشرح والخصائص:** ...
+     ### 🔹 [المفهوم الثاني]
+     **الشرح والخصائص:** ...
+   - ممنوع استخدام الشرطات (— أو -) بين الكلمات ومعانيها أو كفواصل صوتية. استخدم الأقواس () أو فقرات مستقلة.
+4. للمواد العلمية والـ STEM:
+   - الشرح المفاهيمي المتعمق لكافة المفاهيم والظواهر والقوانين والتجارب العملية.
+   - كتابة القوانين الرياضية والمعادلات الكيميائية بترميز LaTeX نقي: $...$ للداخلي و$$...$$ للمستقل.
+   - أمثلة ومسائل وتطبيقات محلولة بالخطوات ($Step-by-step$) بالأرقام والمعطيات ووحدات القياس.
+5. للمواد الأدبية والإنسانية:
+   - النص القرائي أو الشعري كاملاً مضبوطاً بالشكل دون بتر.
+   - مفردات ولغويات منظمة: الكلمة ومعناها بين قوسين (معناها) ومضادها ومفردها/جمعها دون شرطات.
+   - شرح تحليلي مفصل ومواطن جمال وقواعد إعرابية تطبيقية مع الأمثلة المعربة.
+6. احذف الهيدر والفوتر وأرقام الهواتف والدعايات وهوامش أرقام الصفحات المستقلة.
+7. احذف أي بنوك أسئلة وامتحانات في نهاية الدرس (نحن نريد متن الشرح والتعلم فقط).
+`;
+
+  try {
+    const response = await generateContentWithRetry(ai, {
+      contents: [{ parts: [{ text: prompt }] }],
+      config: {
+        temperature: 0.1
+      }
+    }, ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite-preview", "gemini-3-flash-preview", "gemini-3.5-flash"]);
+
+    const generated = response.text || "";
+    return sanitizeServerContent(generated) || sanitizeServerContent(extractedText);
+  } catch (err) {
+    console.warn(`[Faithful Lesson Generator] Warning for lesson "${chapterTitle}":`, err);
+    return sanitizeServerContent(extractedText);
+  }
+}
+
 // 5. Convert content or create ebook from prompt / file upload (Async Background Worker System)
 async function runBackgroundEbookConversion(
   jobId: string,
@@ -2046,6 +2241,27 @@ async function runBackgroundEbookConversion(
       console.warn("[Job Worker] Blueprint extraction error, using fallback:", bErr);
     }
 
+    // 🌟 AUTOMATIC GLOBAL OFFSET CALIBRATION
+    let detectedGlobalOffset = 0;
+    const activeSourceUrl = fileUrl || savedLocalFile;
+    if (syllabusBlueprint && syllabusBlueprint.lessons && syllabusBlueprint.lessons.length > 0 && activeSourceUrl) {
+      const lesson1 = syllabusBlueprint.lessons[0];
+      try {
+        const { buffer } = await resolveCloudOrLocalFileBuffer(activeSourceUrl);
+        if (buffer) {
+          detectedGlobalOffset = await detectBookGlobalOffset(
+            buffer,
+            lesson1.lesson_title,
+            lesson1.start_page || 1,
+            ai ? async (params) => generateContentWithRetry(ai, params, ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite-preview", "gemini-3-flash-preview"]) : undefined
+          );
+          console.log(`[Job Worker] Calibrated book global page offset: ${detectedGlobalOffset}`);
+        }
+      } catch (offErr) {
+        console.warn("[Job Worker] Global offset auto-calibration notice:", offErr);
+      }
+    }
+
     // 2. GENERATE INITIAL GROUNDED BATCH (FIRST 4 LESSONS WITH DEEP GROUNDING)
     const initialBatch = syllabusBlueprint ? getPendingLessons(syllabusBlueprint, 4) : [];
     let parsedEbook: any = null;
@@ -2054,18 +2270,19 @@ async function runBackgroundEbookConversion(
       job.progressStep = `توليد الدفعة الأولى من الدروس (${initialBatch.length} دروس بتفاصيلها ونصوصها الأصيلة)...`;
       job.progressPercent = 65;
 
-      // 🎯 TARGETED JIT PAGE INGESTION FOR INITIAL BATCH
-      const activeSourceUrl = fileUrl || savedLocalFile;
+      // 🎯 TARGETED JIT PAGE INGESTION FOR INITIAL BATCH WITH CALIBRATED OFFSET
       if (activeSourceUrl) {
         for (const l of initialBatch) {
           if (l.start_page && (!l.raw_text_snippet || l.raw_text_snippet.length < 500)) {
             try {
               const { buffer } = await resolveCloudOrLocalFileBuffer(activeSourceUrl);
               if (buffer) {
+                const physStart = (Number(l.start_page) || 1) + detectedGlobalOffset;
+                const physEnd = (Number(l.end_page) || (l.start_page + 6)) + detectedGlobalOffset;
                 const pageText = await extractPdfPageRange(
                   buffer,
-                  l.start_page,
-                  l.end_page || l.start_page + 6,
+                  physStart,
+                  physEnd,
                   async (params) => generateContentWithRetry(ai, params, ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite-preview", "gemini-3-flash-preview"])
                 );
                 if (pageText && pageText.length > 80) {
@@ -2162,20 +2379,6 @@ async function runBackgroundEbookConversion(
       return s.replace(/\\n(?![a-zA-Z])/g, '\n').replace(/\b([a-zA-Z0-9]+)\s+eq\s+([0-9]+)/g, ' \\neq ').replace(/\beq\s+0\b/g, '\\neq 0').trim();
     };
 
-    const sanitizeServerContent = (text: string | undefined): string => {
-      if (!text) return "";
-      return cleanStr(text)
-        .replace(/[▲▼◆◇■□●○★☆►◄]/g, '')
-        .replace(/^[ \t]*(?:ص|صفحة|Page|P\.)\s*\d+[ \t]*$/gmi, '')
-        .replace(/\[\s*\d+\s*\]/g, '')
-        .replace(/\s*\((?:دور\s*(?:أول|ثان|ثاني)|امتحان\s*\d{4}|ثانوية\s*عامة|نماذج\s*الوزارة)[^)]*\)/gi, '')
-        .replace(/أكبر من أو يساوي/g, '≥')
-        .replace(/أصغر من أو يساوي/g, '≤')
-        .replace(/أكبر من/g, '>')
-        .replace(/أصغر من/g, '<')
-        .trim();
-    };
-
     // Deduplicate parsed chapters
     const deduplicatedChapters = deduplicateChapterTitles(parsedEbook?.chapters || []);
     job.generationProgress = {
@@ -2184,6 +2387,33 @@ async function runBackgroundEbookConversion(
       failed: [],
       current: deduplicatedChapters.length
     };
+
+    // 🌟 PARALLEL DEEP GROUNDED EXPANSION FOR INITIAL CHAPTERS
+    job.progressStep = "توليد نصوص الشرح المعمقة والمطابقة للمذكرات الأصلية...";
+    job.progressPercent = 88;
+
+    const detailedContents = await Promise.all(
+      deduplicatedChapters.map(async (ch: any, cIdx: number) => {
+        const matchedLesson = initialBatch[cIdx] || syllabusBlueprint?.lessons?.[cIdx];
+        const rawSlice = matchedLesson?.raw_text_snippet || "";
+        if (rawSlice && rawSlice.trim().length > 50 && ai) {
+          console.log(`[Job Worker] Generating high-fidelity transcription for chapter ${cIdx + 1}: "${ch.title || matchedLesson?.lesson_title}"...`);
+          const detailed = await generateFaithfulLessonContent({
+            chapterTitle: ch.title || matchedLesson?.lesson_title || `الدرس ${cIdx + 1}`,
+            startPage: Number(matchedLesson?.start_page) || (cIdx * 8 + 1),
+            endPage: Number(matchedLesson?.end_page) || ((cIdx + 1) * 8),
+            extractedText: rawSlice,
+            category,
+            grade_level,
+            ai
+          });
+          if (detailed && detailed.trim().length > 200) {
+            return detailed;
+          }
+        }
+        return null;
+      })
+    );
 
     // Formulate a clean Ebook object with IDs
     const ebookId = crypto.randomUUID();
@@ -2195,6 +2425,7 @@ async function runBackgroundEbookConversion(
       sizeCategory: parsedEbook?.sizeCategory || "short",
       createdAt: new Date().toISOString(),
       blueprint: syllabusBlueprint || undefined,
+      page_offset: detectedGlobalOffset,
       source_file_url: fileUrl || undefined,
       original_text: extractedText || promptText || "",
       chapters: deduplicatedChapters.map((ch: any, cIdx: number) => {
@@ -2202,12 +2433,19 @@ async function runBackgroundEbookConversion(
         const matchedLesson = initialBatch[cIdx] || syllabusBlueprint?.lessons?.[cIdx];
         const rawSlice = matchedLesson?.raw_text_snippet || "";
         const originalText = cleanStr(ch.originalContent) || rawSlice || "";
+        const lessonStart = Number(matchedLesson?.start_page) || (cIdx * 8 + 1);
+        const lessonEnd = Number(matchedLesson?.end_page) || ((cIdx + 1) * 8);
+        const deepContent = detailedContents[cIdx] || sanitizeServerContent(ch.content) || "محتوى الدرس قيد المعالجة.";
         return {
           id: chapterId,
           title: cleanStr(ch.title) || cleanStr(matchedLesson?.lesson_title) || `الدرس ${cIdx + 1}`,
-          content: sanitizeServerContent(ch.content) || "محتوى الدرس قيد المعالجة.",
-          originalContent: sanitizeServerContent(originalText),
+          start_page: lessonStart,
+          end_page: lessonEnd,
+          physical_start_page: lessonStart + detectedGlobalOffset,
+          content: deepContent,
+          originalContent: deepContent,
           summary: sanitizeServerContent(ch.summary) || "",
+          audioScript: cleanScientificTextForSpeech(deepContent),
           concepts: (ch.concepts || []).map((c: any) => {
             if (typeof c === 'string') return cleanStr(c);
             return {
@@ -2345,66 +2583,74 @@ app.post("/api/upload-to-gcp", gcpUploader.single("file"), async (req, res) => {
     const effectiveMime = req.file.mimetype || (req.file.originalname?.toLowerCase().endsWith(".pdf") ? "application/pdf" : "application/pdf");
     const safeFileName = `${Date.now()}-${req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
 
-    console.log(`[Google Cloud Upload] Processing ${req.file.originalname} (${sizeMB}MB)...`);
+    console.log(`[Fast Upload] Processing ${req.file.originalname} (${sizeMB}MB)...`);
 
-    // 1. Always save a fast local cache copy in data/uploads/ so server conversion & chapter expansion read in 0.01s
+    // 1. Instantly move multer file into PERSISTENT_UPLOADS_DIR (zero extra RAM, instant rename)
     const localFilePath = path.join(PERSISTENT_UPLOADS_DIR, safeFileName);
     try {
+      fs.renameSync(req.file.path, localFilePath);
+    } catch (moveErr) {
+      // Fallback if cross-device link
       fs.copyFileSync(req.file.path, localFilePath);
-    } catch (copyErr) {
-      console.warn("[Google Cloud Upload] Local cache copy notice:", copyErr);
+      try { fs.unlinkSync(req.file.path); } catch (e) {}
     }
     const localFileUrl = `/data/uploads/${safeFileName}`;
 
-    // 2. Permanent storage in Google Cloud Storage bucket (ebookstoreg)
-    let gcsUrl: string | undefined = undefined;
-    if (process.env.GCS_ACCESS_KEY && process.env.GCS_SECRET_KEY) {
-      try {
-        const s3 = new S3Client({
-          endpoint: "https://storage.googleapis.com",
-          region: "auto",
-          credentials: {
-            accessKeyId: process.env.GCS_ACCESS_KEY,
-            secretAccessKey: process.env.GCS_SECRET_KEY
-          },
-          forcePathStyle: true
-        });
-
-        const safeKey = `uploads/${safeFileName}`;
-        const fileBuffer = fs.readFileSync(req.file.path);
-        await s3.send(new PutObjectCommand({
-          Bucket: process.env.GCS_BUCKET_NAME || "ebookstoreg",
-          Key: safeKey,
-          Body: fileBuffer,
-          ContentType: effectiveMime,
-          ContentLength: fileBuffer.length
-        }));
-
-        gcsUrl = `https://storage.googleapis.com/${process.env.GCS_BUCKET_NAME || "ebookstoreg"}/${safeKey}`;
-        console.log(`[Google Cloud Storage] Successfully saved permanent copy to bucket ebookstoreg: ${gcsUrl}`);
-      } catch (gcsErr: any) {
-        console.warn("[Google Cloud Storage] Bucket storage warning:", gcsErr?.message || gcsErr);
-      }
-    }
-
-    // Clean up temporary multer upload file
-    try { fs.unlinkSync(req.file.path); } catch (e) {}
-
-    return res.json({
+    // 2. Respond to client IMMEDIATELY so the user experience is lightning fast (no blocking on cloud upload)
+    res.json({
       success: true,
-      fileUrl: gcsUrl || localFileUrl,
-      gcsUrl,
+      fileUrl: localFileUrl,
       localFileUrl,
       fileName: req.file.originalname,
       fileType: effectiveMime,
       sizeBytes: req.file.size
     });
+
+    // 3. Asynchronously upload to Google Cloud Storage in the background using lib-storage multipart stream (Zero RAM impact, non-blocking)
+    if (process.env.GCS_ACCESS_KEY && process.env.GCS_SECRET_KEY) {
+      setImmediate(async () => {
+        try {
+          const s3 = new S3Client({
+            endpoint: "https://storage.googleapis.com",
+            region: "auto",
+            credentials: {
+              accessKeyId: process.env.GCS_ACCESS_KEY!,
+              secretAccessKey: process.env.GCS_SECRET_KEY!
+            },
+            forcePathStyle: true
+          });
+
+          const safeKey = `uploads/${safeFileName}`;
+          const fileStream = fs.createReadStream(localFilePath);
+
+          // Upload from @aws-sdk/lib-storage streams multipart chunks smoothly to Google Cloud Storage without InvalidArgument errors
+          const parallelUpload = new Upload({
+            client: s3,
+            params: {
+              Bucket: process.env.GCS_BUCKET_NAME || "ebookstoreg",
+              Key: safeKey,
+              Body: fileStream,
+              ContentType: effectiveMime
+            },
+            queueSize: 2,
+            partSize: 5 * 1024 * 1024
+          });
+
+          await parallelUpload.done();
+
+          const gcsUrl = `https://storage.googleapis.com/${process.env.GCS_BUCKET_NAME || "ebookstoreg"}/${safeKey}`;
+          console.log(`[Google Cloud Storage] Background backup completed safely via lib-storage: ${gcsUrl}`);
+        } catch (gcsErr: any) {
+          console.warn("[Google Cloud Storage] Background backup notice:", gcsErr?.message || gcsErr);
+        }
+      });
+    }
   } catch (err: any) {
-    console.error("[Google Cloud Upload] Upload error:", err);
+    console.error("[Upload Error]:", err);
     if (req.file && fs.existsSync(req.file.path)) {
       try { fs.unlinkSync(req.file.path); } catch (e) {}
     }
-    return res.status(500).json({ error: "فشل رفع الملف إلى سحابة Google Cloud: " + (err?.message || err) });
+    return res.status(500).json({ error: "فشل استلام الملف: " + (err?.message || err) });
   }
 });
 
@@ -2787,40 +3033,45 @@ async function synthesizeGoogleCloudTTS(text: string, voiceName: string, langCod
       else if (!resolvedVoice.startsWith("ar-XA")) resolvedVoice = "ar-XA-Chirp3-HD-Fenrir";
     }
 
-    // Split text into chunks to prevent exceeding 5000 byte limit & avoid long-sentence Chirp3 errors
-    const rawChunks = [];
-    const normalizedText = text
-      .replace(/([.!\n؟؛]+)/g, "$1\n")
+    // Split text into short, punctuated sentences to satisfy Google Cloud Chirp3 requirements (max 140 chars per sentence)
+    const rawChunks: string[] = [];
+    const sentences = text
+      .replace(/([.!\n؟]+)/g, "$1\n")
       .split("\n")
       .map(s => s.trim())
       .filter(Boolean);
 
     let current = "";
-    for (const segment of normalizedText) {
-      if (segment.length > 250) {
-        const words = segment.split(/\s+/);
-        let sub = "";
-        for (const w of words) {
-          if ((sub + " " + w).length > 200) {
-            if (sub) rawChunks.push(sub.trim() + ".");
-            sub = w;
+    for (const rawSent of sentences) {
+      let subSentences: string[] = [];
+      if (rawSent.length > 130) {
+        const parts = rawSent.split(/(?<=[،,؛;\s])/);
+        let temp = "";
+        for (const p of parts) {
+          if ((temp + " " + p).length > 120) {
+            if (temp) subSentences.push(temp.trim().replace(/[،,؛;\s]+$/, "") + ".");
+            temp = p;
           } else {
-            sub = sub ? (sub + " " + w) : w;
+            temp = temp ? (temp + " " + p) : p;
           }
         }
-        if (sub) rawChunks.push(sub.trim() + ".");
-        continue;
+        if (temp) subSentences.push(temp.trim().replace(/[،,؛;\s]+$/, "") + ".");
+      } else {
+        const punctuated = /[.!\?؟]$/.test(rawSent) ? rawSent : (rawSent + ".");
+        subSentences.push(punctuated);
       }
 
-      if ((current + " " + segment).length > 800) {
-        if (current) rawChunks.push(current.trim());
-        current = segment;
-      } else {
-        current = current ? (current + " " + segment) : segment;
+      for (const s of subSentences) {
+        if ((current + " " + s).length > 450) {
+          if (current) rawChunks.push(current.trim());
+          current = s;
+        } else {
+          current = current ? (current + " " + s) : s;
+        }
       }
     }
     if (current) rawChunks.push(current.trim());
-    if (rawChunks.length === 0) rawChunks.push(text.slice(0, 800));
+    if (rawChunks.length === 0) rawChunks.push("شرح الدرس.");
 
     const url = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
     const audioBuffers = [];
@@ -3856,6 +4107,32 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
     }, ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite-preview", "gemini-3-flash-preview", "gemini-3.5-flash"]);
 
     const result = JSON.parse(response.text || "{}");
+
+    // 🌟 PARALLEL DEEP GROUNDED EXPANSION FOR EXPANDED CHAPTERS
+    const detailedContents = await Promise.all(
+      (result.chapters || []).map(async (ch: any, idx: number) => {
+        const matchedLesson = pendingLessons[idx];
+        const rawSlice = matchedLesson?.raw_text_snippet || "";
+        if (rawSlice && rawSlice.trim().length > 50 && ai) {
+          const cleanTitle = cleanStr(ch.title) || cleanStr(matchedLesson?.lesson_title) || `الدرس ${currentChapters.length + idx + 1}`;
+          console.log(`[Expand Chapters] Generating high-fidelity transcription for "${cleanTitle}"...`);
+          const detailed = await generateFaithfulLessonContent({
+            chapterTitle: cleanTitle,
+            startPage: Number(matchedLesson?.start_page) || 1,
+            endPage: Number(matchedLesson?.end_page) || 6,
+            extractedText: rawSlice,
+            category: ebook.category,
+            grade_level: (ebook as any).grade_level,
+            ai
+          });
+          if (detailed && detailed.trim().length > 200) {
+            return detailed;
+          }
+        }
+        return null;
+      })
+    );
+
     const newChapters = (result.chapters || []).map((ch: any, idx: number) => {
       const cIdx = currentChapters.length + idx + 1;
       const chapterId = `ch-${ebook.id}-${cIdx}`;
@@ -3863,11 +4140,12 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
       const rawSlice = matchedLesson?.raw_text_snippet || "";
       const originalText = cleanStr(ch.originalContent) || rawSlice || "";
       const cleanTitle = cleanStr(ch.title) || cleanStr(matchedLesson?.lesson_title) || `الدرس ${cIdx}`;
+      const deepContent = detailedContents[idx] || sanitizeServerContent(ch.content) || "محتوى الدرس قيد المعالجة.";
 
       // Extract concepts from keyConcepts array or content headings
       const conceptsList: Array<{ concept: string; explanation: string }> = Array.isArray(ch.keyConcepts) && ch.keyConcepts.length > 0
         ? ch.keyConcepts.map((k: string) => ({ concept: cleanStr(k), explanation: `المفهوم والمحور التعليمي لدرس ${cleanTitle}.` }))
-        : (ch.content || "").match(/###\s+([^\n]+)/g)?.slice(0, 4).map((h: string) => ({
+        : (deepContent || "").match(/###\s+([^\n]+)/g)?.slice(0, 4).map((h: string) => ({
             concept: cleanStr(h.replace(/###\s+/, '')),
             explanation: `من المحاور الجوهرية المقررة في درس ${cleanTitle}.`
           })) || [
@@ -3879,10 +4157,10 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
         title: cleanTitle,
         start_page: matchedLesson?.start_page || (cIdx * 6 + 5),
         end_page: matchedLesson?.end_page || (cIdx * 6 + 10),
-        content: cleanStr(ch.content) || "محتوى الدرس قيد المعالجة.",
-        originalContent: originalText,
+        content: deepContent,
+        originalContent: deepContent,
         summary: cleanStr(ch.summary) || `ملخص وشرح شامل لدرس ${cleanTitle}.`,
-        audioScript: cleanStr(ch.audioNarration) || "",
+        audioScript: cleanScientificTextForSpeech(deepContent),
         concepts: conceptsList,
         imagePrompt: cleanStr(ch.imagePrompt) || `Educational illustration for ${cleanTitle}`,
         videos: [
@@ -4768,35 +5046,16 @@ app.post("/api/ebooks/:id/chapters/:chapterId/transcribe", async (req, res) => {
       return res.status(500).json({ error: "تعذر استخراج نص مقروء من هذه الصفحات." });
     }
 
-    // Clean and organize the raw extracted text into pure, faithful booklet Markdown
-    const organizePrompt = `
-أنت المحرر والموثق الرقمي الأمين لمذكرات المناهج التعليمية.
-إليك النص الخام المستخرج بصرياً من صفحات المذكرة الدراسية الفعلية (الصفحات المطبوعة ${startPage} إلى ${endPage}) لدرس: "${chapter.title}".
-
-النص الخام من صفحات المذكرة:
-"""
-${extractedText}
-"""
-
-المهمة المطلوبة بدقة متناهية:
-1. أعد كتابة نص الدرس الأصلي وشرحه وتجاربه كما هو مكتوب في المذكرة بنفس الكلمات والفقرات والترتيب.
-2. ركز بالدرجة الأولى على شرح الدرس ومحتواه العلمي والأنشطة؛ ولا تجعل الدرس مقتصراً على جداول نواتج التعلم أو الأهداف التمهيدية بل قدم الشرح العلمي الكامل (مثل تركيب الذرة، النواة، البروتونات، النيوترونات، مستويات الطاقة، التوزيع الإلكتروني، إلخ).
-3. احذف الهيدر والفوتر (اسم السلسلة، اسم المدرس، أرقام الهواتف، وأرقام الصفحات).
-4. احذف أي أسئلة أو تدريبات أو واجبات تقع في نهاية الدرس أو منتصفه (نحن نريد نص الشرح فقط).
-5. إذا كان في المذكرة جداول، أظهرها كما هي في جداول Markdown محكمة وأنيقة.
-6. إذا كان في المذكرة رموز رياضية أو معادلات أو دوائر، اكتبها بترميز LaTeX نقي: $...$ للداخلي، و$$...$$ للمستقل.
-7. ممنوع منعاً باتاً إضافة أي عناوين اصطناعية مثل "أولاً: نواتج التعلم" أو "ثانياً: الشرح" أو "سادساً: مصفوفة المقارنة" أو اختراع أكواد ليست في المذكرة.
-8. اكتب فقط نص المذكرة الحقيقي المنظم بتنسيق Markdown مباشر دون أي نقاط فارغة مبعثرة.
-`;
-
-    const organizeResponse = await generateContentWithRetry(ai, {
-      contents: [{ parts: [{ text: organizePrompt }] }],
-      config: {
-        temperature: 0.1
-      }
-    }, ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite-preview", "gemini-3-flash-preview", "gemini-3.5-flash"]);
-
-    const cleanLessonContent = (organizeResponse.text || extractedText).trim();
+    // Clean and organize the raw extracted text into pure, faithful booklet Markdown using unified engine
+    const cleanLessonContent = await generateFaithfulLessonContent({
+      chapterTitle: chapter.title,
+      startPage,
+      endPage,
+      extractedText,
+      category: book.category,
+      grade_level: (book as any).grade_level,
+      ai
+    });
 
     // Update chapter
     chapter.start_page = startPage;

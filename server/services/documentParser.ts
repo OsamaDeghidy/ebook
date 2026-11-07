@@ -210,7 +210,11 @@ export async function parseDocumentBuffer(
       try {
         const uint8Data = toSafeUint8Array(buffer);
         pdfParser = new PDFParse(uint8Data as any);
-        const parsed = await pdfParser.getText();
+        // ⚡ Memory shield for large PDF files (> 10MB):
+        // Parse the essential front-matter pages (first 35 pages) needed for TOC & syllabus
+        // to prevent V8 heap explosion and server OOM crashes!
+        const isLargeFile = buffer.length > 10 * 1024 * 1024;
+        const parsed = await pdfParser.getText(isLargeFile ? { first: 35 } : {});
         const rawPdfText = parsed.text || "";
         const pageMatch = rawPdfText.match(/--\s*\d+\s*of\s*(\d+)\s*--/i);
         pageCount =
@@ -594,6 +598,125 @@ export interface RenderedPageImage {
 }
 
 /**
+ * 🏛️ Global Front-Matter Offset Detector for Egyptian Curricula & School Booklets
+ * Scans the front matter (pages 1 to 25) of the PDF to pinpoint where the Table of Contents / Intro ends
+ * and Lesson 1 actually starts in the physical PDF pages, compared to its printed page number in the TOC.
+ * 
+ * Example:
+ * - Table of Contents lists Lesson 1 on printed page 2.
+ * - Physical front matter (cover, blank, intro, TOC, unit cover) occupies pages 1..8.
+ * - Lesson 1 actually begins on physical PDF page 9.
+ * - Calculated Global Offset = 9 - 2 = +7.
+ */
+export async function detectBookGlobalOffset(
+  buffer: Buffer,
+  lesson1Title: string,
+  lesson1PrintedStartPage: number = 1,
+  generateFn?: (params: any) => Promise<any>
+): Promise<number> {
+  const printedStart = Math.max(1, Number(lesson1PrintedStartPage) || 1);
+  let pdfParser: PDFParse | null = null;
+
+  try {
+    const uint8Data = toSafeUint8Array(buffer);
+    pdfParser = new PDFParse(uint8Data as any);
+
+    // 1. Fast text-layer scan on the first 25 pages
+    try {
+      const textResult = await pdfParser.getText({ first: 25 });
+      const cleanTitle = lesson1Title
+        .replace(/الدرس\s*(الأول|الثاني|الثالث|\d+)[:\s]*/g, "")
+        .replace(/[^\u0621-\u064A0-9a-zA-Z\s]/g, " ")
+        .trim();
+      const titleKeywords = cleanTitle.split(/\s+/).filter(w => w.length >= 3);
+
+      if (textResult && Array.isArray(textResult.pages) && textResult.pages.length > 0) {
+        for (let p = 1; p <= textResult.pages.length; p++) {
+          const pgText = textResult.pages[p - 1]?.text || "";
+          const isTocPage = /محتويات|فهرس|الفهرس|دليل الكتاب|خطة توزيع/i.test(pgText);
+          const hasTitle = cleanTitle.length > 2 && (
+            pgText.includes(cleanTitle) ||
+            (titleKeywords.length >= 2 && titleKeywords.every(kw => pgText.includes(kw)))
+          );
+
+          // We want the physical page where the lesson starts in the body (after TOC)
+          if (hasTitle && !isTocPage && p >= 3) {
+            const offset = p - printedStart;
+            console.log(`[Global Offset Text] Found Lesson 1 "${cleanTitle}" on physical page ${p} (TOC printed: ${printedStart}) -> Calibrated Offset: ${offset}`);
+            return offset;
+          }
+        }
+      }
+    } catch (e) {}
+
+    // 2. Vision OCR scan across front-matter candidates (pages 4 to 20)
+    if (generateFn) {
+      const candidatePages: number[] = [];
+      for (let p = 4; p <= 20; p++) candidatePages.push(p);
+
+      const shotResult = await withSilencedPdfWarnings(() =>
+        pdfParser!.getScreenshot({
+          partial: candidatePages,
+          scale: 0.5,
+        } as any)
+      );
+
+      const renderedPages: any[] = shotResult?.pages || [];
+      if (renderedPages.length > 0) {
+        const parts: any[] = [];
+        for (let i = 0; i < renderedPages.length; i++) {
+          const pageObj = renderedPages[i];
+          const pageNum = candidatePages[i];
+          let base64Png = "";
+          if (pageObj.dataUrl && typeof pageObj.dataUrl === "string") {
+            base64Png = pageObj.dataUrl.replace(/^data:image\/\w+;base64,/, "");
+          } else if (pageObj.data) {
+            base64Png = Buffer.from(pageObj.data).toString("base64");
+          }
+          if (base64Png) {
+            parts.push({ inlineData: { mimeType: "image/png", data: base64Png } });
+            parts.push({ text: `رقم الصفحة الفيزيائية في الـ PDF: ${pageNum}` });
+          }
+        }
+
+        const cleanTitle = lesson1Title.replace(/الدرس\s*(الأول|\d+)[:\s]*/g, "").trim();
+        parts.push({
+          text: `أمامك صفحات البداية لمذكرة دراسية مصرية (الصفحات من 4 إلى 20).
+المطلوب: حدد رقم الصفحة الفيزيائية الدقيق الذي يبدأ عنده شرح الدرس الأول: "${cleanTitle}" (بعد انتهاء الغلاف والمقدمة والفهرس وغلاف الوحدة).
+علماً بأن الفهرس يذكر أن الدرس يبدأ عند صفحة ${printedStart}.
+أخرج كائن JSON فقط: { "exact_physical_page": رقم_الصفحة }`
+        });
+
+        const resp = await generateFn({
+          contents: [{ parts }],
+          config: { responseMimeType: "application/json", temperature: 0.1 }
+        });
+
+        const text = resp?.text || resp?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) {
+          const parsed = JSON.parse(text.replace(/```json/g, "").replace(/```/g, "").trim());
+          const exactPhys = Number(parsed?.exact_physical_page);
+          if (exactPhys >= 4 && exactPhys <= 25) {
+            const offset = exactPhys - printedStart;
+            console.log(`[Global Offset Vision] Pinpointed Lesson 1 on physical page ${exactPhys} -> Global Offset: ${offset}`);
+            return offset;
+          }
+        }
+      }
+    }
+  } catch (err: any) {
+    console.warn("[Global Offset] Error during auto-calibration:", err?.message || err);
+  } finally {
+    if (pdfParser && typeof (pdfParser as any).destroy === 'function') {
+      try { await (pdfParser as any).destroy(); } catch (e) {}
+    }
+  }
+
+  // Fallback standard Egyptian curriculum offset
+  return 7;
+}
+
+/**
  * 🎯 AutoAnchor: Fast Optical Lesson Anchor Page Detector
  * Automatically scans a narrow micro-window around the estimated page
  * to pinpoint the exact physical PDF page where the lesson title banner begins.
@@ -606,9 +729,9 @@ export async function detectLessonAnchorPage(
   generateFn?: (params: any) => Promise<any>
 ): Promise<number> {
   const safeEst = Math.max(1, estimatedPhysicalPage);
-  // Search narrow window [-2, +4]
+  // Search window [-3, +6] to handle section dividers and unit covers
   const candidatePages: number[] = [];
-  for (let p = Math.max(1, safeEst - 2); p <= safeEst + 4; p++) {
+  for (let p = Math.max(1, safeEst - 3); p <= safeEst + 6; p++) {
     candidatePages.push(p);
   }
 
