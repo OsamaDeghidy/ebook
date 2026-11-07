@@ -11,6 +11,25 @@ export interface ParsedDocument {
 }
 
 /**
+ * Safely creates an isolated, non-detached Uint8Array copy from any Buffer or Uint8Array.
+ * Prevents "TypeError: Cannot perform Construct on a detached ArrayBuffer" across multi-step PDF operations.
+ */
+export function toSafeUint8Array(input: Buffer | Uint8Array): Uint8Array {
+  if (!input) return new Uint8Array(0);
+  if (Buffer.isBuffer(input)) {
+    const copy = Buffer.alloc(input.length);
+    input.copy(copy);
+    return new Uint8Array(copy.buffer, copy.byteOffset, copy.byteLength);
+  }
+  if (input instanceof Uint8Array) {
+    const fresh = new Uint8Array(input.byteLength);
+    fresh.set(new Uint8Array(input.buffer, input.byteOffset, input.byteLength));
+    return fresh;
+  }
+  return new Uint8Array(0);
+}
+
+/**
  * Normalizes Unicode Arabic Presentation Forms (Forms-A \uFB50-\uFDFF and Forms-B \uFE70-\uFEFF)
  * and Egyptian Ministry PDF ligatures (e.g., ﻻ, ﻷ, ﻹ, ﻵ) into standard Arabic Unicode (\u0621-\u064A).
  */
@@ -38,6 +57,30 @@ export function normalizeArabicPresentationForms(text: string): string {
   normalized = normalized.replace(/[\uFFFD\u2400-\u243F]/g, " ");
 
   return normalized;
+}
+
+/**
+ * Safely executes a PDF operation while suppressing harmless canvas/font warnings
+ * like "Knockout groups not supported" and "TT: undefined function" from flooding the terminal.
+ */
+export async function withSilencedPdfWarnings<T>(fn: () => Promise<T>): Promise<T> {
+  const originalWarn = console.warn;
+  console.warn = (...args: any[]) => {
+    const msg = typeof args[0] === 'string' ? args[0] : '';
+    if (
+      msg.includes('Knockout groups not supported') ||
+      msg.includes('TT: undefined function') ||
+      msg.includes('Ensure that the `standardFontDataUrl`')
+    ) {
+      return; // Ignore harmless vector/font rendering noise
+    }
+    originalWarn.apply(console, args);
+  };
+  try {
+    return await fn();
+  } finally {
+    console.warn = originalWarn;
+  }
 }
 
 /**
@@ -165,9 +208,7 @@ export async function parseDocumentBuffer(
     } else if (isPdf) {
       let pdfParser: PDFParse | null = null;
       try {
-        const uint8Data = (buffer instanceof Uint8Array && !Buffer.isBuffer(buffer))
-          ? buffer
-          : new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+        const uint8Data = toSafeUint8Array(buffer);
         pdfParser = new PDFParse(uint8Data as any);
         const parsed = await pdfParser.getText();
         const rawPdfText = parsed.text || "";
@@ -244,40 +285,54 @@ export async function extractPdfTextViaVisionPages(
   const maxPagesToScan = options?.maxPagesToScan || options?.maxPages || 14;
   const includeTocEndPages = options?.includeTocEndPages ?? (startPage === 1);
 
-  let pdfParser: PDFParse | null = null;
   try {
-    const uint8Data = (buffer instanceof Uint8Array && !Buffer.isBuffer(buffer))
-      ? buffer
-      : new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-    pdfParser = new PDFParse(uint8Data as any);
-    const textProbe = await pdfParser.getText({ partial: [1] } as any).catch(() => ({ text: "", total: 0 }));
+    let totalPages = 20;
+  let probeParser: PDFParse | null = null;
+  try {
+    probeParser = new PDFParse(toSafeUint8Array(buffer) as any);
+    const textProbe = await probeParser.getText({ partial: [1] } as any).catch(() => ({ text: "", total: 0 }));
     const pageMatch = (textProbe.text || "").match(/--\s*\d+\s*of\s*(\d+)\s*--/i);
-    const totalPages = (textProbe as any)?.total || (pageMatch ? parseInt(pageMatch[1], 10) : 20);
+    totalPages = (textProbe as any)?.total || (pageMatch ? parseInt(pageMatch[1], 10) : 20);
+  } catch (e) {
+  } finally {
+    if (probeParser) { try { await probeParser.destroy(); } catch (e) {} }
+  }
 
-    const endPage = Math.min(totalPages, startPage + maxPagesToScan - 1);
-    const pagesToRender: number[] = [];
-    for (let p = startPage; p <= endPage; p++) {
-      pagesToRender.push(p);
-    }
+  const endPage = Math.min(totalPages, startPage + maxPagesToScan - 1);
+  const pagesToRender: number[] = [];
+  for (let p = startPage; p <= endPage; p++) {
+    pagesToRender.push(p);
+  }
 
-    // Also include the last 2 pages on initial scan in case the Arabic Table of Contents (الفهرس) is at the end of the book
-    if (includeTocEndPages && totalPages > endPage + 2) {
-      pagesToRender.push(totalPages - 1, totalPages);
-    }
+  // Also include the last 2 pages on initial scan in case the Arabic Table of Contents (الفهرس) is at the end of the book
+  if (includeTocEndPages && totalPages > endPage + 2) {
+    pagesToRender.push(totalPages - 1, totalPages);
+  }
 
-    console.log(
-      `[Vision OCR] Rendering ${pagesToRender.length} pages (${pagesToRender.join(", ")}) of ${totalPages} total pages...`
+  console.log(
+    `[Vision OCR] Rendering ${pagesToRender.length} pages (${pagesToRender.join(", ")}) of ${totalPages} total pages...`
+  );
+
+  let shotParser: PDFParse | null = null;
+  let renderedPages: any[] = [];
+  try {
+    shotParser = new PDFParse(toSafeUint8Array(buffer) as any);
+    const shotResult = await withSilencedPdfWarnings(() =>
+      shotParser!.getScreenshot({
+        partial: pagesToRender,
+        scale: 0.85,
+      } as any)
     );
+    renderedPages = shotResult?.pages || [];
+  } catch (shotErr) {
+    console.warn("[Vision OCR] Screenshot render warning:", shotErr);
+  } finally {
+    if (shotParser) { try { await shotParser.destroy(); } catch (e) {} }
+  }
 
-    const shotResult = await pdfParser.getScreenshot({
-      partial: pagesToRender,
-      scale: 0.85,
-    } as any);
-
-    const renderedPages: any[] = shotResult?.pages || [];
-    if (renderedPages.length === 0) {
-      return { text: "", totalPages, lastScannedPage: endPage };
-    }
+  if (renderedPages.length === 0) {
+    return { text: "", totalPages, lastScannedPage: endPage };
+  }
 
     // Group into batches of 5 pages per Gemini Vision call for fast parallel transcription
     const BATCH_SIZE = 5;
@@ -345,10 +400,6 @@ export async function extractPdfTextViaVisionPages(
   } catch (err: any) {
     console.warn("[Vision OCR] Failed to extract via vision screenshots:", err?.message || err);
     return { text: "", totalPages: 0, lastScannedPage: startPage, lastPageScanned: startPage };
-  } finally {
-    if (pdfParser) {
-      try { await pdfParser.destroy(); } catch (e) {}
-    }
   }
 }
 
@@ -375,15 +426,15 @@ export async function extractPdfPageRange(
 
   let pdfParser: PDFParse | null = null;
   try {
-    const uint8Data = (buffer instanceof Uint8Array && !Buffer.isBuffer(buffer))
-      ? buffer
-      : new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+    const uint8Data = toSafeUint8Array(buffer);
     pdfParser = new PDFParse(uint8Data as any);
 
-    const shotResult = await pdfParser.getScreenshot({
-      partial: pagesToRender,
-      scale: 0.85,
-    } as any);
+    const shotResult = await withSilencedPdfWarnings(() =>
+      pdfParser!.getScreenshot({
+        partial: pagesToRender,
+        scale: 0.85,
+      } as any)
+    );
 
     const renderedPages: any[] = shotResult?.pages || [];
     if (renderedPages.length === 0) return "";
@@ -411,8 +462,14 @@ export async function extractPdfPageRange(
 المطلوب استخراج النصوص الحرفية الكاملة من هذه الصفحات المخصصة للدرس (الصفحات: ${pagesToRender.join("، ")}):
 1. نص الدرس الأصلي الكامل (سواء كان نص قراءة، أو نص شعري بأبياته الشعرية، أو قصة استماع، أو تجربة علمية، أو نظريات رياضية).
 2. معاني المفردات والمضادات والتراكيب المذكورة في هوامش أو جداول الصفحات.
-3. القواعد النحوية أو الإملائية أو القوانين المشروحة في هذه الصفحات.
-4. التدريبات والأنشطة والأسئلة الواردة في نهاية الصفحات.
+3. القواعد النحوية أو الإملائية أو القوانين والنظريات المشروحة في هذه الصفحات.
+4. التدريبات والأنشطة والمسائل والأسئلة الواردة في نهاية الصفحات.
+5. لقوانين ورموز ومسائل الرياضيات والعلوم:
+   - اكتب الصيغ والمعادلات الرياضية بصيغة LaTeX محاطة بـ $ أو $$.
+   - اكتب الرموز الرياضية مقرونة بنطقها العربي السليم:
+     ∈ (ينتمي إلى)، ∉ (لا ينتمي إلى)، ⊂ (مجموعة جزئية من)، ⊄ (ليست مجموعة جزئية من)،
+     √x (الجذر التربيعي لـ)، ∛x (الجذر التكعيبي لـ)، [a, b] (الفترة المغلقة)، ]a, b[ (الفترة المفتوحة)،
+     ح (مجموعة الأعداد الحقيقية)، ن (مجموعة الأعداد النسبية)، نَ (مجموعة الأعداد غير النسبية).
 اكتب النص بدقة وأمانة علمية تامة دون تلخيص أو تأليف من خارج الصفحات.`,
     });
 
@@ -427,6 +484,300 @@ export async function extractPdfPageRange(
   } catch (err: any) {
     console.warn(`[Targeted Page Range] Warning for pages ${safeStart}..${safeEnd}:`, err?.message || err);
     return "";
+  } finally {
+    if (pdfParser) {
+      try { await pdfParser.destroy(); } catch (e) {}
+    }
+  }
+}
+
+/**
+ * Visual Table of Contents Syllabus Extractor
+ * Renders pages 2 through 8 to capture authentic ministry curriculum TOC with high visual fidelity.
+ */
+export async function extractVisualSyllabusFromToc(
+  buffer: Buffer,
+  generateFn: (params: any) => Promise<any>
+): Promise<any> {
+  let pdfParser: PDFParse | null = null;
+  try {
+    const uint8Data = toSafeUint8Array(buffer);
+    pdfParser = new PDFParse(uint8Data as any);
+
+    // Render TOC candidate pages (2 to 8)
+    const tocPages = [2, 3, 4, 5, 6, 7];
+    const shotResult = await withSilencedPdfWarnings(() =>
+      pdfParser!.getScreenshot({
+        partial: tocPages,
+        scale: 0.85,
+      } as any)
+    );
+
+    const renderedPages: any[] = shotResult?.pages || [];
+    if (renderedPages.length === 0) return null;
+
+    const parts: any[] = [];
+    for (const pageObj of renderedPages) {
+      let base64Png = "";
+      if (pageObj.dataUrl && typeof pageObj.dataUrl === "string") {
+        base64Png = pageObj.dataUrl.replace(/^data:image\/\w+;base64,/, "");
+      } else if (pageObj.data) {
+        base64Png = Buffer.from(pageObj.data).toString("base64");
+      }
+      if (base64Png) {
+        parts.push({
+          inlineData: {
+            mimeType: "image/png",
+            data: base64Png,
+          },
+        });
+      }
+    }
+
+    if (parts.length === 0) return null;
+
+    parts.push({
+      text: `أنت خبير فحص مناهج ومذكرات تعليمية وكتب مدرسية معتمد.
+المهمة: طالع صفحات الفهرس (المحتويات) المرفقة بدقة بصرية متناهية:
+1. استخرج اسم المنهج/الكتاب، وقائمة الوحدات، وجميع الدروس بدون استثناء بترتيبها الصارم.
+2. لكل درس: استخرج عنوانه الحرفي، اسم وحدته، ورقم صفحة بدايته start_page، ورقم صفحة نهايته end_page قبل بداية الدرس التالي مباشرة.
+3. استخرج 3 إلى 5 مفاهيم أساسية متوقعة لكل درس في sub_topics.
+
+أخرج النتيجة ككائن JSON فقط بدون أي علامات markdown:
+{
+  "book_title": "اسم المقرر الرسمي",
+  "detected_units": ["الوحدة 1...", "الوحدة 2..."],
+  "lessons": [
+    {
+      "lesson_order": 1,
+      "lesson_title": "الدرس الأول: ...",
+      "unit_title": "الوحدة ...",
+      "start_page": 2,
+      "end_page": 9,
+      "sub_topics": ["المفهوم 1", "المفهوم 2"]
+    }
+  ]
+}`
+    });
+
+    const res = await generateFn({
+      contents: [{ parts }],
+      config: {
+        temperature: 0.1,
+        responseMimeType: "application/json"
+      }
+    });
+
+    const text = res?.text || res?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) return null;
+
+    const parsed = JSON.parse(text.replace(/```json/g, "").replace(/```/g, "").trim());
+    if (parsed && Array.isArray(parsed.lessons) && parsed.lessons.length > 0) {
+      console.log(`[Visual TOC Extractor] Discovered ${parsed.lessons.length} authentic lessons directly from visual TOC!`);
+      return parsed;
+    }
+    return null;
+  } catch (err: any) {
+    console.warn("[Visual TOC Extractor] Warning:", err?.message || err);
+    return null;
+  } finally {
+    if (pdfParser) {
+      try { await pdfParser.destroy(); } catch (e) {}
+    }
+  }
+}
+
+export interface RenderedPageImage {
+  pageNumber: number;
+  dataUrl: string;
+  pageType: 'study' | 'exercise';
+}
+
+/**
+ * 🎯 AutoAnchor: Fast Optical Lesson Anchor Page Detector
+ * Automatically scans a narrow micro-window around the estimated page
+ * to pinpoint the exact physical PDF page where the lesson title banner begins.
+ * Eliminates manual offset calibration across all booklets!
+ */
+export async function detectLessonAnchorPage(
+  buffer: Buffer,
+  estimatedPhysicalPage: number,
+  lessonTitle: string,
+  generateFn?: (params: any) => Promise<any>
+): Promise<number> {
+  const safeEst = Math.max(1, estimatedPhysicalPage);
+  // Search narrow window [-2, +4]
+  const candidatePages: number[] = [];
+  for (let p = Math.max(1, safeEst - 2); p <= safeEst + 4; p++) {
+    candidatePages.push(p);
+  }
+
+  let pdfParser: PDFParse | null = null;
+  try {
+    const uint8Data = toSafeUint8Array(buffer);
+    pdfParser = new PDFParse(uint8Data as any);
+
+    // Fast check: if PDF has clean text layer, check directly via text!
+    try {
+      const textResult = await pdfParser.getText();
+      if (textResult && Array.isArray(textResult.pages) && textResult.pages.length > 0) {
+        const cleanTitle = lessonTitle.replace(/الدرس\s*(الأول|الثاني|الثالث|الرابع|الخامس|السادس|\d+)[:\s]*/g, "").trim();
+        for (const pageNum of candidatePages) {
+          const pgText = textResult.pages[pageNum - 1]?.text || "";
+          if (cleanTitle.length > 2 && pgText.includes(cleanTitle)) {
+            console.log(`[AutoAnchor Text] Found title "${cleanTitle}" on physical page ${pageNum}`);
+            return pageNum;
+          }
+        }
+      }
+    } catch (e) {}
+
+    // If scanned/vectorized and generateFn provided, do a lightweight vision scan of candidate thumbnails
+    if (generateFn) {
+      const shotResult = await withSilencedPdfWarnings(() =>
+        pdfParser!.getScreenshot({
+          partial: candidatePages,
+          scale: 0.6, // Lightweight fast thumbnail
+        } as any)
+      );
+
+      const renderedPages: any[] = shotResult?.pages || [];
+      if (renderedPages.length > 0) {
+        const parts: any[] = [];
+        for (let i = 0; i < renderedPages.length; i++) {
+          const pageObj = renderedPages[i];
+          const pageNum = candidatePages[i];
+          let base64Png = "";
+          if (pageObj.dataUrl && typeof pageObj.dataUrl === "string") {
+            base64Png = pageObj.dataUrl.replace(/^data:image\/\w+;base64,/, "");
+          } else if (pageObj.data) {
+            base64Png = Buffer.from(pageObj.data).toString("base64");
+          }
+          if (base64Png) {
+            parts.push({
+              inlineData: { mimeType: "image/png", data: base64Png }
+            });
+            parts.push({
+              text: `صورة رقم الصفحة في الملف: ${pageNum}`
+            });
+          }
+        }
+
+        parts.push({
+          text: `حدد رقم الصفحة الدقيق الذي تبدأ فيه لافتة وعنوان درس "${lessonTitle}".
+أخرج كائن JSON فقط: { "exact_start_page": رقم_الصفحة }`
+        });
+
+        const resp = await generateFn({
+          contents: [{ parts }],
+          config: { responseMimeType: "application/json", temperature: 0.1 }
+        });
+
+        const text = resp?.text || resp?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) {
+          const parsed = JSON.parse(text.replace(/```json/g, "").replace(/```/g, "").trim());
+          if (parsed && Number(parsed.exact_start_page) > 0) {
+            const exact = Number(parsed.exact_start_page);
+            console.log(`[AutoAnchor Vision] Pinpointed lesson "${lessonTitle}" to exact physical page ${exact}`);
+            return exact;
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[AutoAnchor] Notice:", err);
+  } finally {
+    if (pdfParser) {
+      try { await pdfParser.destroy(); } catch (e) {}
+    }
+  }
+
+  return safeEst;
+}
+
+/**
+ * Dynamic Page Offset Calibrator
+ * Computes the exact delta between the printed book page number and the PDF physical page index.
+ */
+export function calculatePhysicalPage(
+  logicalPage: number, 
+  pageOffset: number = 0, 
+  maxPages: number = 1000
+): number {
+  const target = Math.max(1, (Number(logicalPage) || 1) + (Number(pageOffset) || 0));
+  return Math.min(target, maxPages);
+}
+
+/**
+ * High-Resolution Page Renderer for Dual-Canvas Lesson View
+ * Returns high-fidelity visual page slides for authentic textbook display.
+ * Calibrates physical PDF pages with printed booklet pageOffset.
+ */
+export async function renderPdfPagesToImages(
+  buffer: Buffer,
+  startPage: number,
+  endPage: number,
+  pageOffset: number = 0
+): Promise<RenderedPageImage[]> {
+  const offset = Number(pageOffset) || 0;
+  const safeLogicalStart = Math.max(1, startPage);
+  const safeLogicalEnd = Math.max(safeLogicalStart, Math.min(endPage, safeLogicalStart + 11));
+
+  // Compute physical pages in the PDF file
+  const physicalStart = calculatePhysicalPage(safeLogicalStart, offset);
+  const physicalEnd = calculatePhysicalPage(safeLogicalEnd, offset);
+
+  const physicalPagesToRender: number[] = [];
+  for (let p = physicalStart; p <= physicalEnd; p++) {
+    physicalPagesToRender.push(p);
+  }
+
+  console.log(`[renderPdfPagesToImages] Rendering printed pages ${safeLogicalStart}..${safeLogicalEnd} -> Physical PDF pages ${physicalStart}..${physicalEnd} (Offset: ${offset})`);
+
+  let pdfParser: PDFParse | null = null;
+  try {
+    const uint8Data = toSafeUint8Array(buffer);
+    pdfParser = new PDFParse(uint8Data as any);
+
+    const shotResult = await withSilencedPdfWarnings(() =>
+      pdfParser!.getScreenshot({
+        partial: physicalPagesToRender,
+        scale: 1.1,
+      } as any)
+    );
+
+    const renderedPages: any[] = shotResult?.pages || [];
+    const results: RenderedPageImage[] = [];
+
+    for (let i = 0; i < renderedPages.length; i++) {
+      const pageObj = renderedPages[i];
+      // Display logical printed page number to the student matching printed page on image
+      const physPageNum = physicalPagesToRender[i] || (physicalStart + i);
+      const logicalPageNum = Math.max(1, physPageNum - offset);
+
+      let dataUrl = "";
+      if (pageObj.dataUrl && typeof pageObj.dataUrl === "string") {
+        dataUrl = pageObj.dataUrl.startsWith("data:")
+          ? pageObj.dataUrl
+          : `data:image/png;base64,${pageObj.dataUrl}`;
+      } else if (pageObj.data) {
+        const base64 = Buffer.from(pageObj.data).toString("base64");
+        dataUrl = `data:image/png;base64,${base64}`;
+      }
+      if (dataUrl) {
+        // Last page of a lesson block is standardly the exercises page in Egyptian booklets
+        const isExercise = renderedPages.length > 1 && i === renderedPages.length - 1;
+        results.push({ 
+          pageNumber: logicalPageNum, 
+          dataUrl,
+          pageType: isExercise ? 'exercise' : 'study'
+        });
+      }
+    }
+    return results;
+  } catch (err: any) {
+    console.warn(`[renderPdfPagesToImages] Error rendering pages ${safeLogicalStart}..${safeLogicalEnd}:`, err?.message || err);
+    return [];
   } finally {
     if (pdfParser) {
       try { await pdfParser.destroy(); } catch (e) {}

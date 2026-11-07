@@ -29,6 +29,10 @@ export function repairLatexSyntax(raw: string): string {
   res = res.replace(/\\sqrt\[(\d+)\](?!\s*\{)/g, '\\sqrt{$1}');
   res = res.replace(/(?<!\\)\bsqrt\[(\d+)\](?!\s*\{)/g, '\\sqrt{$1}');
   res = res.replace(/(?<!\\)\bin\b/g, '\\in');
+  res = res.replace(/(?<!\\)\bcup\b/g, '\\cup');
+  res = res.replace(/(?<!\\)\bcap\b/g, '\\cap');
+  res = res.replace(/(?<!\\)\bsubset\b/g, '\\subset');
+  res = res.replace(/(?<!\\)\bmid\b/g, '\\mid');
   res = res.replace(/(?<!\\)\bneq\b/g, '\\neq');
   res = res.replace(/(?<!\\)\bpm\b/g, '\\pm');
   res = res.replace(/(?<!\\)\btimes\b/g, '\\times');

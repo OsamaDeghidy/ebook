@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { MarketplaceBook, Chapter } from '../types';
 import { fireConfetti } from '../utils/confetti';
+import AuthenticExerciseBank from './AuthenticExerciseBank';
 
 interface DynamicDomainSandboxProps {
   book: MarketplaceBook;
@@ -17,8 +18,8 @@ export default function DynamicDomainSandbox({ book, chapter }: DynamicDomainSan
   const combinedContext = `${book?.title || ''} ${chapter?.title || ''} ${chapter?.content || ''}`.toLowerCase();
   const isTechDomain = /حاسب|كمبيوتر|برمج|كود|logic|شبك|معالج|computer|python|html|javascript|scratch/.test(combinedContext);
 
-  // Tab mode if course is technical: 'activity' or 'code_sandbox'
-  const [activeTab, setActiveTab] = useState<'activity' | 'code_sandbox'>('activity');
+  // Mode: 'exercises' (authentic booklet exercises + AI grading), 'activity' (interactive archetype), or 'code_sandbox'
+  const [activeTab, setActiveTab] = useState<'exercises' | 'activity' | 'code_sandbox'>('exercises');
 
   // Activity State
   const [activity, setActivity] = useState<any>(null);
@@ -290,50 +291,72 @@ export default function DynamicDomainSandbox({ book, chapter }: DynamicDomainSan
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-2 self-start md:self-center shrink-0">
-          {isTechDomain && (
-            <div className="flex items-center p-1 bg-slate-100 rounded-2xl border border-slate-200 text-xs font-bold">
-              <button
-                type="button"
-                onClick={() => setActiveTab('activity')}
-                className={`px-3 py-1.5 rounded-xl transition cursor-pointer ${
-                  activeTab === 'activity' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-900'
-                }`}
-              >
-                النشاط التفاعلي 🎯
-              </button>
+        <div className="flex items-center gap-2 self-start md:self-center shrink-0 flex-wrap">
+          <div className="flex items-center p-1 bg-slate-100 rounded-2xl border border-slate-200 text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => setActiveTab('exercises')}
+              className={`px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'exercises' ? 'bg-indigo-600 text-white shadow-xs font-black' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <span>تمارين المذكرة وتصحيح الـ AI 🎯</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('activity')}
+              className={`px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'activity' ? 'bg-teal-600 text-white shadow-xs font-black' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <span>النشاط التفاعلي 🧪</span>
+            </button>
+            {isTechDomain && (
               <button
                 type="button"
                 onClick={() => setActiveTab('code_sandbox')}
-                className={`px-3 py-1.5 rounded-xl transition cursor-pointer ${
-                  activeTab === 'code_sandbox' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-900'
+                className={`px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
+                  activeTab === 'code_sandbox' ? 'bg-slate-900 text-white shadow-xs font-black' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                محرر الكود والمنطق 💻
+                <span>محرر الكود 💻</span>
               </button>
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={() => handleGenerateActivity(true)}
-            disabled={isLoading}
-            className="px-3.5 py-2 bg-gradient-to-r from-teal-600 to-indigo-600 hover:from-teal-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm active:scale-95 disabled:opacity-60 cursor-pointer"
-          >
-            {isLoading ? (
-              <>
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span>جاري بناء النشاط...</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                <span>توليد نشاط بالـ AI</span>
-              </>
             )}
-          </button>
+          </div>
+
+          {activeTab === 'activity' && (
+            <button
+              type="button"
+              onClick={() => handleGenerateActivity(true)}
+              disabled={isLoading}
+              className="px-3.5 py-2 bg-gradient-to-r from-teal-600 to-indigo-600 hover:from-teal-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm active:scale-95 disabled:opacity-60 cursor-pointer"
+            >
+              {isLoading ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>جاري بناء النشاط...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  <span>توليد نشاط بالـ AI</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
+
+      {/* 🎯 TAB 1: AUTHENTIC EXERCISE BANK WITH AI GRADING */}
+      {activeTab === 'exercises' && (
+        <AuthenticExerciseBank
+          bookId={book.id}
+          chapterId={chapter.id}
+          chapterTitle={chapter.title}
+          gradeLevel={(book as any).grade_level}
+          subject={book.category || book.title}
+        />
+      )}
 
       {/* 2. LOADING STATE */}
       {isLoading && (

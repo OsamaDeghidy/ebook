@@ -30,7 +30,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { PDFParse } from "pdf-parse";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
-import { parseDocumentBuffer, extractPdfTextViaVisionPages, extractPdfPageRange } from "./server/services/documentParser";
+import { parseDocumentBuffer, extractPdfTextViaVisionPages, extractPdfPageRange, renderPdfPagesToImages, extractVisualSyllabusFromToc, calculatePhysicalPage, detectLessonAnchorPage } from "./server/services/documentParser";
 import { buildMasterPedagogicalPrompt, evaluatePedagogicalChunking, deduplicateChapterTitles } from "./server/services/pedagogicalChunker";
 import { extractDocumentBlueprint, getPendingLessons, markLessonsCompleted, DocumentSyllabusBlueprint, SyllabusLessonBlueprint } from "./server/services/documentBlueprint";
 import { buildGroundedBatchPrompt } from "./server/services/groundedLessonBuilder";
@@ -42,6 +42,7 @@ import { detectTeacherPersona } from "./server/services/teacherPersonas";
 import { buildInteractiveExplanationPrompt } from "./server/services/interactiveExplanationV2";
 import { buildCurriculumMindMapPrompt } from "./server/services/curriculumMindMap";
 import { generateLessonActivity, detectActivityArchetype, GeneratedActivity } from "./server/services/activityEngine";
+import { transpileSTEMToSpokenArabic } from "./server/services/arabicSTEMLexicon";
 
 dotenv.config();
 
@@ -117,6 +118,9 @@ async function uploadAudioFileToSupabase(filePath: string, fileName: string): Pr
 function cleanScientificTextForSpeech(input: string): string {
   let cleaned = input || "";
 
+  // 0. Apply Master Arabic STEM & Phonetic Lexicon for Math, Chemistry & Physics
+  cleaned = transpileSTEMToSpokenArabic(cleaned);
+
   // 0. P0 STRIP MARKDOWN BLOCKQUOTE MARKERS & REPETITIVE STRUCTURAL BOILERPLATE HEADINGS
   cleaned = cleaned.replace(/^[ \t]*>[ \t]*/gm, " ");
   cleaned = cleaned.replace(/(?:^|\n)\s*>\s*/g, " \n ");
@@ -151,8 +155,53 @@ function cleanScientificTextForSpeech(input: string): string {
   // E. LaTeX Fractions: \frac{a}{b} -> a على b
   cleaned = cleaned.replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, " $1 عَلَى $2 ");
 
-  // F. Square Roots: \sqrt{x}
-  cleaned = cleaned.replace(/\\sqrt\{([^{}]+)\}/g, " الجَذْرُ التَّرْبِيعِيُّ لِـ $1 ");
+  // F. Cube & N-th Roots & Square Roots
+  cleaned = cleaned.replace(/\\sqrt\[3\]\{([^{}]+)\}|∛([0-9a-zA-Z\u0600-\u06FF]+)/g, " الجَذْرُ التَّكْعِيبِيُّ لِـ $1$2 ");
+  cleaned = cleaned.replace(/\\sqrt\{([^{}]+)\}|√([0-9a-zA-Z\u0600-\u06FF]+)/g, " الجَذْرُ التَّرْبِيعِيُّ لِـ $1$2 ");
+
+  // F2. Set Theory, Intervals & Logic Operations (نطق الفترات والمجموعات والعمليات المنطقية)
+  cleaned = cleaned.replace(/\\cup|\bcup\b|∪/g, " اتِّحَاد ");
+  cleaned = cleaned.replace(/\\cap|\bcap\b|∩/g, " تَقَاطُع ");
+  cleaned = cleaned.replace(/\\notin|∉/g, " لَا يَنْتَمِي إِلَى ");
+  cleaned = cleaned.replace(/\\in|∈/g, " يَنْتَمِي إِلَى ");
+  cleaned = cleaned.replace(/\\not\\subset|⊄/g, " لَيْسَتْ مَجْمُوعَةً جُزْئِيَّةً مِنْ ");
+  cleaned = cleaned.replace(/\\subset|⊂/g, " مَجْمُوعَةٌ جُزْئِيَّةٌ مِنْ ");
+  cleaned = cleaned.replace(/\\lor|∨/g, " أَوْ ");
+  cleaned = cleaned.replace(/\\land|∧/g, " وَ ");
+  cleaned = cleaned.replace(/\\mathbb\{R\}|ℝ|\bح\b/g, " مَجْمُوعَةُ الأَعْدَادِ الحَقِيقِيَّة ");
+  cleaned = cleaned.replace(/\\mathbb\{Q\}'|ℚ'|\bن['’َ]\b/g, " مَجْمُوعَةُ الأَعْدَادِ غَيْرِ النِّسْبِيَّة ");
+  cleaned = cleaned.replace(/\\mathbb\{Q\}|ℚ|\bن\b/g, " مَجْمُوعَةُ الأَعْدَادِ النِّسْبِيَّة ");
+  cleaned = cleaned.replace(/\\mathbb\{Z\}|ℤ|\bص\b/g, " مَجْمُوعَةُ الأَعْدَادِ الصَّحِيحَة ");
+  cleaned = cleaned.replace(/\\mathbb\{N\}|ℕ|\bط\b/g, " مَجْمُوعَةُ الأَعْدَادِ الطَّبِيعِيَّة ");
+  cleaned = cleaned.replace(/\\mid/g, " حَيْثُ ");
+  cleaned = cleaned.replace(/-\\infty|-∞/g, " سَالِب مَا لَا نِهَايَة ");
+  cleaned = cleaned.replace(/\\infty|∞/g, " مَا لَا نِهَايَة ");
+
+  // F3. Intervals Notation [a, b] or ]a, b[ or [a, b[
+  cleaned = cleaned.replace(/\[\s*(-?\d+|-\\infty|-∞)\s*,\s*(-?\d+|\\infty|∞)\s*\]/g, " الفَتْرَةُ الْمُغْلَقَةُ مِنْ $1 إِلَى $2 ");
+  cleaned = cleaned.replace(/\]\s*(-?\d+|-\\infty|-∞)\s*,\s*(-?\d+|\\infty|∞)\s*\[/g, " الفَتْرَةُ الْمَفْتُوحَةُ مِنْ $1 إِلَى $2 ");
+  cleaned = cleaned.replace(/\[\s*(-?\d+|-\\infty|-∞)\s*,\s*(-?\d+|\\infty|∞)\s*\[/g, " الفَتْرَةُ نِصْفُ الْمُغْلَقَةِ مِنْ $1 إِلَى $2 ");
+  cleaned = cleaned.replace(/\]\s*(-?\d+|-\\infty|-∞)\s*,\s*(-?\d+|\\infty|∞)\s*\]/g, " الفَتْرَةُ نِصْفُ الْمَفْتُوحَةِ مِنْ $1 إِلَى $2 ");
+
+  // F4. Digital Logic & Computer Architecture Terminology (الحاسب الآلي ونظم الأعداد)
+  cleaned = cleaned.replace(/\bHalf\s*Adder\b/gi, " نِصْفُ الْجَامِع ");
+  cleaned = cleaned.replace(/\bFull\s*Adder\b/gi, " الْجَامِعُ الْكَامِل ");
+  cleaned = cleaned.replace(/\bCombinational(?:\s*Circuits?)?\b/gi, " الدَّوَائِرُ التَّجْمِيعِيَّة ");
+  cleaned = cleaned.replace(/\bSequential(?:\s*Circuits?)?\b/gi, " الدَّوَائِرُ التَّسَلْسُلِيَّة ");
+  cleaned = cleaned.replace(/\bXNOR\b/gi, " بَوَّابَةُ إِكْس نُور ");
+  cleaned = cleaned.replace(/\bXOR\b/gi, " بَوَّابَةُ إِكْس أُور ");
+  cleaned = cleaned.replace(/\bNAND\b/gi, " بَوَّابَةُ نَانْد ");
+  cleaned = cleaned.replace(/\bNOR\b/gi, " بَوَّابَةُ نُور ");
+  cleaned = cleaned.replace(/\bAND\b/g, " بَوَّابَةُ آنْد ");
+  cleaned = cleaned.replace(/\bOR\b/g, " بَوَّابَةُ أُور ");
+  cleaned = cleaned.replace(/\bNOT\b/g, " بَوَّابَةُ نَات الْعَاكِسَة ");
+  cleaned = cleaned.replace(/\bFlip-?Flops?\b/gi, " الْقَلَّابَاتُ الْمَنْطِقِيَّة ");
+  cleaned = cleaned.replace(/\bRegisters?\b/gi, " الْمُسَجِّلَات ");
+  cleaned = cleaned.replace(/\bCounters?\b/gi, " الْعَدَّادَات ");
+  cleaned = cleaned.replace(/\bDeMultiplexers?\b/gi, " مُوَزِّعُ الْقَنَوَات ");
+  cleaned = cleaned.replace(/\bMultiplexers?\b/gi, " مُعَدِّدُ الْقَنَوَات ");
+  cleaned = cleaned.replace(/\bDecoders?\b/gi, " فَاكُّ الشِّفْرَة ");
+  cleaned = cleaned.replace(/\bEncoders?\b/gi, " الْمُشَفِّر ");
 
   // G. Dimensions: 2 \times 2 or 2 x 2 or 2 × 2
   cleaned = cleaned.replace(/(\d+)\s*(?:\\times|[xX×])\s*(\d+)/g, " $1 فِي $2 ");
@@ -685,20 +734,63 @@ function loadEbooks(): any[] {
   return ebooks;
 }
 
-function saveEbooks(data: any[], targetBook?: any) {
-  try {
-    fs.writeFileSync(EBOOKS_FILE, JSON.stringify(data, null, 2), "utf-8");
-  } catch (err) {
-    console.error("Error writing ebooks database file:", err);
-  }
+let isSavingEbooks = false;
+let pendingSaveEbooksData: any[] | null = null;
+let pendingSaveTargetBook: any = null;
 
-  // Only sync the targeted or most recently added UUID book to prevent bulk network socket saturation
-  const bookToSync = targetBook || (Array.isArray(data) && data.length > 0 ? data[data.length - 1] : null);
-  if (bookToSync) {
-    syncBookToSupabase(bookToSync).catch(err => {
-      console.warn("[Supabase Sync] Single book sync notice:", err);
-    });
-  }
+function saveEbooks(data: any[], targetBook?: any) {
+  pendingSaveEbooksData = data;
+  if (targetBook) pendingSaveTargetBook = targetBook;
+
+  if (isSavingEbooks) return;
+  isSavingEbooks = true;
+
+  setImmediate(() => {
+    try {
+      const dataToSave = pendingSaveEbooksData;
+      const bookToSync = pendingSaveTargetBook;
+      pendingSaveEbooksData = null;
+      pendingSaveTargetBook = null;
+
+      if (dataToSave && Array.isArray(dataToSave)) {
+        let saved = false;
+        const serialized = JSON.stringify(dataToSave, null, 2);
+        for (let attempt = 0; attempt < 5; attempt++) {
+          try {
+            fs.writeFileSync(EBOOKS_FILE, serialized, "utf-8");
+            saved = true;
+            break;
+          } catch (writeErr) {
+            // Windows brief lock delay
+            const start = Date.now();
+            while (Date.now() - start < 30) {}
+          }
+        }
+        if (!saved) {
+          console.warn("[saveEbooks] Notice: Direct write failed after 5 attempts.");
+        }
+      }
+
+      if (bookToSync) {
+        syncBookToSupabase(bookToSync).catch(err => {
+          console.warn("[Supabase Sync] Single book sync notice:", err?.message || err);
+        });
+      }
+    } catch (err: any) {
+      try {
+        if (data && Array.isArray(data)) {
+          fs.writeFileSync(EBOOKS_FILE, JSON.stringify(data, null, 2), "utf-8");
+        }
+      } catch (innerErr) {
+        console.error("Error writing ebooks database file:", err?.message || err);
+      }
+    } finally {
+      isSavingEbooks = false;
+      if (pendingSaveEbooksData) {
+        saveEbooks(pendingSaveEbooksData, pendingSaveTargetBook);
+      }
+    }
+  });
 }
 
 // Background sync from Supabase on startup
@@ -987,6 +1079,34 @@ app.post("/api/ebooks/:id/chapters/save", async (req, res) => {
   }
 
   if (chapters && Array.isArray(chapters)) {
+    const previousChapters = book.chapters || [];
+    const newChapters = chapters;
+    const deletedChapters = previousChapters.filter((pc: any) => !newChapters.some((nc: any) => nc.id === pc.id));
+
+    if (deletedChapters.length > 0 && book.blueprint && Array.isArray(book.blueprint.lessons)) {
+      deletedChapters.forEach((delCh: any) => {
+        // Was this chapter the latest/tail chapter of the book?
+        const wasTail = previousChapters.length > 0 && previousChapters[previousChapters.length - 1].id === delCh.id;
+
+        const bpMatch = book.blueprint.lessons.find((l: any) => 
+          l.id === delCh.id || 
+          l.lesson_title === delCh.title || 
+          (l.lesson_title && delCh.title && (l.lesson_title.includes(delCh.title) || delCh.title.includes(l.lesson_title)))
+        );
+
+        if (bpMatch) {
+          if (wasTail) {
+            console.log(`[Tail-Delete Retry Trigger] User deleted latest chapter "${delCh.title}". Resetting blueprint status to 'pending' to trigger clean re-generation!`);
+            bpMatch.status = "pending";
+            delete bpMatch.raw_text_snippet;
+          } else {
+            console.log(`[Middle Chapter Prune] User permanently removed intermediate chapter "${delCh.title}".`);
+            bpMatch.status = "pruned_by_user";
+          }
+        }
+      });
+    }
+
     book.chapters = chapters;
   } else {
     const targetId = chapterId || chapter?.id;
@@ -1242,6 +1362,54 @@ app.post("/api/ebooks/:id/exams/generate", async (req, res) => {
 const PERSISTENT_UPLOADS_DIR = path.join(process.cwd(), "data", "uploads");
 if (!fs.existsSync(PERSISTENT_UPLOADS_DIR)) {
   try { fs.mkdirSync(PERSISTENT_UPLOADS_DIR, { recursive: true }); } catch (e) {}
+}
+
+const PAGE_CACHE_DIR = path.join(process.cwd(), "data", "page-cache");
+if (!fs.existsSync(PAGE_CACHE_DIR)) {
+  try { fs.mkdirSync(PAGE_CACHE_DIR, { recursive: true }); } catch (e) {}
+}
+app.use("/api/page-cache", express.static(PAGE_CACHE_DIR, { maxAge: "7d" }));
+
+/**
+ * Persists high-res rendered page images to disk files in data/page-cache
+ * and returns lightweight URL references (/api/page-cache/...)
+ * This keeps ebooks-db.json under 10MB and prevents Node.js from running out of memory (OOM).
+ */
+function persistPageImagesToDisk(bookId: string, chapterId: string, pages: any[]): any[] {
+  if (!Array.isArray(pages) || pages.length === 0) return [];
+  const cleanBookId = String(bookId || 'book').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const cleanChapterId = String(chapterId || 'chapter').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const targetDir = path.join(PAGE_CACHE_DIR, cleanBookId, cleanChapterId);
+
+  return pages.map((page, idx) => {
+    if (!page || typeof page !== 'object') return page;
+    const pageNum = page.pageNumber || (idx + 1);
+
+    if (page.dataUrl && typeof page.dataUrl === 'string' && page.dataUrl.startsWith('data:image/')) {
+      try {
+        if (!fs.existsSync(targetDir)) {
+          fs.mkdirSync(targetDir, { recursive: true });
+        }
+        const matches = page.dataUrl.match(/^data:image\/([a-zA-Z]+);base64,(.+)$/);
+        if (matches) {
+          const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1];
+          const b64Data = matches[2];
+          const buffer = Buffer.from(b64Data, 'base64');
+          const fileName = `p_${pageNum}.${ext}`;
+          const filePath = path.join(targetDir, fileName);
+          fs.writeFileSync(filePath, buffer);
+
+          return {
+            ...page,
+            dataUrl: `/api/page-cache/${cleanBookId}/${cleanChapterId}/${fileName}`
+          };
+        }
+      } catch (err) {
+        console.warn(`[Page Cache Disk Persist] Failed for page ${pageNum}:`, err);
+      }
+    }
+    return page;
+  });
 }
 
 /**
@@ -1838,6 +2006,41 @@ async function runBackgroundEbookConversion(
         syllabusBlueprint.last_scanned_page = scannedLastPage;
         syllabusBlueprint.source_file_url = fileUrl;
       }
+
+      // 🌟 VISUAL TOC ENHANCER: If text OCR only found 1 lesson for a multi-page book, scan visual TOC!
+      if (syllabusBlueprint && syllabusBlueprint.total_lessons <= 1) {
+        const activeSource = fileUrl || savedLocalFile;
+        if (activeSource) {
+          try {
+            const { buffer: rawBuf } = await resolveCloudOrLocalFileBuffer(activeSource);
+            if (rawBuf) {
+              console.log(`[Job Worker] Text blueprint found only 1 lesson. Activating Visual TOC Extractor...`);
+              const visualToc = await extractVisualSyllabusFromToc(
+                rawBuf,
+                async (params) => generateContentWithRetry(ai, params, ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite-preview", "gemini-3-flash-preview"])
+              );
+              if (visualToc && Array.isArray(visualToc.lessons) && visualToc.lessons.length > 1) {
+                syllabusBlueprint.detected_units = visualToc.detected_units || syllabusBlueprint.detected_units;
+                syllabusBlueprint.lessons = visualToc.lessons.map((l: any, idx: number) => ({
+                  lesson_order: idx + 1,
+                  lesson_title: l.lesson_title,
+                  unit_title: l.unit_title,
+                  start_page: Number(l.start_page) || (idx * 8 + 1),
+                  end_page: Number(l.end_page) || ((idx + 1) * 8),
+                  sub_topics: l.sub_topics || ["المفاهيم الأساسية", "الشرح والتطبيقات"],
+                  raw_text_snippet: "",
+                  status: "pending" as const
+                }));
+                syllabusBlueprint.total_lessons = syllabusBlueprint.lessons.length;
+                console.log(`[Job Worker] Visual TOC successfully upgraded blueprint to ${syllabusBlueprint.total_lessons} authentic lessons!`);
+              }
+            }
+          } catch (vErr) {
+            console.warn("[Job Worker] Visual TOC error:", vErr);
+          }
+        }
+      }
+
       console.log(`[Job Worker] Syllabus Blueprint generated: ${syllabusBlueprint.total_lessons} lessons discovered in document.`);
     } catch (bErr) {
       console.warn("[Job Worker] Blueprint extraction error, using fallback:", bErr);
@@ -2339,7 +2542,8 @@ const ttsSnippetCache = new Map<string, { audioBase64: string; mimeType: string 
 // Helper function to thoroughly sanitize text for natural human voice narration
 function sanitizeTextForHumanNarration(rawText: string): { cleanText: string; isArabic: boolean } {
   const isArabic = /[\u0600-\u06FF]/.test(rawText);
-  let text = rawText || "";
+  // Pass through specialized phonetic transpiler for Math/Science/CS first
+  let text = cleanScientificTextForSpeech(rawText || "");
 
   // Strip code blocks & inline code
   text = text.replace(/```[\s\S]*?```/g, " ");
@@ -3294,6 +3498,51 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
     grade_level: (ebook as any).grade_level
   });
 
+  console.log("\n\x1b[35m=======================================================\x1b[0m");
+  console.log(`\x1b[1m\x1b[32m🚀 [EXPAND-CHAPTERS TRIGGERED]\x1b[0m Book: "\x1b[36m${ebook.title}\x1b[0m" (ID: \x1b[33m${bookId}\x1b[0m)`);
+  console.log(`📊 Current Chapters: \x1b[33m${currentChapters.length}\x1b[0m | Requested Batch: \x1b[33m${batchSize}\x1b[0m`);
+  console.log("\x1b[35m-------------------------------------------------------\x1b[0m");
+
+  // 🩺 SELF-HEALING VISUAL TOC RECOVERY: If blueprint only has 1 lesson, upgrade it with full Visual TOC!
+  const candidateUrl = ebook.source_file_url || (ebook.blueprint as any)?.source_file_url;
+  const currentLessonCount = ebook.blueprint && Array.isArray(ebook.blueprint.lessons) ? ebook.blueprint.lessons.length : 0;
+  if (candidateUrl && currentLessonCount <= 1) {
+    try {
+      console.log(`[Expand Chapters Self-Healing] Blueprint has <= 1 lesson for "${ebook.title}". Running Visual TOC discovery...`);
+      const { buffer } = await resolveCloudOrLocalFileBuffer(candidateUrl);
+      if (buffer) {
+        const visualToc = await extractVisualSyllabusFromToc(
+          buffer,
+          async (params) => generateContentWithRetry(ai, params, ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite-preview", "gemini-3-flash-preview"])
+        );
+        if (visualToc && Array.isArray(visualToc.lessons) && visualToc.lessons.length > 1) {
+          const completedCount = currentChapters.length;
+          ebook.blueprint = {
+            book_title: visualToc.book_title || ebook.title,
+            total_lessons: visualToc.lessons.length,
+            detected_units: visualToc.detected_units || [],
+            lessons: visualToc.lessons.map((l: any, idx: number) => ({
+              lesson_order: idx + 1,
+              lesson_title: l.lesson_title,
+              unit_title: l.unit_title,
+              start_page: Number(l.start_page) || (idx * 8 + 1),
+              end_page: Number(l.end_page) || ((idx + 1) * 8),
+              sub_topics: l.sub_topics || ["المفاهيم الأساسية", "الشرح والتطبيقات"],
+              raw_text_snippet: "",
+              status: idx < completedCount ? ("completed" as const) : ("pending" as const)
+            })),
+            source_file_url: candidateUrl,
+            createdAt: new Date().toISOString()
+          };
+          saveEbooks(ebooks, ebook);
+          console.log(`\x1b[32m[Expand Chapters Self-Healing] Successfully upgraded blueprint to ${ebook.blueprint.lessons.length} lessons from authentic TOC!\x1b[0m`);
+        }
+      }
+    } catch (tocErr) {
+      console.warn("[Expand Chapters Self-Healing] Visual TOC warning:", tocErr);
+    }
+  }
+
   // 🩺 SELF-HEALING ASSET LOCATOR: If blueprint is missing, recover source document from cache/storage
   if (!ebook.blueprint || !ebook.original_text) {
     try {
@@ -3382,7 +3631,7 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
           const completedOrders = Array.from({ length: completedCount }, (_, i) => i + 1);
           ebook.blueprint = markLessonsCompleted(recoveredBp, completedOrders);
           saveEbooks(ebooks, ebook);
-          console.log(`[Expand Chapters Self-Healing] Blueprint healed and saved! ${ebook.blueprint.lessons.length} total lessons mapped.`);
+          console.log(`[Expand Chapters Self-Healing] Blueprint healed and saved! ${ebook.blueprint.lessons?.length || 0} total lessons mapped.`);
         }
       }
     } catch (healErr) {
@@ -3454,17 +3703,22 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
       console.log(`[Expand Chapters] Generating grounded micro-batch for ${pendingLessons.length} pending lessons...`);
 
       // 🎯 TARGETED JIT PAGE INGESTION:
-      // If the lesson has start_page and sourceFileUrl exists, extract authentic pages on-demand!
+      // If the lesson has start_page and sourceFileUrl exists, extract authentic pages on-demand using page_offset!
       for (const l of pendingLessons) {
         if (sourceFileUrl && l.start_page && (!l.raw_text_snippet || l.raw_text_snippet.length < 500)) {
           try {
-            console.log(`[Targeted Ingestion] Fetching exact pages ${l.start_page}..${l.end_page || l.start_page + 6} for "${l.lesson_title}"...`);
+            const pageOffset = Number((ebook as any).page_offset) || 0;
+            const sPage = Number(l.start_page) || 1;
+            const ePage = Math.max(sPage + 3, Number(l.end_page) || (sPage + 6));
+            const physStart = calculatePhysicalPage(sPage, pageOffset, 1000);
+            const physEnd = calculatePhysicalPage(ePage, pageOffset, 1000);
+            console.log(`[Targeted Ingestion] Fetching exact physical pages ${physStart}..${physEnd} (Printed ${sPage}..${ePage}, offset: ${pageOffset}) for "${l.lesson_title}"...`);
             const { buffer } = await resolveCloudOrLocalFileBuffer(sourceFileUrl);
             if (buffer) {
               const targetedText = await extractPdfPageRange(
                 buffer,
-                l.start_page,
-                l.end_page || l.start_page + 6,
+                physStart,
+                physEnd,
                 async (params) => generateContentWithRetry(ai, params, ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite-preview", "gemini-3-flash-preview"])
               );
               if (targetedText && targetedText.length > 80) {
@@ -3495,32 +3749,39 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
     } else {
       // 🚀 THE MAESTRO AUTO-DISCOVERY ENGINE:
       // Never halt on exhausted blueprint! Automatically slice the next lesson from original_text,
-      // scan the next PDF pages, or generate the next logical curriculum lesson.
+      // extract targeted PDF pages, or generate the next logical curriculum lesson.
       const fullText = (ebook as any).original_text || "";
       const estimatedCharsPerChapter = 2500;
       const startChar = currentChapters.length * estimatedCharsPerChapter;
       let remainingSlice = "";
 
+      let nextStartPage = 11;
+      let nextEndPage = 16;
+      const existingEndPages = currentChapters.map((c: any) => Number(c.end_page) || 0).filter(p => p > 0);
+      if (existingEndPages.length > 0) {
+        nextStartPage = Math.max(...existingEndPages) + 1;
+        nextEndPage = nextStartPage + 5;
+      } else {
+        nextStartPage = currentChapters.length * 6 + 1;
+        nextEndPage = nextStartPage + 5;
+      }
+
       if (fullText && fullText.length > startChar + 150) {
         remainingSlice = fullText.substring(startChar, Math.min(fullText.length, startChar + 15000));
       } else if (sourceFileUrl) {
-        // Attempt to load and transcribe the next PDF page batch from disk/cloud
         try {
           const { buffer } = await resolveCloudOrLocalFileBuffer(sourceFileUrl);
           if (buffer) {
-            const nextStartPage = Math.max(1, (ebook.blueprint?.last_scanned_page || Math.floor(startChar / 1200)) + 1);
-            console.log(`[Auto-Discovery] Scanning next pages for ${ebook.title} starting at page ${nextStartPage}...`);
-            const visionRes = await extractPdfTextViaVisionPages(
+            console.log(`[Auto-Discovery] Extracting authentic curriculum pages ${nextStartPage}..${nextEndPage} for ${ebook.title}...`);
+            const targetedText = await extractPdfPageRange(
               buffer,
-              async (params) => generateContentWithRetry(ai, params, ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite-preview", "gemini-3-flash-preview"]),
-              { startPage: nextStartPage, maxPagesToScan: 6, includeTocEndPages: false }
+              nextStartPage,
+              nextEndPage,
+              async (params) => generateContentWithRetry(ai, params, ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite-preview", "gemini-3-flash-preview"])
             );
-            if (visionRes.text && visionRes.text.length > 80) {
-              (ebook as any).original_text = ((ebook as any).original_text || "") + "\n\n" + visionRes.text;
-              remainingSlice = visionRes.text;
-              if (ebook.blueprint) {
-                ebook.blueprint.last_scanned_page = visionRes.lastScannedPage;
-              }
+            if (targetedText && targetedText.length > 80) {
+              remainingSlice = targetedText;
+              (ebook as any).original_text = ((ebook as any).original_text || "") + "\n\n" + targetedText;
             }
           }
         } catch (scanErr) {
@@ -3539,6 +3800,8 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
         lesson_order: nextOrder,
         lesson_title: `${ebook.title} - الدرس ${nextOrder}`,
         raw_text_snippet: remainingSlice,
+        start_page: nextStartPage,
+        end_page: nextEndPage,
         status: "pending",
         sub_topics: ["المفاهيم والنصوص الأساسية", "التطبيقات والشروحات المقررة", "التقييم وسر التفوق"]
       };
@@ -3569,6 +3832,7 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
               originalContent: { type: Type.STRING, description: "Original text segment extracted from the source" },
               summary: { type: Type.STRING, description: "Concise summary of key points" },
               content: { type: Type.STRING, description: "Deep, thorough chapter content in Markdown adhering to the subject's pedagogical structure" },
+              audioNarration: { type: Type.STRING, description: "A continuous, spoken-ready educational Arabic explanation script (200-400 words) without markdown symbols, bullet points or raw equations, perfectly suited for Voice Narration / TTS." },
               keyConcepts: { 
                 type: Type.ARRAY, 
                 items: { type: Type.STRING }, 
@@ -3613,9 +3877,12 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
       return {
         id: chapterId,
         title: cleanTitle,
+        start_page: matchedLesson?.start_page || (cIdx * 6 + 5),
+        end_page: matchedLesson?.end_page || (cIdx * 6 + 10),
         content: cleanStr(ch.content) || "محتوى الدرس قيد المعالجة.",
         originalContent: originalText,
         summary: cleanStr(ch.summary) || `ملخص وشرح شامل لدرس ${cleanTitle}.`,
+        audioScript: cleanStr(ch.audioNarration) || "",
         concepts: conceptsList,
         imagePrompt: cleanStr(ch.imagePrompt) || `Educational illustration for ${cleanTitle}`,
         videos: [
@@ -3672,21 +3939,34 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
     ebook.chapters = [...currentChapters, ...newChapters];
     saveEbooks(ebooks, ebook);
 
-    // Save to Supabase
+    console.log("\x1b[35m-------------------------------------------------------\x1b[0m");
+    console.log(`\x1b[1m\x1b[32m✅ [EXPAND-CHAPTERS COMPLETED]\x1b[0m Book: "\x1b[36m${ebook.title}\x1b[0m"`);
+    console.log(`📚 Generated \x1b[33m${newChapters.length}\x1b[0m new chapter(s). Total Chapters now: \x1b[32m${ebook.chapters.length}\x1b[0m`);
+    newChapters.forEach((ch: any, i: number) => {
+      console.log(`   👉 Chapter #${currentChapters.length + i + 1}: "\x1b[1m${ch.title}\x1b[0m" (Pages ${ch.start_page}..${ch.end_page})`);
+    });
+    console.log("\x1b[35m=======================================================\n\x1b[0m");
+
+    // Save to Supabase asynchronously (fire-and-forget, non-blocking)
     try {
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(ebook.id));
       if (isUuid) {
-        await supabase.from('books').update({
-          chapters: ebook.chapters,
-          blueprint: ebook.blueprint,
-          original_text: (ebook as any).original_text
-        }).eq('id', ebook.id);
+        Promise.resolve(
+          supabase.from('books').update({
+            chapters: ebook.chapters,
+            blueprint: ebook.blueprint
+          }).eq('id', ebook.id)
+        ).then(() => {
+          console.log(`[Supabase Async] Successfully synced expanded chapters for "${ebook.title}"`);
+        }).catch((dbErr: any) => {
+          console.warn("[Supabase Async] chapters update error:", dbErr?.message || dbErr);
+        });
       }
     } catch (dbErr) {
-      console.warn("Supabase chapters update error:", dbErr);
+      console.warn("Supabase chapters async trigger error:", dbErr);
     }
 
-    const pendingInBlueprint = ebook.blueprint ? ebook.blueprint.lessons.filter(l => l.status === "pending").length : 0;
+    const pendingInBlueprint = ebook.blueprint && Array.isArray(ebook.blueprint.lessons) ? ebook.blueprint.lessons.filter(l => l.status === "pending").length : 0;
     const moreScannedPages = isScannedPdf && (ebook.blueprint?.last_scanned_page || 0) < totalPdfPages ? Math.ceil((totalPdfPages - (ebook.blueprint?.last_scanned_page || 0)) / 4) : 0;
 
     res.json({
@@ -3726,23 +4006,31 @@ app.post("/api/ebooks/:id/pregenerate-all-assets", async (req, res) => {
       let completedSteps = 0;
       let totalAudioFilesSynthesized = 0;
 
+      let edgeTtsCircuitBroken = false;
+
       for (let i = 0; i < chapters.length; i++) {
         const ch = chapters[i];
         
-        // 1. Pre-generate EdgeTTS chapter narrative audio
+        // 1. Pre-generate EdgeTTS chapter narrative audio (with instant circuit breaker)
         pregenJobs[bookId].currentStep = `تجهيز التسجيل الصوتي للراوي (الفصل ${i + 1}: ${ch.title})...`;
         const cleanedText = cleanScientificTextForSpeech(ch.content || ch.summary || "");
-        if (cleanedText) {
+        if (cleanedText && !edgeTtsCircuitBroken) {
           const safeText = cleanedText.length > 700 ? cleanedText.substring(0, 700) + "..." : cleanedText;
           const textHash = crypto.createHash("md5").update(`ar-EG-SalmaNeural_${safeText}`).digest("hex");
           const cachedFilePath = path.join(AUDIO_CACHE_DIR, `${textHash}.mp3`);
           if (!fs.existsSync(cachedFilePath)) {
             try {
-              const tts = new EdgeTTS({ voice: "ar-EG-SalmaNeural", timeout: 35000 });
+              const tts = new EdgeTTS({ voice: "ar-EG-SalmaNeural", timeout: 4000 });
               await tts.ttsPromise(safeText, cachedFilePath);
               totalAudioFilesSynthesized++;
-            } catch (e) {
-              console.warn(`[Batch Pregen] Audio synthesis notice for chapter ${i + 1}:`, e);
+            } catch (e: any) {
+              const errMsg = e?.message || String(e);
+              if (errMsg.includes("403") || errMsg.includes("Unexpected server response") || errMsg.includes("Forbidden")) {
+                console.warn(`[Batch Pregen] EdgeTTS 403 / Forbidden detected. Tripping instant Circuit Breaker to prevent delays.`);
+                edgeTtsCircuitBroken = true;
+              } else {
+                console.warn(`[Batch Pregen] Audio synthesis notice for chapter ${i + 1}:`, errMsg);
+              }
             }
           }
         }
@@ -3771,8 +4059,9 @@ app.post("/api/ebooks/:id/pregenerate-all-assets", async (req, res) => {
         }
 
         // Now pre-synthesize EdgeTTS audio voices for each line of dialogue in Karim and Farah's transcript!
-        if (podcastData && Array.isArray(podcastData.transcript)) {
+        if (podcastData && Array.isArray(podcastData.transcript) && !edgeTtsCircuitBroken) {
           for (let tIdx = 0; tIdx < podcastData.transcript.length; tIdx++) {
+            if (edgeTtsCircuitBroken) break;
             const turn = podcastData.transcript[tIdx];
             const isMale = turn.speaker === "كريم" || turn.speaker.includes("كريم");
             const voice = isMale ? "ar-EG-ShakirNeural" : "ar-EG-SalmaNeural";
@@ -3783,11 +4072,18 @@ app.post("/api/ebooks/:id/pregenerate-all-assets", async (req, res) => {
               const turnAudioPath = path.join(AUDIO_CACHE_DIR, `${turnHash}.mp3`);
               if (!fs.existsSync(turnAudioPath)) {
                 try {
-                  const tts = new EdgeTTS({ voice, timeout: 35000 });
+                  const tts = new EdgeTTS({ voice, timeout: 4000 });
                   await tts.ttsPromise(safeTurnText, turnAudioPath);
                   totalAudioFilesSynthesized++;
-                } catch (ttsErr) {
-                  console.warn(`[Batch Pregen] EdgeTTS turn error:`, ttsErr);
+                } catch (ttsErr: any) {
+                  const errMsg = ttsErr?.message || String(ttsErr);
+                  if (errMsg.includes("403") || errMsg.includes("Unexpected server response") || errMsg.includes("Forbidden")) {
+                    console.warn(`[Batch Pregen] EdgeTTS 403 in podcast turn. Tripping circuit breaker immediately.`);
+                    edgeTtsCircuitBroken = true;
+                    break;
+                  } else {
+                    console.warn(`[Batch Pregen] EdgeTTS turn error:`, errMsg);
+                  }
                 }
               }
             }
@@ -4184,6 +4480,644 @@ app.post("/api/activities/:bookId/:chapterId/submit", async (req, res) => {
   } catch (err: any) {
     console.error("[Activity Engine] Submit error:", err);
     res.status(500).json({ error: "فشل تسجيل نتيجة النشاط: " + err.message });
+  }
+});
+
+// ========================================================
+// 📖 DUAL-CANVAS & AUTHENTIC LESSON ASSETS ENDPOINTS
+// ========================================================
+
+// 1. GET authentic booklet page slides for a chapter
+app.get("/api/ebooks/:id/chapters/:chapterId/pages", async (req, res) => {
+  try {
+    const { id: bookId, chapterId } = req.params;
+    const book = ebooks.find(b => b.id === bookId);
+    if (!book) return res.status(404).json({ error: "الكتاب غير موجود." });
+
+    const chapter = (book.chapters || []).find((c: any) => c.id === chapterId);
+    if (!chapter) return res.status(404).json({ error: "الفصل غير موجود." });
+
+    const pageOffset = Number((book as any).page_offset) || 0;
+
+    // 1. Check if pages are already cached in the chapter object
+    if (chapter.pages && Array.isArray(chapter.pages) && chapter.pages.length > 0) {
+      return res.json({ success: true, pages: chapter.pages, pageOffset, source: "cache" });
+    }
+
+    // 2. Determine start and end pages
+    let startPage = Number(chapter.start_page) || 0;
+    let endPage = Number(chapter.end_page) || 0;
+
+    if (!startPage || !endPage) {
+      // Check blueprint on the book
+      const lessonsList = Array.isArray(book.blueprint) 
+        ? book.blueprint 
+        : (book.blueprint && Array.isArray((book.blueprint as any).lessons) ? (book.blueprint as any).lessons : []);
+
+      const bpMatch = lessonsList.find((bp: any) => 
+        bp.lesson_title === chapter.title || 
+        bp.title === chapter.title || 
+        bp.id === chapter.id ||
+        (bp.lesson_title && chapter.title && (bp.lesson_title.includes(chapter.title) || chapter.title.includes(bp.lesson_title))) ||
+        (bp.title && chapter.title && (bp.title.includes(chapter.title) || chapter.title.includes(bp.title)))
+      );
+      if (bpMatch && bpMatch.start_page && bpMatch.end_page) {
+        startPage = Number(bpMatch.start_page);
+        endPage = Number(bpMatch.end_page);
+      }
+    }
+
+    // Fallback: estimate from chapter index if still missing
+    if (!startPage || !endPage) {
+      const idx = (book.chapters || []).findIndex((c: any) => c.id === chapterId);
+      const safeIdx = Math.max(0, idx);
+      startPage = safeIdx * 8 + 11;
+      endPage = startPage + 4;
+    }
+
+    console.log(`[Chapter Pages Renderer] Rendering authentic pages ${startPage}..${endPage} for chapter: ${chapter.title}`);
+
+    // 3. Resolve source document buffer
+    let pdfBuffer: Buffer | null = null;
+    if (book.source_file_url) {
+      const resolved = await resolveCloudOrLocalFileBuffer(book.source_file_url);
+      if (resolved.buffer) {
+        pdfBuffer = resolved.buffer;
+      }
+    }
+
+    // Secondary search if buffer not found: intelligently match by subject and stage!
+    if (!pdfBuffer) {
+      const searchDirs = [PERSISTENT_UPLOADS_DIR, path.join(process.cwd(), "data", "source-books")];
+      const titleLower = ((book.title || "") + " " + (book.category || "")).toLowerCase();
+      const isScience = /علوم|science/.test(titleLower);
+      const isMath = /رياض|math|جبر|هندس/.test(titleLower);
+      const isSocial = /دراسات|social|تاريخ|جغرافي/.test(titleLower);
+      const isPrep2 = /ثاني|تاني|prep2|prp2/.test(titleLower);
+
+      for (const dir of searchDirs) {
+        if (fs.existsSync(dir)) {
+          const files = fs.readdirSync(dir);
+          for (const f of files) {
+            if (f.endsWith(".pdf")) {
+              const fLower = f.toLowerCase();
+              const matchSubject = (isScience && fLower.includes("science")) ||
+                                   (isMath && fLower.includes("math")) ||
+                                   (isSocial && fLower.includes("social"));
+              const matchGrade = !isPrep2 || (fLower.includes("prep2") || fLower.includes("prp2"));
+              if (matchSubject && matchGrade) {
+                try {
+                  pdfBuffer = fs.readFileSync(path.join(dir, f));
+                  console.log(`[Chapter Pages] Smart match local PDF: ${f} for "${book.title}"`);
+                  break;
+                } catch (e) {}
+              }
+            }
+          }
+        }
+        if (pdfBuffer) break;
+      }
+    }
+
+    if (!pdfBuffer) {
+      return res.json({ 
+        success: true, 
+        pages: [], 
+        message: "لم يتم العثور على ملف الـ PDF الأصلي لقص الصفحات، يُرجى فحص مسار الملف المصدر." 
+      });
+    }
+
+    // 4. Render pages to high-res images with AutoAnchor calibration
+    let effectiveOffset = pageOffset;
+    if (!chapter.physical_start_page && pdfBuffer) {
+      try {
+        const ai = getGenAIClient();
+        const estPhys = calculatePhysicalPage(startPage, pageOffset);
+        const autoAnchor = await detectLessonAnchorPage(
+          pdfBuffer,
+          estPhys,
+          chapter.title,
+          ai ? async (params) => generateContentWithRetry(ai, params, ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite-preview", "gemini-3-flash-preview"]) : undefined
+        );
+        if (autoAnchor && autoAnchor !== estPhys) {
+          chapter.physical_start_page = autoAnchor;
+          effectiveOffset = autoAnchor - startPage;
+          console.log(`[AutoAnchor] Aligned chapter "${chapter.title}" to physical page ${autoAnchor} (calibrated offset: ${effectiveOffset})`);
+        }
+      } catch (anchorErr) {
+        console.warn("[AutoAnchor] Fallback to standard offset:", anchorErr);
+      }
+    }
+
+    const renderedImages = await renderPdfPagesToImages(pdfBuffer, startPage, endPage, effectiveOffset);
+    if (renderedImages && renderedImages.length > 0) {
+      const persistedImages = persistPageImagesToDisk(bookId, chapterId, renderedImages);
+      chapter.pages = persistedImages;
+      chapter.start_page = startPage;
+      chapter.end_page = endPage;
+      saveEbooks(ebooks);
+
+      return res.json({ 
+        success: true, 
+        pages: persistedImages, 
+        pageOffset,
+        startPage, 
+        endPage, 
+        source: "pdf_render" 
+      });
+    }
+
+    return res.json({ success: true, pages: [], message: "لم يتم استخراج صور من الصفحات المحددة." });
+  } catch (err: any) {
+    console.error("[Chapter Pages Error]:", err);
+    res.status(500).json({ error: "فشل استخراج صفحات الدرس الأصلية: " + err.message });
+  }
+});
+
+// 1.05 POST /api/ebooks/:id/page-offset
+// Calibrates dynamic optical offset and invalidates cached rendered pages
+app.post("/api/ebooks/:id/page-offset", (req, res) => {
+  try {
+    const { id } = req.params;
+    const { offset } = req.body;
+    const book = ebooks.find((b) => b.id === id);
+    if (!book) return res.status(404).json({ error: "الكتاب غير موجود" });
+
+    const newOffset = Number(offset) || 0;
+    book.page_offset = newOffset;
+
+    // Invalidate cached pages on chapters so next view re-renders with calibrated offset
+    if (Array.isArray(book.chapters)) {
+      book.chapters.forEach((ch: any) => {
+        delete ch.pages;
+      });
+    }
+
+    saveEbooks(ebooks);
+    console.log(`[Page Offset Calibrator] Set offset to ${newOffset} for book "${book.title}", invalidated pages cache.`);
+    res.json({ success: true, page_offset: newOffset });
+  } catch (err: any) {
+    res.status(500).json({ error: "فشل تحديث الإزاحة: " + err.message });
+  }
+});
+
+// 1.1 POST /api/ebooks/:id/chapters/:chapterId/transcribe
+// Extracts verbatim, faithful text directly from the PDF booklet pages (High-Fidelity Document Twin)
+app.post("/api/ebooks/:id/chapters/:chapterId/transcribe", async (req, res) => {
+  try {
+    const { id, chapterId } = req.params;
+    const book = ebooks.find((b) => b.id === id);
+    if (!book) {
+      return res.status(404).json({ error: "الكتاب غير موجود." });
+    }
+
+    const chapter = (book.chapters || []).find((c: any) => c.id === chapterId);
+    if (!chapter) {
+      return res.status(404).json({ error: "الفصل غير موجود." });
+    }
+
+    // Determine logical start and end pages from chapter or blueprint
+    let startPage = Number(chapter.start_page) || 0;
+    let endPage = Number(chapter.end_page) || 0;
+
+    if (!startPage || !endPage) {
+      const lessonsList = Array.isArray(book.blueprint) 
+        ? book.blueprint 
+        : (book.blueprint && Array.isArray((book.blueprint as any).lessons) ? (book.blueprint as any).lessons : []);
+
+      const bpMatch = lessonsList.find((bp: any) => 
+        bp.lesson_title === chapter.title || 
+        bp.title === chapter.title || 
+        bp.id === chapter.id ||
+        (bp.lesson_title && chapter.title && (bp.lesson_title.includes(chapter.title) || chapter.title.includes(bp.lesson_title))) ||
+        (bp.title && chapter.title && (bp.title.includes(chapter.title) || chapter.title.includes(bp.title)))
+      );
+      if (bpMatch && bpMatch.start_page && bpMatch.end_page) {
+        startPage = Number(bpMatch.start_page);
+        endPage = Number(bpMatch.end_page);
+      }
+    }
+
+    if (!startPage || !endPage) {
+      const idx = (book.chapters || []).findIndex((c: any) => c.id === chapterId);
+      const safeIdx = Math.max(0, idx);
+      startPage = safeIdx * 8 + 2;
+      endPage = startPage + 7;
+    }
+
+    const offset = Number((book as any).page_offset) || 0;
+    const physicalStart = Math.max(1, startPage + offset);
+    const physicalEnd = Math.max(physicalStart, endPage + offset);
+
+    let pdfBuffer: Buffer | null = null;
+    if (book.source_file_url) {
+      const resolved = await resolveCloudOrLocalFileBuffer(book.source_file_url);
+      if (resolved.buffer) pdfBuffer = resolved.buffer;
+    }
+
+    if (!pdfBuffer) {
+      // Local fallback search
+      const searchDirs = [PERSISTENT_UPLOADS_DIR, path.join(process.cwd(), "data", "source-books")];
+      const titleLower = ((book.title || "") + " " + (book.category || "")).toLowerCase();
+      const isScience = /علوم|science/.test(titleLower);
+      const isMath = /رياض|math|جبر|هندس/.test(titleLower);
+      const isSocial = /دراسات|social|تاريخ|جغرافي/.test(titleLower);
+      const isPrep2 = /ثاني|تاني|prep2|prp2/.test(titleLower);
+
+      for (const dir of searchDirs) {
+        if (fs.existsSync(dir)) {
+          const files = fs.readdirSync(dir);
+          for (const f of files) {
+            if (f.endsWith(".pdf")) {
+              const fLower = f.toLowerCase();
+              const matchSubject = (isScience && fLower.includes("science")) ||
+                                   (isMath && fLower.includes("math")) ||
+                                   (isSocial && fLower.includes("social"));
+              const matchGrade = !isPrep2 || (fLower.includes("prep2") || fLower.includes("prp2"));
+              if (matchSubject && matchGrade) {
+                try {
+                  pdfBuffer = fs.readFileSync(path.join(dir, f));
+                  break;
+                } catch (e) {}
+              }
+            }
+          }
+        }
+        if (pdfBuffer) break;
+      }
+    }
+
+    if (!pdfBuffer) {
+      return res.status(404).json({ error: "ملف الـ PDF الأصلي غير متوفر لاستخراج النص." });
+    }
+
+    const ai = getGenAIClient();
+    if (!ai) {
+      return res.status(500).json({ error: "مفتاح الذكاء الاصطناعي غير متوفر." });
+    }
+
+    console.log(`[Authentic Transcriber] Extracting authentic physical pages ${physicalStart}..${physicalEnd} (Logical: ${startPage}..${endPage}, Offset: ${offset}) for chapter "${chapter.title}"...`);
+    const extractedText = await extractPdfPageRange(
+      pdfBuffer,
+      physicalStart,
+      physicalEnd,
+      async (params) => generateContentWithRetry(ai, params, ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite-preview", "gemini-3-flash-preview", "gemini-3.5-flash"])
+    );
+
+    if (!extractedText || extractedText.trim().length === 0) {
+      return res.status(500).json({ error: "تعذر استخراج نص مقروء من هذه الصفحات." });
+    }
+
+    // Clean and organize the raw extracted text into pure, faithful booklet Markdown
+    const organizePrompt = `
+أنت المحرر والموثق الرقمي الأمين لمذكرات المناهج التعليمية.
+إليك النص الخام المستخرج بصرياً من صفحات المذكرة الدراسية الفعلية (الصفحات المطبوعة ${startPage} إلى ${endPage}) لدرس: "${chapter.title}".
+
+النص الخام من صفحات المذكرة:
+"""
+${extractedText}
+"""
+
+المهمة المطلوبة بدقة متناهية:
+1. أعد كتابة نص الدرس الأصلي وشرحه وتجاربه كما هو مكتوب في المذكرة بنفس الكلمات والفقرات والترتيب.
+2. ركز بالدرجة الأولى على شرح الدرس ومحتواه العلمي والأنشطة؛ ولا تجعل الدرس مقتصراً على جداول نواتج التعلم أو الأهداف التمهيدية بل قدم الشرح العلمي الكامل (مثل تركيب الذرة، النواة، البروتونات، النيوترونات، مستويات الطاقة، التوزيع الإلكتروني، إلخ).
+3. احذف الهيدر والفوتر (اسم السلسلة، اسم المدرس، أرقام الهواتف، وأرقام الصفحات).
+4. احذف أي أسئلة أو تدريبات أو واجبات تقع في نهاية الدرس أو منتصفه (نحن نريد نص الشرح فقط).
+5. إذا كان في المذكرة جداول، أظهرها كما هي في جداول Markdown محكمة وأنيقة.
+6. إذا كان في المذكرة رموز رياضية أو معادلات أو دوائر، اكتبها بترميز LaTeX نقي: $...$ للداخلي، و$$...$$ للمستقل.
+7. ممنوع منعاً باتاً إضافة أي عناوين اصطناعية مثل "أولاً: نواتج التعلم" أو "ثانياً: الشرح" أو "سادساً: مصفوفة المقارنة" أو اختراع أكواد ليست في المذكرة.
+8. اكتب فقط نص المذكرة الحقيقي المنظم بتنسيق Markdown مباشر دون أي نقاط فارغة مبعثرة.
+`;
+
+    const organizeResponse = await generateContentWithRetry(ai, {
+      contents: [{ parts: [{ text: organizePrompt }] }],
+      config: {
+        temperature: 0.1
+      }
+    }, ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite-preview", "gemini-3-flash-preview", "gemini-3.5-flash"]);
+
+    const cleanLessonContent = (organizeResponse.text || extractedText).trim();
+
+    // Update chapter
+    chapter.start_page = startPage;
+    chapter.end_page = endPage;
+    chapter.content = cleanLessonContent;
+    chapter.originalContent = cleanLessonContent;
+    chapter.audioScript = cleanScientificTextForSpeech(cleanLessonContent);
+
+    saveEbooks(ebooks);
+
+    if (supabase) {
+      try {
+        await supabase
+          .from("interactive_augmented_ebooks")
+          .update({ chapters: book.chapters })
+          .eq("id", book.id);
+      } catch (sbErr) {
+        console.warn("[Transcribe Endpoint] Supabase sync warning:", sbErr);
+      }
+    }
+
+    return res.json({
+      success: true,
+      content: cleanLessonContent,
+      chapter
+    });
+  } catch (err: any) {
+    console.error("[Transcribe Endpoint Error]:", err);
+    res.status(500).json({ error: "فشل استخراج نص المذكرة: " + err.message });
+  }
+});
+
+// 2. POST instant paragraph-level text-to-speech audio snippet
+app.post("/api/paragraphs/narrate", async (req, res) => {
+  try {
+    const { text, voice = "ar-EG-ShakirNeural", rate = "+0%" } = req.body;
+    if (!text || typeof text !== "string" || text.trim().length === 0) {
+      return res.status(400).json({ error: "النص المطلوب استماعه مطلوب." });
+    }
+
+    const cleanText = cleanScientificTextForSpeech(text).substring(0, 1500);
+    const textHash = crypto.createHash("md5").update(`paragraph_${cleanText}_${voice}_${rate}`).digest("hex");
+    const audioPath = path.join(AUDIO_CACHE_DIR, `${textHash}.mp3`);
+
+    if (!fs.existsSync(audioPath)) {
+      try {
+        const tts = new EdgeTTS({ voice, rate, timeout: 5000 });
+        await tts.ttsPromise(cleanText, audioPath);
+      } catch (edgeErr: any) {
+        console.warn("[Paragraph TTS] Primary voice failed, attempting fallback:", edgeErr?.message || edgeErr);
+        try {
+          const fallbackTts = new EdgeTTS({ voice: "ar-SA-HamedNeural", rate, timeout: 4000 });
+          await fallbackTts.ttsPromise(cleanText, audioPath);
+        } catch (fbErr: any) {
+          console.warn("[Paragraph TTS] EdgeTTS cloud network error/403, signaling client Web Speech fallback:", fbErr?.message || fbErr);
+          return res.json({ 
+            success: true, 
+            fallbackToWebSpeech: true, 
+            cleanText 
+          });
+        }
+      }
+    }
+
+    if (fs.existsSync(audioPath)) {
+      const audioBuffer = fs.readFileSync(audioPath);
+      const audioBase64 = `data:audio/mp3;base64,${audioBuffer.toString("base64")}`;
+      return res.json({ success: true, audioUrl: audioBase64 });
+    }
+
+    return res.json({ success: true, fallbackToWebSpeech: true, cleanText });
+  } catch (err: any) {
+    console.error("[Paragraph TTS Error]:", err);
+    res.status(500).json({ error: "خطأ في التوليد الصوتي: " + err.message });
+  }
+});
+
+// 3. POST AI-driven authentic exercise evaluation & grading
+app.post("/api/exercises/evaluate", async (req, res) => {
+  try {
+    const {
+      questionText,
+      studentAnswer,
+      modelAnswer,
+      rubricCriteria = [],
+      gradeLevel = "الصف الثاني الإعدادي",
+      subject = "اللغة العربية",
+      studentId = "student-1",
+      bookId = "book-1",
+      chapterId = "ch-1"
+    } = req.body;
+
+    if (!questionText || !studentAnswer) {
+      return res.status(400).json({ error: "السؤال وإجابة الطالب مطلوبان للتقييم." });
+    }
+
+    const ai = getGenAIClient();
+    if (!ai) {
+      return res.status(400).json({ error: "مفتاح الذكاء الاصطناعي مطلوب لإجراء التصحيح." });
+    }
+
+    const prompt = `أنت موجه تربوي ومصحح وزاري خبير في تصحيح الاختبارات لمادة (${subject}) لـ (${gradeLevel}).
+المطلوب تقييم إجابة الطالب بإنصاف، بدقة علمية، وبروح تشجيعية مع إبراز نقاط القوة وما ينقصه.
+
+معلومات السؤال والإجابة:
+- السؤال: ${questionText}
+- إجابة الطالب: ${studentAnswer}
+- الإجابة النموذجية المعتمدة: ${modelAnswer || "الإجابة العلمية الدقيقة المستنتجة من سياق المنهج"}
+- معايير التقييم ومفاتيح الإجابة (Rubric Criteria): ${Array.isArray(rubricCriteria) ? rubricCriteria.join(" | ") : rubricCriteria || "الربط بالقاعدة، الدقة اللغوية/العلمية"}
+
+أخرج النتيجة ككائن JSON فقط بالهيكل التالي:
+{
+  "score": 8.5,
+  "maxScore": 10,
+  "isPassed": true,
+  "percentage": 85,
+  "feedback": "ملاحظة تربوية واضحة ومباشرة تشرح سبب هذه الدرجة وتوجهه للتحسين",
+  "strengths": ["نقطة قوة 1", "نقطة قوة 2"],
+  "missingPoints": ["ما ينقصه لاكتمال الدرجة النهائية"],
+  "modelCorrection": "الصياغة النموذجية الكاملة المتطابقة مع معايير الوزارة"
+}`;
+
+    const fallbackModels = [
+      "gemini-3.5-flash-lite",
+      "gemini-3.1-flash-lite-preview",
+      "gemini-3-flash-preview",
+      "gemini-3.5-flash"
+    ];
+
+    let resultJson: any = null;
+    let evalError: any = null;
+
+    for (const model of fallbackModels) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents: prompt,
+          config: {
+            temperature: 0.2,
+            responseMimeType: "application/json"
+          }
+        });
+        const txt = response.text || "";
+        resultJson = JSON.parse(txt);
+        break;
+      } catch (mErr: any) {
+        evalError = mErr;
+      }
+    }
+
+    if (!resultJson) {
+      const pass = studentAnswer.trim().length >= 10;
+      resultJson = {
+        score: pass ? 8 : 4,
+        maxScore: 10,
+        isPassed: pass,
+        percentage: pass ? 80 : 40,
+        feedback: pass ? "إجابة جيدة تدل على استيعاب الفكرة العامة للدرس." : "الإجابة مختصرة جداً، يُرجى التوسع والربط بالقاعدة.",
+        strengths: ["المحاولة والمشاركة في الإجابة"],
+        missingPoints: ["إكمال صياغة الاستدلال"],
+        modelCorrection: modelAnswer || "يُرجى مراجعة فقرات الشرح والاطلاع على الإجابة النموذجية المعتمدة."
+      };
+    }
+
+    // Record submission telemetry
+    try {
+      const telemetryPath = path.join(process.cwd(), "data", "student_telemetry.json");
+      if (fs.existsSync(telemetryPath)) {
+        const content = fs.readFileSync(telemetryPath, "utf8");
+        const arr = JSON.parse(content || "[]");
+        arr.push({
+          timestamp: new Date().toISOString(),
+          studentId,
+          bookId,
+          chapterId,
+          eventType: "exercise_ai_evaluation",
+          score: resultJson.score,
+          maxScore: resultJson.maxScore,
+          isPassed: resultJson.isPassed,
+          questionText: questionText.substring(0, 100)
+        });
+        fs.writeFileSync(telemetryPath, JSON.stringify(arr, null, 2), "utf8");
+      }
+    } catch (e) {}
+
+    return res.json({ success: true, evaluation: resultJson });
+  } catch (err: any) {
+    console.error("[Exercise Evaluation Error]:", err);
+    res.status(500).json({ error: "فشل تقييم إجابة الطالب: " + err.message });
+  }
+});
+
+// 4. POST / GET authentic exercise bank for chapter
+app.get("/api/ebooks/:id/chapters/:chapterId/exercises", async (req, res) => {
+  try {
+    const { id: bookId, chapterId } = req.params;
+    const book = ebooks.find(b => b.id === bookId);
+    if (!book) return res.status(404).json({ error: "الكتاب غير موجود." });
+
+    const chapter = (book.chapters || []).find((c: any) => c.id === chapterId);
+    if (!chapter) return res.status(404).json({ error: "الفصل غير موجود." });
+
+    // Ensure authentic chapter pages are available
+    if (!chapter.pages || chapter.pages.length === 0) {
+      let startPage = Number(chapter.start_page) || 0;
+      let endPage = Number(chapter.end_page) || 0;
+      
+      const lessonsList = Array.isArray(book.blueprint) 
+        ? book.blueprint 
+        : (book.blueprint && Array.isArray((book.blueprint as any).lessons) ? (book.blueprint as any).lessons : []);
+
+      const bpMatch = lessonsList.find((bp: any) => 
+        bp.lesson_title === chapter.title || 
+        bp.title === chapter.title || 
+        bp.id === chapter.id ||
+        (bp.lesson_title && chapter.title && (bp.lesson_title.includes(chapter.title) || chapter.title.includes(bp.lesson_title)))
+      );
+      if (bpMatch && bpMatch.start_page && bpMatch.end_page) {
+        startPage = Number(bpMatch.start_page);
+        endPage = Number(bpMatch.end_page);
+      }
+      
+      if (!startPage || !endPage) {
+        const idx = (book.chapters || []).findIndex((c: any) => c.id === chapterId);
+        startPage = Math.max(0, idx) * 8 + 11;
+        endPage = startPage + 4;
+      }
+
+      if (book.source_file_url) {
+        try {
+          const resolved = await resolveCloudOrLocalFileBuffer(book.source_file_url);
+          if (resolved.buffer) {
+            const pageOffset = Number((book as any).page_offset) || 0;
+            const rendered = await renderPdfPagesToImages(resolved.buffer, startPage, endPage, pageOffset);
+            if (rendered && rendered.length > 0) {
+              const persisted = persistPageImagesToDisk(book.id, chapter.id, rendered);
+              chapter.pages = persisted;
+              chapter.start_page = startPage;
+              chapter.end_page = endPage;
+              saveEbooks(ebooks);
+            }
+          }
+        } catch (e) {
+          console.warn("[Exercise Auto-Render Pages Warning]:", e);
+        }
+      }
+    }
+
+    let exercisePage = (chapter.pages || []).find((p: any) => p.pageType === 'exercise');
+    if (!exercisePage && chapter.pages && chapter.pages.length > 0) {
+      exercisePage = chapter.pages[chapter.pages.length - 1];
+    }
+
+    if (chapter.exercises && Array.isArray(chapter.exercises) && chapter.exercises.length > 0) {
+      return res.json({ success: true, exercises: chapter.exercises, exercisePage: exercisePage || null });
+    }
+
+    // Auto-generate authentic grounded exercises directly from the lesson's exercise page or content
+    const ai = getGenAIClient();
+    if (!ai) {
+      return res.json({ success: true, exercises: [], exercisePage: exercisePage || null });
+    }
+
+    const parts: any[] = [];
+    if (exercisePage && exercisePage.dataUrl) {
+      const base64Png = exercisePage.dataUrl.replace(/^data:image\/\w+;base64,/, "");
+      if (base64Png.length > 100) {
+        parts.push({
+          inlineData: {
+            mimeType: "image/png",
+            data: base64Png
+          }
+        });
+      }
+    }
+
+    const lessonContext = (chapter.content || "").substring(0, 3000);
+    parts.push({
+      text: `أنت خبير تدقيق وإعداد أسئلة امتحانات معتمد لوزارة التربية والتعليم.
+المهمة: استخرج بدقة تامة أسئلة وتدريبات المذكرة الموضحة في الصورة أو من صلب محتوى الدرس:
+عنوان الدرس: ${chapter.title}
+محتوى الدرس:
+${lessonContext}
+
+المطلوب:
+1. إذا كانت هناك أسئلة اختيار من متعدد في الصفحة (مثل: اختر الإجابة الصحيحة): استخرج نصوص الأسئلة الحرفية كاملة مع كافة خياراتها (أ، ب، ج، د) وحدد الخيار الصحيح في model_answer.
+2. إذا كانت هناك جداول مقارنة أو أسئلة مقالية (مثل: أكمل جدول المقارنة أو لخص صفة): استخرج السؤال وصغ إجابته النموذجية الدقيقة.
+3. اكتب 4 إلى 5 أسئلة واضحة وتفاعلية تغطي كافة أنشطة الدرس.
+
+أخرج الإجابة كـ JSON Array فقط من الكائنات بهذا الشكل:
+[
+  {
+    "id": "ex-1",
+    "question_text": "نص السؤال الواضح الحرفي...",
+    "question_type": "mcq", // mcq, short_answer, essay, true_false
+    "options": ["أ) ...", "ب) ...", "ج) ...", "د) ..."],
+    "model_answer": "الإجابة النموذجية المعتمدة الكاملة...",
+    "rubric_criteria": ["معيار 1", "معيار 2"],
+    "max_score": 10,
+    "difficulty": "medium"
+  }
+]`
+    });
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash-lite",
+      contents: [{ parts }],
+      config: {
+        temperature: 0.15,
+        responseMimeType: "application/json"
+      }
+    });
+
+    const exercises = JSON.parse(response.text || "[]");
+    chapter.exercises = exercises;
+    saveEbooks(ebooks);
+
+    res.json({ success: true, exercises, exercisePage: exercisePage || null });
+  } catch (err: any) {
+    console.error("[Exercise Bank Error]:", err);
+    res.status(500).json({ error: "فشل تحميل بنك التمارين: " + err.message });
   }
 });
 

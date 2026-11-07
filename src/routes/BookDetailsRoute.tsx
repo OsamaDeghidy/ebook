@@ -887,6 +887,7 @@ export default function BookDetailsRoute({
         </div>
         <ReadSection
           chapter={activeChapter}
+          bookId={book.id}
           isInstructorOrAdmin={false}
           isEditMode={false}
           onSaveChapter={handleSaveChapter}
@@ -1051,11 +1052,12 @@ export default function BookDetailsRoute({
             </button>
 
             <button
-              onClick={() => setIsExpandingChapters(true)}
-              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black flex items-center gap-1.5 transition shadow-xs active:scale-95 cursor-pointer"
+              onClick={handleExpandChapters}
+              disabled={isExpandingChapters}
+              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-black flex items-center gap-1.5 transition shadow-xs active:scale-95 cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>رفع واستكمال بالـ AI 📤</span>
+              <span>{isExpandingChapters ? 'جاري الاستكمال...' : 'استكمال بالـ AI 📤'}</span>
             </button>
 
             <button
@@ -1188,12 +1190,13 @@ export default function BookDetailsRoute({
                       <span>إضافة فصل ➕</span>
                     </button>
                     <button
-                      onClick={() => setIsExpandingChapters(true)}
-                      className="py-1.5 px-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 rounded-xl text-[11px] font-black transition flex items-center justify-center gap-1 border border-indigo-200 cursor-pointer"
-                      title="رفع واستكمال فصول بالذكاء الاصطناعي"
+                      onClick={handleExpandChapters}
+                      disabled={isExpandingChapters}
+                      className="py-1.5 px-2.5 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-50 text-indigo-800 rounded-xl text-[11px] font-black transition flex items-center justify-center gap-1 border border-indigo-200 cursor-pointer"
+                      title="استكمال فصول المنهج بالذكاء الاصطناعي"
                     >
                       <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                      <span>استكمال بالـ AI 📤</span>
+                      <span>{isExpandingChapters ? 'جاري الاستكمال...' : 'استكمال بالـ AI 📤'}</span>
                     </button>
                   </div>
                 )}
@@ -1345,12 +1348,13 @@ export default function BookDetailsRoute({
                     <button
                       onClick={() => {
                         setIsMobileChaptersOpen(false);
-                        setIsExpandingChapters(true);
+                        handleExpandChapters();
                       }}
-                      className="py-2 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 border border-indigo-200 cursor-pointer"
+                      disabled={isExpandingChapters}
+                      className="py-2 px-3 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-50 text-indigo-800 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 border border-indigo-200 cursor-pointer"
                     >
                       <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                      <span>استكمال بالـ AI 📤</span>
+                      <span>{isExpandingChapters ? 'جاري الاستكمال...' : 'استكمال بالـ AI 📤'}</span>
                     </button>
                   </div>
                 )}
@@ -1475,6 +1479,7 @@ export default function BookDetailsRoute({
               />
               <ReadSection 
                 chapter={activeChapter} 
+                bookId={book.id}
                 isInstructorOrAdmin={isInstructorOrAdmin}
                 isEditMode={isTeacherEditMode}
                 onSaveChapter={handleSaveChapter}
@@ -1489,6 +1494,7 @@ export default function BookDetailsRoute({
           <div className="relative w-full">
             <ReadSection
               chapter={activeChapter}
+              bookId={book.id}
               isInstructorOrAdmin={isInstructorOrAdmin}
               isEditMode={isTeacherEditMode}
               onSaveChapter={handleSaveChapter}

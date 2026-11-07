@@ -462,10 +462,12 @@ export function markLessonsCompleted(
   blueprint: DocumentSyllabusBlueprint,
   completedOrders: number[]
 ): DocumentSyllabusBlueprint {
+  if (!blueprint) return blueprint;
+  const lessons = Array.isArray(blueprint.lessons) ? blueprint.lessons : [];
   const completedSet = new Set(completedOrders);
   return {
     ...blueprint,
-    lessons: blueprint.lessons.map(l =>
+    lessons: lessons.map(l =>
       completedSet.has(l.lesson_order) ? { ...l, status: "completed" } : l
     )
   };

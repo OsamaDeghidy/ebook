@@ -18,6 +18,7 @@ import { useGlobalAudio } from '../hooks/useGlobalAudio';
 import { sanitizeBookContent } from '../utils/sanitizeBookContent';
 import { useLanguage } from '../i18n/LanguageContext';
 import MathRenderer from './MathRenderer';
+import AuthenticBookletViewer from './AuthenticBookletViewer';
 
 /**
  * Deep text sanitizer to remove escaped characters, format LaTeX smoothly into clear math typography,
@@ -29,117 +30,7 @@ function sanitizeEducationalMarkdown(text: string | undefined): string {
 }
 
 
-/**
- * Visual Comparison & Concept Cards Component
- * Converts plain markdown tables into modern, engaging, colorful concept cards
- */
-function VisualComparisonCards({ headerCells, dataRows }: { headerCells: string[]; dataRows: string[][] }) {
-  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
-  const cardIcons = ['🗺️', '🧭', '🔍', '📏', '💡', '📌', '⭐', '⚡', '📐', '🎯'];
 
-  return (
-    <div className="my-6 space-y-3">
-      <div className="flex items-center justify-between pb-2 border-b border-indigo-100">
-        <div className="flex items-center gap-2">
-          <div className="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse" />
-          <span className="text-xs font-black text-indigo-900">
-            {headerCells.join(' المقابلة لـ ') || 'عناصر ومفاهيم الدرس البصرية'}
-          </span>
-        </div>
-
-        <div className="flex items-center bg-gray-100 p-0.5 rounded-xl text-[11px] font-bold">
-          <button
-            onClick={() => setViewMode('cards')}
-            className={`px-3 py-1 rounded-lg transition flex items-center gap-1.5 ${
-              viewMode === 'cards' ? 'bg-white text-indigo-700 shadow-xs font-black' : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <LayoutGrid className="w-3.5 h-3.5" />
-            <span>بطاقات بصرية 📇</span>
-          </button>
-          <button
-            onClick={() => setViewMode('table')}
-            className={`px-3 py-1 rounded-lg transition flex items-center gap-1.5 ${
-              viewMode === 'table' ? 'bg-white text-indigo-700 shadow-xs font-black' : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <Table2 className="w-3.5 h-3.5" />
-            <span>جدول مقارنة 📊</span>
-          </button>
-        </div>
-      </div>
-
-      {viewMode === 'cards' ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-          {dataRows.map((row, rIdx) => {
-            const title = row[0] || `عنصر ${rIdx + 1}`;
-            const desc = row.slice(1).join(' - ') || '';
-            const icon = cardIcons[rIdx % cardIcons.length];
-
-            return (
-              <div
-                key={rIdx}
-                className="group relative bg-gradient-to-br from-white via-indigo-50/20 to-purple-50/30 p-5 rounded-2xl border-2 border-indigo-100/90 hover:border-indigo-400 hover:shadow-md transition-all duration-300 flex flex-col justify-between space-y-2.5"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-2xl shrink-0 p-2 bg-white rounded-xl shadow-xs border border-indigo-100 group-hover:scale-110 transition-transform">
-                      {icon}
-                    </span>
-                    <div>
-                      <span className="text-[10px] font-bold text-indigo-500 block">
-                        {headerCells[0] || 'العنصر الرئيسي'}
-                      </span>
-                      <h5 className="font-black text-sm sm:text-base text-gray-900 group-hover:text-indigo-700 transition-colors">
-                        {title}
-                      </h5>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-3 bg-white/80 rounded-xl border border-indigo-50 shadow-inner">
-                  {headerCells[1] && (
-                    <span className="text-[10px] font-bold text-amber-700 block mb-1">
-                      ✨ {headerCells[1]}:
-                    </span>
-                  )}
-                  <p className="text-xs sm:text-sm text-gray-700 font-medium leading-relaxed">
-                    {desc}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="overflow-x-auto rounded-2xl border border-indigo-200/80 shadow-xs bg-white">
-          <table className="w-full text-right text-xs sm:text-sm border-collapse min-w-[340px]">
-            <thead className="bg-gradient-to-r from-indigo-50 to-teal-50/50 text-indigo-950 font-black border-b border-indigo-200">
-              <tr>
-                {headerCells.map((h, i) => (
-                  <th key={i} className="p-3.5 text-xs sm:text-sm font-black text-indigo-900 border-l border-indigo-100/60 last:border-l-0">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {dataRows.map((row, rIdx) => (
-                <tr key={rIdx} className="hover:bg-indigo-50/30 transition-colors">
-                  {row.map((cell, cIdx) => (
-                    <td key={cIdx} className="p-3.5 text-xs sm:text-sm text-gray-800 border-l border-gray-100 last:border-l-0 font-medium leading-relaxed">
-                      {cell}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
 
 // Recursive raw text extractor from React nodes for safe condition checking
 function extractRawText(node: any): string {
@@ -194,17 +85,7 @@ const markdownComponents = {
     }
 
     if (rawText.includes('نص المذكرة') || rawText.includes('المصدر الأصلي') || rawText.includes('النص الأصلي')) {
-      return (
-        <div className="my-5 p-5 sm:p-6 rounded-2xl bg-[#FFFDF9] border-2 border-amber-300/80 border-r-6 border-r-amber-500 shadow-sm text-slate-900 relative">
-          <div className="flex items-center gap-2 text-xs font-black text-amber-900 mb-2.5 pb-2 border-b border-amber-200/60">
-            <span className="text-lg">📜</span>
-            <span>نص المذكرة الأصلي المعتمد (المصدر النصي الموثق)</span>
-          </div>
-          <div className="text-xs sm:text-sm font-serif leading-relaxed text-slate-800 [&_strong:first-child]:hidden [&_p:first-child>strong:first-child]:hidden [&_p:first-child]:inline-block">
-            {children}
-          </div>
-        </div>
-      );
+      return null;
     }
 
     if (rawText.includes('نشاط') || rawText.includes('فكرة') || rawText.includes('نصيحة') || rawText.includes('تطبيق') || rawText.includes('استكشاف') || rawText.includes('TIP')) {
@@ -252,61 +133,11 @@ const markdownComponents = {
   },
   p: ({ children }: any) => {
     const rawText = extractRawText(children);
-
-    if (rawText.includes('|')) {
-      const lines = rawText.trim().split('\n').map(l => l.trim()).filter(Boolean);
-      const sepIndex = lines.findIndex(l => l.includes('---') || l.includes(':--'));
-      
-      if (sepIndex > 0) {
-        const headerLine = lines[sepIndex - 1];
-        const headerCells = headerLine.split('|').map(c => c.trim()).filter(Boolean);
-        const dataLines = lines.slice(sepIndex + 1).filter(l => l.includes('|') && !l.includes('---'));
-        const dataRows = dataLines.map(row => row.split('|').map(c => c.trim()).filter(Boolean)).filter(r => r.length > 0);
-        const leadLines = lines.slice(0, sepIndex - 1);
-
-        if (headerCells.length > 0 && dataRows.length > 0) {
-          return (
-            <div className="space-y-2 my-3">
-              {leadLines.length > 0 && (
-                <p className="my-2 text-xs sm:text-sm text-gray-700 leading-relaxed font-bold">
-                  {leadLines.join('\n')}
-                </p>
-              )}
-              <VisualComparisonCards headerCells={headerCells} dataRows={dataRows} />
-            </div>
-          );
-        }
-      }
-
-      // Handle direct pipe lists without dashed lines
-      const cleanedLines = rawText
-        .replace(/\|\s*[-:\s|]{2,}\s*\|/g, '')
-        .split('\n')
-        .map(l => l.trim())
-        .filter(l => l && !l.match(/^[-:\s|]+$/));
-
-      const tableRows = cleanedLines
-        .filter(l => l.includes('|'))
-        .map(l => l.split('|').map(c => c.trim()).filter(Boolean))
-        .filter(r => r.length >= 2);
-
-      if (tableRows.length >= 2) {
-        const headerCells = tableRows[0];
-        const dataRows = tableRows.slice(1);
-        return (
-          <div className="space-y-2 my-3">
-            <VisualComparisonCards headerCells={headerCells} dataRows={dataRows} />
-          </div>
-        );
-      }
-    }
-
     if (rawText.match(/^[-:\s|]{3,}$/)) {
       return null;
     }
-
     return (
-      <p className="my-2 text-xs sm:text-sm text-gray-700 leading-relaxed">
+      <p className="my-2.5 text-xs sm:text-sm text-gray-800 leading-relaxed font-normal">
         {children}
       </p>
     );
@@ -894,20 +725,20 @@ function ChapterWorkedExampleAndComparison({ chapter }: { chapter: Chapter }) {
  */
 interface ReadSectionProps {
   chapter: Chapter;
+  bookId?: string;
   isInstructorOrAdmin?: boolean;
   isEditMode?: boolean;
   onSaveChapter?: (updatedChapter: Chapter) => Promise<void>;
-  initialTab?: 'interleaved' | 'teacher_sos';
+  initialTab?: 'booklet_pages' | 'interleaved' | 'teacher_sos';
 }
 
-export function ReadSection({ chapter, isInstructorOrAdmin, isEditMode, onSaveChapter, initialTab }: ReadSectionProps) {
+export function ReadSection({ chapter, bookId, isInstructorOrAdmin, isEditMode, onSaveChapter, initialTab }: ReadSectionProps) {
   const { t, language, dir } = useLanguage();
   const { isItemPlaying, isItemLoading, play, stop } = useGlobalAudio();
-  const [showOriginalSource, setShowOriginalSource] = useState(false);
   const [isZenMode, setIsZenMode] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
-  const [selectedConcept, setSelectedConcept] = useState<{ title: string; desc: string } | null>(null);
-  const [readerTab, setReaderTab] = useState<'interleaved' | 'teacher_sos'>(initialTab || 'interleaved');
+  const [readerTab, setReaderTab] = useState<'booklet_pages' | 'interleaved' | 'teacher_sos'>(initialTab || 'booklet_pages');
+  const activeBookId = (chapter as any).bookId || bookId || 'active_book';
 
   useEffect(() => {
     if (initialTab) {
@@ -1015,6 +846,39 @@ export function ReadSection({ chapter, isInstructorOrAdmin, isEditMode, onSaveCh
       console.error(e);
     } finally {
       setIsSendingSos(false);
+    }
+  };
+
+  // 📖 AUTHENTIC BOOKLET LIVE TRANSCRIBER STATE & HANDLER
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const handleTranscribeFromBooklet = async () => {
+    setIsTranscribing(true);
+    try {
+      const res = await fetch(`/api/ebooks/${activeBookId}/chapters/${chapter.id}/transcribe`, {
+        method: 'POST'
+      });
+      const data = await res.json();
+      if (data.success && data.content) {
+        if (onSaveChapter) {
+          await onSaveChapter({
+            ...chapter,
+            content: data.content,
+            originalContent: data.content
+          });
+        } else {
+          chapter.content = data.content;
+          chapter.originalContent = data.content;
+        }
+        setEditedContent(data.content);
+        setReaderTab('interleaved');
+      } else {
+        alert(data.error || "تعذر استخراج نص المذكرة من ملف PDF");
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert("خطأ أثناء الاتصال بالخادم لاستخراج نص المذكرة");
+    } finally {
+      setIsTranscribing(false);
     }
   };
 
@@ -1222,11 +1086,15 @@ export function ReadSection({ chapter, isInstructorOrAdmin, isEditMode, onSaveCh
 
   const handleToggleMasterAudio = () => {
     if (isMasterPlaying || isMasterLoading) {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
       stop();
       return;
     }
 
-    const cleanText = fullNarrationText
+    const rawNarrative = (chapter as any).audioScript || fullNarrationText;
+    const cleanText = rawNarrative
       .replace(/^[ \t]*>[ \t]*/gm, ' ')
       .replace(/(?:^|\n)\s*>\s*/g, ' ')
       .replace(/(?:نص المذكرة الأصلي المعتمد|المصدر النصي الموثق|ماذا ستتعلم وتتقن في هذا الدرس|التشريح العلمي وتفكيك المعنى|معجم القواعد والمصطلحات الحاكمة|المسائل التدريبية والحلول النموذجية|منظومة المسائل الثلاثية الإلزامية المتدرجة|مصيدة الامتحان والقاعدة الذهبية)/gi, ' ')
@@ -1237,6 +1105,31 @@ export function ReadSection({ chapter, isInstructorOrAdmin, isEditMode, onSaveCh
       .replace(/[\uD83C-\uDBFF\uDC00-\uDFFF]+/g, ' ')
       .replace(/[\u2600-\u27BF\u2300-\u23FF\u2B50\u200D\uFE0F\u20E3\u2190-\u21FF]/g, ' ')
       .replace(/[🔴🔵🟢🟣🟠🟡⚪⚫🔺🔻⭐✨💡📌🧭📏🗺️⚠️🚨🎉🎙️🎒🔍🎮📖📐🎯🧠💡🎬🚀📐⚡🏆🔥]/gu, ' ')
+      // Math & Set Theory Phonetic Replacement
+      .replace(/\\cup|\bcup\b|∪/g, ' اتِّحَاد ')
+      .replace(/\\cap|\bcap\b|∩/g, ' تَقَاطُع ')
+      .replace(/\\notin|∉/g, ' لَا يَنْتَمِي إِلَى ')
+      .replace(/\\in|∈/g, ' يَنْتَمِي إِلَى ')
+      .replace(/\\not\\subset|⊄/g, ' لَيْسَتْ مَجْمُوعَةً جُزْئِيَّةً مِنْ ')
+      .replace(/\\subset|⊂/g, ' مَجْمُوعَةٌ جُزْئِيَّةٌ مِنْ ')
+      .replace(/\\lor|∨/g, ' أَوْ ')
+      .replace(/\\land|∧/g, ' وَ ')
+      .replace(/\\mathbb\{R\}|ℝ|\bح\b/g, ' مَجْمُوعَةُ الأَعْدَادِ الحَقِيقِيَّة ')
+      .replace(/\\mathbb\{Q\}'|ℚ'|\bن['’َ]\b/g, ' مَجْمُوعَةُ الأَعْدَادِ غَيْرِ النِّسْبِيَّة ')
+      .replace(/\\mathbb\{Q\}|ℚ|\bن\b/g, ' مَجْمُوعَةُ الأَعْدَادِ النِّسْبِيَّة ')
+      .replace(/\\mathbb\{Z\}|ℤ|\bص\b/g, ' مَجْمُوعَةُ الأَعْدَادِ الصَّحِيحَة ')
+      .replace(/\\mathbb\{N\}|ℕ|\bط\b/g, ' مَجْمُوعَةُ الأَعْدَادِ الطَّبِيعِيَّة ')
+      .replace(/\\sqrt\[3\]\{([^{}]+)\}|∛([0-9a-zA-Z\u0600-\u06FF]+)/g, ' الجَذْرُ التَّكْعِيبِيُّ لِـ $1$2 ')
+      .replace(/\\sqrt\{([^{}]+)\}|√([0-9a-zA-Z\u0600-\u06FF]+)/g, ' الجَذْرُ التَّرْبِيعِيُّ لِـ $1$2 ')
+      // Computer Architecture & Digital Logic
+      .replace(/\bHalf\s*Adder\b/gi, ' نِصْفُ الْجَامِع ')
+      .replace(/\bFull\s*Adder\b/gi, ' الْجَامِعُ الْكَامِل ')
+      .replace(/\bCombinational\b/gi, ' الدَّوَائِرُ التَّجْمِيعِيَّة ')
+      .replace(/\bSequential\b/gi, ' الدَّوَائِرُ التَّسَلْسُلِيَّة ')
+      .replace(/\bXOR\b/gi, ' بَوَّابَةُ إِكْس أُور ')
+      .replace(/\bAND\b/g, ' بَوَّابَةُ آنْد ')
+      .replace(/\bOR\b/g, ' بَوَّابَةُ أُور ')
+      .replace(/\bNOT\b/g, ' بَوَّابَةُ نَات ')
       .replace(/(\d+)\s*[\/÷]\s*(\d+)/g, '$1 على $2')
       .replace(/([^\d\s\/\\]+)\s*[\/\\]\s*([^\d\s\/\\]+)/g, '$1 أو $2')
       .replace(/[\(\)\[\]\{\}«»‹›（）【】〔〕《》“”"'\`\/\\]/g, ' ')
@@ -1250,17 +1143,29 @@ export function ReadSection({ chapter, isInstructorOrAdmin, isEditMode, onSaveCh
     if (!cleanText) return;
 
     play(masterAudioId, async () => {
-      const res = await fetch('/api/tts/stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: cleanText, speaker: 'male' })
-      });
+      try {
+        const res = await fetch('/api/tts/stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: cleanText, speaker: 'male' })
+        });
 
-      if (!res.ok) {
-        throw new Error('Failed to fetch audio stream');
+        if (res.ok) {
+          return await res.blob();
+        }
+      } catch (err) {
+        console.warn('[Audio Player] Server TTS network error, falling back to Web Speech API:', err);
       }
 
-      return await res.blob();
+      // Seamless Browser Web Speech API Fallback
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(cleanText.substring(0, 800));
+        utterance.lang = 'ar-EG';
+        utterance.rate = 0.95;
+        window.speechSynthesis.speak(utterance);
+      }
+      return null;
     });
   };
 
@@ -1346,9 +1251,78 @@ export function ReadSection({ chapter, isInstructorOrAdmin, isEditMode, onSaveCh
         </div>
       </div>
 
+      {/* 🧭 DUAL-CANVAS NAVIGATION PILLS */}
+      <div className="bg-white border-2 border-indigo-100 rounded-2xl p-2 shadow-xs flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-xl">
+          <button
+            onClick={() => setReaderTab('booklet_pages')}
+            className={`px-4 py-2 rounded-lg text-xs font-black transition flex items-center gap-2 cursor-pointer ${
+              readerTab === 'booklet_pages'
+                ? 'bg-amber-500 text-slate-950 shadow-xs'
+                : 'text-slate-700 hover:text-slate-950 hover:bg-white/60'
+            }`}
+          >
+            <BookOpen className="w-4 h-4" />
+            <span>📖 صفحات المذكرة الأصلية</span>
+            {(chapter as any).pages?.length ? (
+              <span className="px-1.5 py-0.2 rounded-md bg-amber-600/20 text-slate-950 text-[10px]">
+                {(chapter as any).pages.length} ص
+              </span>
+            ) : null}
+          </button>
 
+          <button
+            onClick={() => setReaderTab('interleaved')}
+            className={`px-4 py-2 rounded-lg text-xs font-black transition flex items-center gap-2 cursor-pointer ${
+              readerTab === 'interleaved'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'text-slate-700 hover:text-slate-950 hover:bg-white/60'
+            }`}
+          >
+            <FileText className="w-4 h-4" />
+            <span>📖 النص القرائي للمذكرة</span>
+          </button>
 
+          <button
+            onClick={() => setReaderTab('teacher_sos')}
+            className={`px-4 py-2 rounded-lg text-xs font-black transition flex items-center gap-2 cursor-pointer ${
+              readerTab === 'teacher_sos'
+                ? 'bg-rose-600 text-white shadow-xs'
+                : 'text-slate-700 hover:text-slate-950 hover:bg-white/60'
+            }`}
+          >
+            <HelpCircle className="w-4 h-4" />
+            <span>🙋‍♂️ استفسار المعلم (SOS)</span>
+          </button>
+        </div>
 
+        {/* 🔄 LIVE PDF TRANSCRIBE ACTION TRIGGER */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleTranscribeFromBooklet}
+            disabled={isTranscribing}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs transition shadow-xs cursor-pointer disabled:opacity-50"
+            title="استخراج النص القرائي الحقيقي والمطابق لصفحات المذكرة مباشرة من ملف PDF"
+          >
+            {isTranscribing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+            <span>{isTranscribing ? "جاري استخراج نص المذكرة من PDF..." : "🔄 استخراج نص المذكرة الأصلي من PDF"}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 📖 TAB: AUTHENTIC BOOKLET PAGES CANVAS */}
+      {readerTab === 'booklet_pages' && (
+        <AuthenticBookletViewer
+          bookId={activeBookId}
+          chapterId={chapter.id}
+          chapterTitle={chapter.title}
+          startPage={(chapter as any).start_page}
+          endPage={(chapter as any).end_page}
+          onSwitchToSmartReader={() => setReaderTab('interleaved')}
+          onPlayAudio={handleToggleMasterAudio}
+          isAudioPlaying={isMasterPlaying}
+        />
+      )}
 
       {/* INLINE WORD-LIKE EDITOR BUTTON (VISIBLE ONLY WHEN TEACHER EDIT MODE IS ACTIVE) */}
       {isInstructorOrAdmin && isEditMode && (
@@ -1600,112 +1574,9 @@ export function ReadSection({ chapter, isInstructorOrAdmin, isEditMode, onSaveCh
       )}
 
 
-      {/* 💡 3. CORE CONCEPTS INTERACTIVE GRID WITH AUDIO PRONUNCIATION */}
-      {conceptsArr.length > 0 && (
-        <div id="core-concepts" className="space-y-3.5 scroll-mt-16">
-          <div className="flex items-center justify-between px-1">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center font-bold">
-                <Lightbulb className="w-4 h-4 text-amber-600" />
-              </div>
-              <span className="text-xs sm:text-sm font-black text-gray-900">المفاهيم المحورية والمصطلحات الأساسية للدرس ({conceptsArr.length})</span>
-            </div>
-            <span className="text-[11px] text-gray-400 font-bold hidden sm:inline">
-              انقر للاستماع للنطق أو عرض الشرح المعرفي 💡
-            </span>
-          </div>
 
-          <div className={`grid gap-3.5 ${conceptsArr.length === 1 ? 'grid-cols-1 max-w-2xl mx-auto' : 'grid-cols-1 md:grid-cols-2'}`}>
-            {conceptsArr.map((concept: any, idx: number) => {
-              const rawName = typeof concept === 'string' ? concept : (concept.concept || concept.title || `مفهوم ${idx+1}`);
-              const rawDesc = typeof concept === 'string' ? '' : (concept.explanation || concept.description || '');
-              
-              const cName = rawName.replace(/\s*\([a-zA-Z\s\-_0-9\/\.\:]+\)/g, '').trim();
-              const cDesc = sanitizeEducationalMarkdown(rawDesc).replace(/\s*\([a-zA-Z\s\-_0-9\/\.\:]+\)/g, '').trim();
 
-              const handleSpeakConcept = (e: React.MouseEvent) => {
-                e.stopPropagation();
-                const fullSpeech = `${cName}. ${cDesc}`;
-                const audioUrl = `/api/tts/stream?text=${encodeURIComponent(fullSpeech)}&speaker=female&voice=ar-XA-Chirp3-HD-Aoede&lang=ar`;
-                const audio = new Audio(audioUrl);
-                audio.play().catch(() => {
-                  if ('speechSynthesis' in window) {
-                    window.speechSynthesis.cancel();
-                    const cleanFallback = fullSpeech.replace(/["'«»<>{}\[\]]/g, ' ');
-                    const utter = new SpeechSynthesisUtterance(cleanFallback);
-                    utter.lang = 'ar-SA';
-                    utter.rate = 0.95;
-                    window.speechSynthesis.speak(utter);
-                  }
-                });
-              };
 
-              return (
-                <div 
-                  key={idx} 
-                  className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-indigo-50 hover:border-indigo-200 shadow-xs hover:shadow-sm transition-all space-y-2.5 flex flex-col justify-between"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
-                      <h5 className="font-black text-gray-900 text-sm sm:text-base text-indigo-950">{cName}</h5>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={handleSpeakConcept}
-                      className="p-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 transition flex items-center gap-1 text-[11px] font-bold cursor-pointer"
-                      title="استمع لنطق المفهوم وشرحه"
-                    >
-                      <Volume2 className="w-3.5 h-3.5 text-amber-600" />
-                      <span className="hidden sm:inline">نطق</span>
-                    </button>
-                  </div>
-
-                  {cDesc && (
-                    <p className="text-gray-700 text-xs sm:text-sm leading-relaxed font-medium bg-gray-50/90 p-3 rounded-xl border border-gray-100">
-                      {cDesc}
-                    </p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* 📇 CONCEPT POPUP MODAL */}
-      {selectedConcept && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4" dir="rtl">
-          <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-indigo-100 space-y-4 animate-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold">
-                  <Lightbulb className="w-4 h-4" />
-                </div>
-                <h4 className="font-black text-base text-gray-900">{selectedConcept.title}</h4>
-              </div>
-              <button
-                onClick={() => setSelectedConcept(null)}
-                className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-4 bg-indigo-50/60 rounded-2xl border border-indigo-100 text-sm text-gray-800 leading-relaxed font-medium">
-              {selectedConcept.desc}
-            </div>
-
-            <button
-              onClick={() => setSelectedConcept(null)}
-              className="w-full py-2.5 bg-slate-900 text-white text-xs font-black rounded-xl hover:bg-slate-800 transition"
-            >
-              إغلاق البطاقة
-            </button>
-          </div>
-        </div>
-      )}
 
             {/* TAB 1: INTERLEAVED READER (DEFAULT) */}
       {readerTab === 'interleaved' && (
@@ -1719,8 +1590,8 @@ export function ReadSection({ chapter, isInstructorOrAdmin, isEditMode, onSaveCh
                 <BookOpen className="w-5 h-5" />
               </div>
               <div>
-                <span className="text-[10px] font-black text-indigo-600 block">الشرح التطبيقي والأمثلة الميسرة</span>
-                <h4 className="text-base sm:text-lg font-black text-gray-900">المحتوى التعليمي الكامل للدرس</h4>
+                <span className="text-[10px] font-black text-indigo-600 block">النص القرائي المعتمد والمطابق للمذكرة</span>
+                <h4 className="text-base sm:text-lg font-black text-gray-900">{chapter.title}</h4>
               </div>
             </div>
           </div>
@@ -1837,29 +1708,7 @@ export function ReadSection({ chapter, isInstructorOrAdmin, isEditMode, onSaveCh
       )}
 
 
-{/* 📑 6. COLLAPSIBLE ORIGINAL SOURCE MATERIAL */}
-      {normalizedOriginal && (
-        <div id="original-source" className="bg-gray-50/80 border border-gray-200/80 rounded-3xl overflow-hidden transition-all scroll-mt-16">
-          <button
-            onClick={() => setShowOriginalSource(!showOriginalSource)}
-            className="w-full p-5 flex items-center justify-between text-right font-black text-xs sm:text-sm text-gray-700 hover:bg-gray-100/60 transition cursor-pointer"
-          >
-            <div className="flex items-center gap-2.5">
-              <FileText className="w-4 h-4 text-gray-500" />
-              <span>النص الأصلي المستخرج من المذكرة المرفوعة (للمطابقة والمراجعة)</span>
-            </div>
-            {showOriginalSource ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
-          </button>
 
-          {showOriginalSource && (
-            <div className="p-6 pt-0 border-t border-gray-200/60 animate-fade-in">
-              <div className="whitespace-pre-wrap bg-white p-5 rounded-2xl border border-gray-200 font-serif leading-relaxed text-xs text-gray-700 max-h-96 overflow-y-auto mt-4">
-                {normalizedOriginal}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
     </div>
   );

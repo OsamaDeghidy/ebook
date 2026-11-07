@@ -11,3 +11,10 @@ giminiapi.txt
 plan.txt
 osama.txt
 elivenlabs.txt
+
+# Local Uploads Cache & Large Binaries
+data/uploads/
+data/page-cache/
+*.tmp
+*.bak
+scratch/
