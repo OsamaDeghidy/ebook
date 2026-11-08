@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { BookOpen, ArrowLeft, Brain, HelpCircle, Youtube, Edit, Radio, Sparkles, RefreshCw, Layers, Terminal, Volume2, Eye, EyeOff, Check, Flame, Lock, ShoppingCart, CheckCircle2, ExternalLink, X, Maximize2, Minimize2, ShieldCheck, Shield, Play, Film, Smartphone, QrCode, Trash2, Plus } from 'lucide-react';
+import { BookOpen, ArrowLeft, Brain, HelpCircle, Youtube, Edit, Radio, Sparkles, RefreshCw, Layers, Terminal, Volume2, Eye, EyeOff, Check, Flame, Lock, ShoppingCart, CheckCircle2, ExternalLink, X, Maximize2, Minimize2, ShieldCheck, Shield, Play, Film, Smartphone, QrCode, Trash2, Plus, FlaskConical } from 'lucide-react';
 import { MarketplaceBook, MindMapNode, Flashcard, Chapter, UserRole, EduReel, EduReelStyle } from '../types';
 import MindMap from '../components/MindMap';
 import QuizSection from '../components/QuizSection';
@@ -11,6 +11,7 @@ import ChapterEditor from '../components/ChapterEditor';
 import FlashcardsSection from '../components/FlashcardsSection';
 import DynamicDomainSandbox from '../components/DynamicDomainSandbox';
 import FloatingAudioBar from '../components/FloatingAudioBar';
+import InteractiveLabView from '../components/InteractiveLabView';
 import { useGlobalAudio } from '../hooks/useGlobalAudio';
 import { PurchaseModal } from '../components/PurchaseModal';
 import { OmniscientStemAiTutor } from '../components/ai/OmniscientStemAiTutor';
@@ -410,7 +411,8 @@ export default function BookDetailsRoute({
   }, [id, passedBook]);
 
   const [activeChapterId, setActiveChapterId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'read' | 'mindmap' | 'practice' | 'videos' | 'teacher_sos' | 'editor'>(() => {
+  const [activeTab, setActiveTab] = useState<'read' | 'labs' | 'mindmap' | 'practice' | 'videos' | 'teacher_sos' | 'editor'>(() => {
+    if (initialTab === 'labs') return 'labs';
     if (initialTab === 'quiz' || initialTab === 'flashcards' || initialTab === 'sandbox' || initialTab === 'practice') return 'practice';
     if (initialTab === 'reels' || initialTab === 'videos') return 'videos';
     if (initialTab === 'interactive_curriculum' || initialTab === 'interactive_lesson') return 'mindmap';
@@ -1125,14 +1127,25 @@ export default function BookDetailsRoute({
             <span>قراءة الدرس 📖</span>
           </button>
 
-          {/* TAB 2: FULL CURRICULUM EXPLANATION & MINDMAP */}
+          {/* TAB 2: INTERACTIVE LABS & ACTIVITIES */}
+          <button
+            onClick={() => setActiveTab('labs')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
+              activeTab === 'labs' ? 'bg-emerald-600 text-white font-black shadow-xs' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <FlaskConical className="w-3.5 h-3.5" />
+            <span>النشاط والمعمل التفاعلي 🧪</span>
+          </button>
+
+          {/* TAB 4: FULL CURRICULUM EXPLANATION & MINDMAP */}
           <button
             onClick={() => setActiveTab('mindmap')}
             className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
               activeTab === 'mindmap' ? 'bg-teal-600 text-white font-black shadow-xs' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <Sparkles className="w-3.5 h-3.5" />
+            <Layers className="w-3.5 h-3.5" />
             <span>شرح وخريطة المنهج 🗺️</span>
           </button>
 
@@ -1516,6 +1529,14 @@ export default function BookDetailsRoute({
               />
             </div>
           </ScreenShieldGuard>
+        )}
+
+        {/* 🧪 TAB: INTERACTIVE LABS & ACTIVITIES */}
+        {activeTab === 'labs' && activeChapter && (
+          <InteractiveLabView
+            chapter={activeChapter}
+            book={book}
+          />
         )}
 
         {/* 🙋‍♂️ TAB 3: TEACHER DIRECT SOS HELPDESK */}
@@ -2039,13 +2060,23 @@ export default function BookDetailsRoute({
         </button>
 
         <button
+          onClick={() => setActiveTab('labs')}
+          className={`flex flex-col items-center gap-1 text-[11px] font-bold transition cursor-pointer ${
+            activeTab === 'labs' ? 'text-emerald-600 font-black' : 'text-slate-500 hover:text-slate-900'
+          }`}
+        >
+          <FlaskConical className="w-4 h-4" />
+          <span>المعمل 🧪</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('mindmap')}
           className={`flex flex-col items-center gap-1 text-[11px] font-bold transition cursor-pointer ${
             activeTab === 'mindmap' ? 'text-teal-600 font-black' : 'text-slate-500 hover:text-slate-900'
           }`}
         >
-          <Sparkles className="w-4 h-4" />
-          <span>الشرح والخريطة 🗺️</span>
+          <Layers className="w-4 h-4" />
+          <span>الخريطة 🗺️</span>
         </button>
 
         <button

@@ -166,31 +166,43 @@ const PHYSICS_AND_UNITS_RULES: STEMLexiconRule[] = [
   { pattern: /(?<=\d\s*)(?:m|م)(?=[\s\.,،؛]|$)/gi, replacement: " مِتْر " },
 
   // Mass, Force, Work & Energy
-  { pattern: /(?<=\d|\s)(?:kg|كجم|كغم)(?=[\s\.,،؛]|$)/gi, replacement: " كِيلُوجْرَام " },
-  { pattern: /(?<=\d|\s)(?:g|جم|جرام)(?=[\s\.,،؛]|$)/gi, replacement: " جْرَام " },
-  { pattern: /(?<=\d|\s)(?:N|نيوتن)(?=[\s\.,،؛]|$)/gi, replacement: " نِيُوتِن " },
-  { pattern: /(?<=\d|\s)(?:J|جول)(?=[\s\.,،؛]|$)/gi, replacement: " جُول " },
-  { pattern: /(?<=\d|\s)(?:W|واط|وات)(?=[\s\.,،؛]|$)/gi, replacement: " وَاط " },
+  { pattern: /(?<=\d\s*)(?:kg|كجم|كغم)(?=[\s\.,،؛]|$)/gi, replacement: " كِيلُوجْرَام " },
+  { pattern: /(?<=\d\s*)(?:g|جم|جرام)(?=[\s\.,،؛]|$)/gi, replacement: " جْرَام " },
+  { pattern: /(?<=\d\s*)N(?=[\s\.,،؛]|$)/g, replacement: " نِيُوتِن " },
+  { pattern: /\b(?:نيوتن)\b/gi, replacement: " نِيُوتِن " },
+  { pattern: /(?<=\d\s*)J(?=[\s\.,،؛]|$)/g, replacement: " جُول " },
+  { pattern: /\b(?:جول)\b/gi, replacement: " جُول " },
+  { pattern: /(?<=\d\s*)W(?=[\s\.,،؛]|$)/g, replacement: " وَاط " },
+  { pattern: /\b(?:واط|وات)\b/gi, replacement: " وَاط " },
   { pattern: /\b(?:kW|كيلو\s*واط|كيلو\s*وات)\b/gi, replacement: " كِيلُو وَاط " },
   { pattern: /\b(?:kWh|كيلو\s*واط\s*ساعة)\b/gi, replacement: " كِيلُو وَاط سَاعَة " },
 
-  // Electricity & Magnetism
-  { pattern: /(?<=\d|\s)(?:A|أمبير|امبير)(?=[\s\.,،؛]|$)/gi, replacement: " أَمْبِير " },
-  { pattern: /(?<=\d|\s)(?:V|فولت)(?=[\s\.,،؛]|$)/gi, replacement: " فُولْت " },
-  { pattern: /(?<=\d|\s)(?:Ω|أوم|اوم)(?=[\s\.,،؛]|$)/gi, replacement: " أُوم " },
-  { pattern: /(?<=\d|\s)(?:C|كولوم)(?=[\s\.,،؛]|$)/gi, replacement: " كُولُوم " },
-  { pattern: /(?<=\d|\s)(?:T|تسلا)(?=[\s\.,،؛]|$)/gi, replacement: " تِسْلَا " },
-  { pattern: /(?<=\d|\s)(?:Hz|هرتز)(?=[\s\.,،؛]|$)/gi, replacement: " هِرْتِز " },
+  // Electricity & Magnetism (Strict: Only uppercase and ONLY when preceded by numbers)
+  { pattern: /(?<=\d\s*)A(?=[\s\.,،؛]|$)/g, replacement: " أَمْبِير " },
+  { pattern: /\b(?:أمبير|امبير)\b/gi, replacement: " أَمْبِير " },
+  { pattern: /(?<=\d\s*)V(?=[\s\.,،؛]|$)/g, replacement: " فُولْت " },
+  { pattern: /\b(?:فولت)\b/gi, replacement: " فُولْت " },
+  { pattern: /(?<=\d\s*)Ω(?=[\s\.,،؛]|$)/g, replacement: " أُوم " },
+  { pattern: /\b(?:أوم|اوم)\b/gi, replacement: " أُوم " },
+  { pattern: /(?<=\d\s*)C(?=[\s\.,،؛]|$)/g, replacement: " كُولُوم " },
+  { pattern: /\b(?:كولوم)\b/gi, replacement: " كُولُوم " },
+  { pattern: /(?<=\d\s*)T(?=[\s\.,،؛]|$)/g, replacement: " تِسْلَا " },
+  { pattern: /\b(?:تسلا)\b/gi, replacement: " تِسْلَا " },
+  { pattern: /(?<=\d\s*)Hz(?=[\s\.,،؛]|$)/gi, replacement: " هِرْتِز " },
+  { pattern: /\b(?:هرتز)\b/gi, replacement: " هِرْتِز " },
   { pattern: /\b(?:kHz|كيلو\s*هرتز)\b/gi, replacement: " كِيلُو هِرْتِز " },
   { pattern: /\b(?:MHz|ميجا\s*هرتز)\b/gi, replacement: " مِيجَا هِرْتِز " },
   { pattern: /\b(?:GHz|جيجا\s*هرتز)\b/gi, replacement: " جِيجَا هِرْتِز " },
 
   // Pressure & Temperature
-  { pattern: /(?<=\d|\s)(?:Pa|باسكال)(?=[\s\.,،؛]|$)/gi, replacement: " بَاسْكَال " },
-  { pattern: /(?<=\d|\s)(?:bar|بار)(?=[\s\.,،؛]|$)/gi, replacement: " بَار " },
-  { pattern: /(?<=\d|\s)(?:atm|ض\.ج|ضغط\s*جوي)(?=[\s\.,،؛]|$)/gi, replacement: " ضَغْط جَوِّي " },
+  { pattern: /(?<=\d\s*)Pa(?=[\s\.,،؛]|$)/gi, replacement: " بَاسْكَال " },
+  { pattern: /\b(?:باسكال)\b/gi, replacement: " بَاسْكَال " },
+  { pattern: /(?<=\d\s*)bar(?=[\s\.,،؛]|$)/gi, replacement: " بَار " },
+  { pattern: /\b(?:بار)\b/gi, replacement: " بَار " },
+  { pattern: /\b(?:atm|ض\.ج|ضغط\s*جوي)\b/gi, replacement: " ضَغْط جَوِّي " },
   { pattern: /(?:°C|°م|درجة\s*مئوية|درجة\s*سيليزية)/gi, replacement: " دَرَجَة سِيلِيزِيَّة مِئَوِيَّة " },
-  { pattern: /(?<=\d|\s)(?:K|كلفن)(?=[\s\.,،؛]|$)/gi, replacement: " كِلْفِن " }
+  { pattern: /(?<=\d\s*)K(?=[\s\.,،؛]|$)/g, replacement: " كِلْفِن " },
+  { pattern: /\b(?:كلفن)\b/gi, replacement: " كِلْفِن " }
 ];
 
 /**

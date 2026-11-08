@@ -8,10 +8,10 @@ import { sanitizeMathText } from './sanitizeMathText';
 export function repairMarkdownTables(markdown: string): string {
   if (!markdown || !markdown.includes('|')) return markdown;
 
-  // 1. تفكيك الصفوف المدمجة في نفس السطر (مثل | 1 u || النيوترون |)
+  // 1. تفكيك الصفوف المدمجة في نفس السطر (مثل | 1 u || النيوترون | أو | a | | b |)
   let text = markdown.replace(/\|\s*\|\s*/g, '|\n| ');
 
-  // 2. إصلاح غياب سطر الفواصل بين الرأس والبيانات
+  // 2. إصلاح غياب سطر الفواصل وضمان أسطر فارغة قبل وبعد الجدول لـ remark-gfm
   const lines = text.split('\n');
   const repaired: string[] = [];
   let inTable = false;
@@ -19,31 +19,44 @@ export function repairMarkdownTables(markdown: string): string {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const trimmed = line.trim();
-    const isTableRow = trimmed.startsWith('|') && trimmed.endsWith('|');
+    const isTableRow = trimmed.startsWith('|') && (trimmed.endsWith('|') || trimmed.split('|').length >= 3);
 
     if (!isTableRow) {
-      inTable = false;
+      if (inTable) {
+        inTable = false;
+        if (repaired.length > 0 && repaired[repaired.length - 1] !== '') {
+          repaired.push('');
+        }
+      }
       repaired.push(line);
       continue;
     }
 
+    const normalizedRow = trimmed.endsWith('|') ? trimmed : `${trimmed} |`;
+
     if (!inTable) {
       inTable = true;
-      repaired.push(line);
+      if (repaired.length > 0 && repaired[repaired.length - 1] !== '') {
+        repaired.push('');
+      }
+      repaired.push(normalizedRow);
       const nextLine = lines[i + 1]?.trim() || '';
       const isDivider = /^\|(?:\s*:?-+:?\s*\|)+$/.test(nextLine);
 
-      // إذا لم يكن السطر التالي سطر فواصل، نقوم بتوليده وحقنه فوراً للرأس فقط
-      if (!isDivider && nextLine.startsWith('|')) {
-        const columnCount = (line.match(/\|/g) || []).length - 1;
+      if (!isDivider) {
+        const columnCount = (normalizedRow.match(/\|/g) || []).length - 1;
         if (columnCount > 0) {
           const dividerRow = '|' + Array(columnCount).fill(' :--- |').join('');
           repaired.push(dividerRow);
         }
       }
     } else {
-      repaired.push(line);
+      repaired.push(normalizedRow);
     }
+  }
+
+  if (inTable && repaired.length > 0 && repaired[repaired.length - 1] !== '') {
+    repaired.push('');
   }
 
   return repaired.join('\n');
@@ -70,8 +83,10 @@ export function sanitizeBookContent(text: string | undefined): string {
   cleaned = repairMarkdownTables(cleaned);
 
   // 0.3 🛡️ STRIP WORKSHEET EXAM BLANKS & TRAILING DOTS e.g. "............"
-  cleaned = cleaned.replace(/[ \t]*[\.·•]{3,}[ \t]*/g, ' ');
-  cleaned = cleaned.replace(/_{3,}/g, '');
+  cleaned = cleaned.replace(/:\s*[\.·•…\u06D4\u2026_-]{2,}/g, ': ');
+  cleaned = cleaned.replace(/[ \t]*[\.·•…\u06D4\u2026_-]{2,}[ \t]*/g, ' ');
+  cleaned = cleaned.replace(/_{2,}/g, '');
+  cleaned = cleaned.replace(/\b(?:ext|etc)\.{2,}/gi, 'إلخ...');
 
   // Repair corrupted \neq that became "eq 0" or "b eq 0"
   cleaned = cleaned.replace(/\b([a-zA-Z0-9]+)\s+eq\s+([0-9]+)/g, '$1 \\neq $2');

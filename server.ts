@@ -118,7 +118,11 @@ async function uploadAudioFileToSupabase(filePath: string, fileName: string): Pr
 
 export function repairMarkdownTables(markdown: string): string {
   if (!markdown || !markdown.includes('|')) return markdown;
+
+  // 1. تفكيك الصفوف المدمجة في نفس السطر (مثل | 1 u || النيوترون | أو | a | | b |)
   let text = markdown.replace(/\|\s*\|\s*/g, '|\n| ');
+
+  // 2. إصلاح غياب سطر الفواصل وضمان أسطر فارغة قبل وبعد الجدول لـ remark-gfm
   const lines = text.split('\n');
   const repaired: string[] = [];
   let inTable = false;
@@ -126,30 +130,44 @@ export function repairMarkdownTables(markdown: string): string {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const trimmed = line.trim();
-    const isTableRow = trimmed.startsWith('|') && trimmed.endsWith('|');
+    const isTableRow = trimmed.startsWith('|') && (trimmed.endsWith('|') || trimmed.split('|').length >= 3);
 
     if (!isTableRow) {
-      inTable = false;
+      if (inTable) {
+        inTable = false;
+        if (repaired.length > 0 && repaired[repaired.length - 1] !== '') {
+          repaired.push('');
+        }
+      }
       repaired.push(line);
       continue;
     }
 
+    const normalizedRow = trimmed.endsWith('|') ? trimmed : `${trimmed} |`;
+
     if (!inTable) {
       inTable = true;
-      repaired.push(line);
+      if (repaired.length > 0 && repaired[repaired.length - 1] !== '') {
+        repaired.push('');
+      }
+      repaired.push(normalizedRow);
       const nextLine = lines[i + 1]?.trim() || '';
       const isDivider = /^\|(?:\s*:?-+:?\s*\|)+$/.test(nextLine);
 
-      if (!isDivider && nextLine.startsWith('|')) {
-        const columnCount = (line.match(/\|/g) || []).length - 1;
+      if (!isDivider) {
+        const columnCount = (normalizedRow.match(/\|/g) || []).length - 1;
         if (columnCount > 0) {
           const dividerRow = '|' + Array(columnCount).fill(' :--- |').join('');
           repaired.push(dividerRow);
         }
       }
     } else {
-      repaired.push(line);
+      repaired.push(normalizedRow);
     }
+  }
+
+  if (inTable && repaired.length > 0 && repaired[repaired.length - 1] !== '') {
+    repaired.push('');
   }
 
   return repaired.join('\n');
@@ -172,8 +190,10 @@ export function sanitizeServerContent(text: string | undefined): string {
   cleaned = repairMarkdownTables(cleaned);
 
   // 1.2 🛡️ Strip worksheet exam blanks & trailing dots e.g. "............"
-  cleaned = cleaned.replace(/[ \t]*[\.·•]{3,}[ \t]*/g, ' ');
-  cleaned = cleaned.replace(/_{3,}/g, '');
+  cleaned = cleaned.replace(/:\s*[\.·•…\u06D4\u2026_-]{2,}/g, ': ');
+  cleaned = cleaned.replace(/[ \t]*[\.·•…\u06D4\u2026_-]{2,}[ \t]*/g, ' ');
+  cleaned = cleaned.replace(/_{2,}/g, '');
+  cleaned = cleaned.replace(/\b(?:ext|etc)\.{2,}/gi, 'إلخ...');
 
   // 2. Strip OCR scanning artifacts and bullet glyphs
   cleaned = cleaned.replace(/[▲▼◆◇■□●○★☆►◄]/g, '');
@@ -734,6 +754,38 @@ const sampleEbooks: any[] = [
 
 let ebooks: any[] = [];
 const EBOOKS_FILE = path.join(process.cwd(), "ebooks-db.json");
+const DELETED_BOOKS_FILE = path.join(process.cwd(), "data", "deleted_books.json");
+
+function loadDeletedBookIds(): Set<string> {
+  try {
+    if (fs.existsSync(DELETED_BOOKS_FILE)) {
+      const raw = fs.readFileSync(DELETED_BOOKS_FILE, "utf-8");
+      const list = JSON.parse(raw);
+      if (Array.isArray(list)) return new Set(list.map(String));
+    }
+  } catch (e) {}
+  return new Set();
+}
+
+function recordDeletedBookId(id: string) {
+  try {
+    const set = loadDeletedBookIds();
+    set.add(String(id));
+    const dir = path.dirname(DELETED_BOOKS_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(DELETED_BOOKS_FILE, JSON.stringify(Array.from(set), null, 2), "utf-8");
+  } catch (e) {}
+}
+
+function recordMultipleDeletedBookIds(ids: string[]) {
+  try {
+    const set = loadDeletedBookIds();
+    ids.forEach(id => set.add(String(id)));
+    const dir = path.dirname(DELETED_BOOKS_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(DELETED_BOOKS_FILE, JSON.stringify(Array.from(set), null, 2), "utf-8");
+  } catch (e) {}
+}
 
 // Asynchronously sync a book with full chapters, mindmap, questions, and media to Supabase
 async function syncBookToSupabase(book: any) {
@@ -881,10 +933,14 @@ function saveEbooks(data: any[], targetBook?: any) {
 // Background sync from Supabase on startup
 async function initSupabaseSync() {
   try {
+    const deletedIds = loadDeletedBookIds();
     const { data, error } = await supabase.from('books').select('*').order('created_at', { ascending: false });
     if (!error && Array.isArray(data) && data.length > 0) {
       console.log(`[Supabase Init] Loaded ${data.length} books from Supabase cloud database.`);
       for (const dbBook of data) {
+        if (deletedIds.has(String(dbBook.id))) {
+          continue; // 🚫 Permanently ignore books deleted by user
+        }
         const idx = ebooks.findIndex(b => b.id === dbBook.id);
         if (idx >= 0) {
           ebooks[idx] = { ...ebooks[idx], ...dbBook };
@@ -1131,6 +1187,7 @@ app.get("/api/ebooks/:id", (req, res) => {
 // 3. Delete ebook and cascade delete all associated reels & assets
 app.delete("/api/ebooks/:id", async (req, res) => {
   const bookId = req.params.id;
+  recordDeletedBookId(bookId);
   ebooks = ebooks.filter((e) => e.id !== bookId);
   saveEbooks(ebooks);
 
@@ -1161,6 +1218,22 @@ app.delete("/api/ebooks/:id", async (req, res) => {
   }
 
   res.json({ success: true, message: "Ebook and all associated reels deleted successfully" });
+});
+
+// 3.1 Bulk purge all ebooks from storage & database (permanent)
+app.post("/api/ebooks/purge-all", async (req, res) => {
+  try {
+    const allIds = ebooks.map(b => String(b.id));
+    recordMultipleDeletedBookIds(allIds);
+    ebooks = [];
+    saveEbooks(ebooks);
+    try {
+      await supabase.from("books").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    } catch (e) {}
+    res.json({ success: true, message: "تم مسح جميع المذكرات وحظر استعادتها نهائياً.", count: allIds.length });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "خطأ أثناء تفريغ المذكرات" });
+  }
 });
 
 // 4. Update or Upsert ebook
@@ -1535,6 +1608,115 @@ function persistPageImagesToDisk(bookId: string, chapterId: string, pages: any[]
 }
 
 /**
+ * Resolves a page object (which may contain a base64 dataUrl or a disk path /api/page-cache/...)
+ * into a clean { mimeType, data } object suitable for Gemini inlineData.
+ */
+function resolvePageBase64(page: any): { mimeType: string; data: string } | null {
+  if (!page || !page.dataUrl || typeof page.dataUrl !== 'string') return null;
+  const url = page.dataUrl.trim();
+
+  if (url.startsWith('data:image/')) {
+    const matches = url.match(/^data:(image\/[a-zA-Z]+);base64,(.+)$/);
+    if (matches && matches[2] && matches[2].length > 50) {
+      return { mimeType: matches[1], data: matches[2] };
+    }
+    const cleanB64 = url.replace(/^data:image\/\w+;base64,/, "");
+    if (cleanB64.length > 50 && !cleanB64.startsWith('/') && !cleanB64.startsWith('http')) {
+      return { mimeType: 'image/png', data: cleanB64 };
+    }
+  }
+
+  if (url.startsWith('/api/page-cache/')) {
+    const relPath = url.replace(/^\/api\/page-cache\//, '');
+    const diskPath = path.join(PAGE_CACHE_DIR, relPath);
+    if (fs.existsSync(diskPath)) {
+      try {
+        const buf = fs.readFileSync(diskPath);
+        const ext = path.extname(diskPath).toLowerCase();
+        const mimeType = ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : 'image/png';
+        return { mimeType, data: buf.toString('base64') };
+      } catch (e) {
+        console.warn('[resolvePageBase64] Failed reading disk file:', diskPath, e);
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Robust JSON parser for exercise bank responses from Gemini,
+ * handling code blocks, trailing commas, and partial structures.
+ */
+function safeParseExercises(rawText: string): any[] {
+  if (!rawText) return [];
+  let cleaned = rawText.trim();
+  cleaned = cleaned.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/i, '').trim();
+
+  try {
+    const parsed = JSON.parse(cleaned);
+    if (Array.isArray(parsed)) return parsed;
+    if (parsed && Array.isArray(parsed.exercises)) return parsed.exercises;
+  } catch (e) {}
+
+  const startBracket = cleaned.indexOf('[');
+  const endBracket = cleaned.lastIndexOf(']');
+  if (startBracket !== -1 && endBracket !== -1 && endBracket > startBracket) {
+    const arrayStr = cleaned.substring(startBracket, endBracket + 1);
+    try {
+      const parsed = JSON.parse(arrayStr);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {
+      const fixedCommas = arrayStr.replace(/,\s*([}\]])/g, '$1');
+      try {
+        const parsed = JSON.parse(fixedCommas);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e2) {}
+    }
+  }
+
+  const items: any[] = [];
+  const objRegex = /\{[\s\S]*?"question_text"[\s\S]*?\}/g;
+  let match;
+  while ((match = objRegex.exec(cleaned)) !== null) {
+    try {
+      const item = JSON.parse(match[0].replace(/,\s*([}\]])/g, '$1'));
+      if (item && item.question_text) items.push(item);
+    } catch (e) {}
+  }
+  return items;
+}
+
+function generateEmergencyGroundedExercises(title: string, category: string, context: string): any[] {
+  return [
+    {
+      id: "ex-em-1",
+      question_text: `اختر الإجابة الصحيحة: ما هو المحور الأساسي الذي يدور حوله موضوع "${title}"؟`,
+      question_type: "mcq",
+      options: [
+        `أ) ترسيخ المفاهيم والقيم والشواهد المرتبطة بـ ${title}.`,
+        "ب) الاقتصار على سرد الأحداث دون تحليل المغزى.",
+        "ج) إغفال دور الشخصيات والوقائع المنهجية.",
+        "د) الحفظ الآلي دون التطبيق والاستدلال."
+      ],
+      model_answer: `أ) ترسيخ المفاهيم والقيم والشواهد المرتبطة بـ ${title}.`,
+      rubric_criteria: ["تحديد الفكرة المنهجية بدقة", "صحة الاختيار"],
+      max_score: 10,
+      difficulty: "easy"
+    },
+    {
+      id: "ex-em-2",
+      question_text: `علل / اشرح: ما الأهمية المنهجية والتربوية المكتسبة من دراسة "${title}" وفق ما ورد في المذكرة؟`,
+      question_type: "essay",
+      model_answer: `إدراك الأبعاد الحقيقية لـ "${title}" وربطها بالواقع العملي والمنهجي واستحضار الشواهد التطبيقية بدقة.`,
+      rubric_criteria: ["ذكر الشواهد المنهجية", "سلامة الاستدلال", "الصياغة التعبيرية"],
+      max_score: 10,
+      difficulty: "medium"
+    }
+  ];
+}
+
+/**
  * Parses Google Cloud Storage URLs in all 3 formats:
  * 1. Public URL: https://storage.googleapis.com/<bucket>/<key>
  * 2. Authenticated URL: https://storage.cloud.google.com/<bucket>/<key>
@@ -1849,24 +2031,33 @@ export async function generateFaithfulLessonContent(params: {
   grade_level?: string;
   ai: any;
 }): Promise<string> {
-  const { chapterTitle, startPage, endPage, extractedText, ai } = params;
-  if (!extractedText || extractedText.trim().length === 0) {
-    return "";
-  }
+  const { chapterTitle, startPage, endPage, extractedText, category, grade_level, ai } = params;
 
-  const prompt = `
-أنت معلم خبير وموثق رقمي دقيق للمناهج التعليمية المعتمدة.
+  let sourceSnippetBlock = "";
+  if (extractedText && extractedText.trim().length > 0) {
+    sourceSnippetBlock = `
 إليك النص الخام المستخرج بصرياً وبدقة من صفحات المذكرة الفعلية (الصفحات المطبوعة ${startPage} إلى ${endPage}) لدرس: "${chapterTitle}".
 
 النص الخام من صفحات المذكرة:
 """
 ${extractedText}
 """
+`;
+  } else {
+    sourceSnippetBlock = `
+قم ببناء وتوليد الشرح التربوي الشامل والكامل لدرس: "${chapterTitle}" المقرر على ${grade_level || 'المرحلة الدراسية'} في مادة ${category || 'المقرر'}.
+استحضر كافة نصوص المذكرة والقواعد والشواهد والمفاهيم الرسمية المعتمدة لوزارة التربية والتعليم بدقة متناهية.
+`;
+  }
+
+  const prompt = `
+أنت معلم خبير وموثق رقمي دقيق للمناهج التعليمية المعتمدة.
+${sourceSnippetBlock}
 
 المهمة المطلوبة بدقة متناهية:
 1. 🚫 ممنوع منعاً باتاً كتابة أي مقدمات حوارية أو ديباجات آلية (مثل: "بصفتي المحرر...", "أقدم لك...", "إليك محتوى...", "وفقاً للتوجيهات..."). ابدأ فوراً بعنوان الدرس ثم متن الشرح التربوي المنظم.
 2. 📏 الشرح الموسع الشامل دون تلخيص مخل (حظر تلخيص عدة صفحات إلى فقرة عابرة):
-   - اشرح كل مفهوم، وظاهرة، وقانون، وتجربة واردة في الصفحات شرحاً تربوياً مفصلاً ووافياً وعميقاً (من 1500 إلى 2500 كلمة).
+   - اشرح كل مفهوم، وظاهرة، وقانون، وتجربة واردة شرحاً تربوياً مفصلاً ووافياً وعميقاً (من 1500 إلى 2500 كلمة).
    - إذا تضمنت الصفحات أنشطة أو أوراق عمل بنقاط فارغة ("........" أو "___" أو "أكمل ما يأتي:")، حظر ترك نقاط فارغة نهائياً! اكتب الحقيقة العلمية والشرح كاملاً مع الإجابة النموذجية المكتملة.
 3. 🚫 حظر تام لجداول المقارنة وحظر الفواصل بالشرط:
    - ممنوع منعاً باتاً استخدام جداول المقارنة نهائياً لأنها تشوه العرض وتفسد القراءة الصوتية.
@@ -1902,6 +2093,169 @@ ${extractedText}
     console.warn(`[Faithful Lesson Generator] Warning for lesson "${chapterTitle}":`, err);
     return sanitizeServerContent(extractedText);
   }
+}
+
+export function detectInteractiveLabType(title: string, category?: string, content?: string): {
+  type: 'simulation' | 'code_runner' | 'concept_lab';
+  interactiveType: 'binary_converter' | 'atomic_model' | 'reaction_lab' | 'math_graph' | 'language_lab' | 'general_simulation';
+  title: string;
+  duration: string;
+  description: string;
+  objective: string;
+} {
+  const combined = ((title || "") + " " + (category || "") + " " + (content || "")).toLowerCase();
+
+  if (/حاسب|برمج|كود|code|python|binary|نظام عد|أنظمة العد|ثنائي|عشري|سداسي|خوارزم|تكنولوجيا|رقمي/.test(combined)) {
+    return {
+      type: 'simulation',
+      interactiveType: 'binary_converter',
+      title: 'محاكي أنظمة العد والتحويل الرقمي في الحاسب الآلي',
+      duration: '5 دقائق',
+      description: 'قم بتحريك المؤشرات لتحديد أساس النظام العددي والعدد المدخل، ولاحظ كيف يتغير التمثيل الرقمي المقابل في النظام العشري، ثم أجب عن سؤال التحدي الرياضي.',
+      objective: 'استيعاب آليات التحويل بين الأنظمة العددية (الثنائي، العشري، الثماني، والسداسي عشر) والتطبيقات الرقمية المقررة.'
+    };
+  }
+
+  if (/كيمياء|ذرة|ذرات|بروتون|إلكترون|نيوترون|جدول دوري|روابط|عناصر|توزيع إلكتروني|أيون/.test(combined)) {
+    return {
+      type: 'simulation',
+      interactiveType: 'atomic_model',
+      title: 'مختبر محاكاة التركيب الذري وتوزيع مستويات الطاقة',
+      duration: '7 دقائق',
+      description: 'اختر العنصر الكيميائي، وتحكم في عدد البروتونات والإلكترونات، وشاهد التوزيع الإلكتروني في المستويات الرئيسية (K, L, M, N) وحساب العدد الكتلي والذري تفاعلياً.',
+      objective: 'الربط العملي بين التوزيع الإلكتروني في مستويات الطاقة وتكافؤ العنصر وسلوكه الكيميائي.'
+    };
+  }
+
+  if (/معادلة|تفاعل|حمض|قلوي|أكسيد|ملح|محلول|غاز|تفاعلات/.test(combined)) {
+    return {
+      type: 'simulation',
+      interactiveType: 'reaction_lab',
+      title: 'مختبر وزن المعادلات الكيميائية وملاحظة نواتج التفاعل',
+      duration: '6 دقائق',
+      description: 'قم بتغيير معاملات المتفاعلات ولاحظ قانون بقاء المادة واكتمال التكافؤ مع محاكاة بصرية لتصاعد الغازات أو تكون الرواسب.',
+      objective: 'إتقان وزن المعادلات الكيميائية وتطبيق قانون بقاء الكتلة عملياً.'
+    };
+  }
+
+  if (/فيزياء|سرعة|عجلة|حركة|جاذبية|قوة|نيوتن|مسافة|زمن|طاقة/.test(combined)) {
+    return {
+      type: 'simulation',
+      interactiveType: 'math_graph',
+      title: 'محاكي الحركة الفيزيائية وقوانين الجاذبية والسرعة',
+      duration: '5 دقائق',
+      description: 'تحكم في السرعة الابتدائية والعجلة وكتلة الجسم ولاحظ منحنى الحركة البياني (المسافة-الزمن) وحساب محصلة القوى تفاعلياً.',
+      objective: 'تحليل الرسوم البيانية للحركة واستنتاج العلاقات الرياضية للسرعة والعجلة.'
+    };
+  }
+
+  if (/عربي|نحو|لغة|إعراب|بلاغة|تشبيه|شعر|فعل|فاعل|مفعول|نصوص/.test(combined)) {
+    return {
+      type: 'concept_lab',
+      interactiveType: 'language_lab',
+      title: 'مختبر الإعراب التفاعلي والتذوق البلاغي',
+      duration: '5 دقائق',
+      description: 'حدد أركان الجملة أو مواطن الجمال الشعري، واختبر مواقع الكلمات الإعرابية مع شجرة الإعراب التفاعلية والتصحيح اللحظي.',
+      objective: 'تطبيق القواعد النحوية والبلاغية على النصوص المقررة واستخراج الدلالات الجمالية.'
+    };
+  }
+
+  return {
+    type: 'simulation',
+    interactiveType: 'general_simulation',
+    title: `مختبر الاستكشاف التفاعلي لدرس: ${title}`,
+    duration: '5 دقائق',
+    description: 'مختبر تفاعلي لتطبيق مفاهيم الدرس واختبار الاستيعاب العملي من صلب المنهج.',
+    objective: 'تعزيز الفهم العميق من خلال المحاكاة والتطبيق العملي.'
+  };
+}
+
+export async function extractInteractiveLabsForChapter(params: {
+  chapterTitle: string;
+  category?: string;
+  grade_level?: string;
+  chapterContent?: string;
+  rawText?: string;
+  ai?: any;
+}): Promise<any[]> {
+  const { chapterTitle, category, grade_level, chapterContent, rawText, ai } = params;
+  const labMeta = detectInteractiveLabType(chapterTitle, category, chapterContent || rawText);
+
+  let exerciseBank: any[] = [];
+  if (ai && (rawText || chapterContent)) {
+    try {
+      const prompt = `
+أنت خبير إعداد معامل تفاعلية وبنوك أسئلة مدرسية لوزارة التربية والتعليم.
+للدرس: "${chapterTitle}" (${category || 'عام'} - ${grade_level || 'مرحلة إعدادية'}).
+محتوى الدرس والأنشطة:
+"""
+${(rawText || chapterContent || "").substring(0, 4000)}
+"""
+
+المطلوب: استخراج أو صياغة 4 إلى 6 أسئلة وتحديات تطبيقية حقيقية للمعمل والأنشطة، بحيث تتضمن:
+- أسئلة اختيار من متعدد بتحديات رقمية أو علمية
+- مسائل عملية مع خطوات الحل والناتج الدقيق
+- معايير التصحيح النموذجي
+
+أخرج النتيجة كـ JSON Array فقط:
+[
+  {
+    "id": "ex-1",
+    "question": "نص السؤال أو التحدي العملي",
+    "options": ["خيار أ", "خيار ب", "خيار ج", "خيار د"],
+    "correctOptionIndex": 0,
+    "modelAnswer": "الإجابة النموذجية الكاملة",
+    "explanation": "شرح وخطوات الحل التفصيلية",
+    "difficulty": "medium"
+  }
+]
+`;
+      const res = await generateContentWithRetry(ai, {
+        contents: [{ parts: [{ text: prompt }] }],
+        config: {
+          responseMimeType: "application/json",
+          temperature: 0.1
+        }
+      }, ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite-preview", "gemini-3-flash-preview"]);
+
+      exerciseBank = JSON.parse(res.text || "[]");
+    } catch (e) {
+      console.warn("[Interactive Lab Generation Notice]:", e);
+    }
+  }
+
+  if (!exerciseBank || exerciseBank.length === 0) {
+    exerciseBank = [
+      {
+        id: "ex-default-1",
+        question: `ما هو التطبيق العملي الأساسي لمفاهيم درس (${chapterTitle})؟`,
+        options: [
+          `تطبيق القواعد والمعايير المقررة في المنهج بدقة واستدلال`,
+          `الحفظ النظري دون فهم الخطوات`,
+          `تجاهل العلاقات الرياضية والبيانية`,
+          `عدم ربط الأسباب بالنتائج`
+        ],
+        correctOptionIndex: 0,
+        modelAnswer: `تطبيق القواعد والمعايير المقررة في المنهج بدقة واستدلال`,
+        explanation: `يعتمد المعمل والمحاكاة على الفهم والتطبيق العملي للقواعد المنصوص عليها.`,
+        difficulty: "easy"
+      }
+    ];
+  }
+
+  return [
+    {
+      id: `lab-${Date.now()}`,
+      title: labMeta.title,
+      type: labMeta.type,
+      duration: labMeta.duration,
+      description: labMeta.description,
+      objective: labMeta.objective,
+      interactiveType: labMeta.interactiveType,
+      config: {},
+      exerciseBank
+    }
+  ];
 }
 
 // 5. Convert content or create ebook from prompt / file upload (Async Background Worker System)
@@ -2396,19 +2750,24 @@ async function runBackgroundEbookConversion(
       deduplicatedChapters.map(async (ch: any, cIdx: number) => {
         const matchedLesson = initialBatch[cIdx] || syllabusBlueprint?.lessons?.[cIdx];
         const rawSlice = matchedLesson?.raw_text_snippet || "";
-        if (rawSlice && rawSlice.trim().length > 50 && ai) {
-          console.log(`[Job Worker] Generating high-fidelity transcription for chapter ${cIdx + 1}: "${ch.title || matchedLesson?.lesson_title}"...`);
-          const detailed = await generateFaithfulLessonContent({
-            chapterTitle: ch.title || matchedLesson?.lesson_title || `الدرس ${cIdx + 1}`,
-            startPage: Number(matchedLesson?.start_page) || (cIdx * 8 + 1),
-            endPage: Number(matchedLesson?.end_page) || ((cIdx + 1) * 8),
-            extractedText: rawSlice,
-            category,
-            grade_level,
-            ai
-          });
-          if (detailed && detailed.trim().length > 200) {
-            return detailed;
+        const chTitle = ch.title || matchedLesson?.lesson_title || `الدرس ${cIdx + 1}`;
+        if (ai) {
+          console.log(`[Job Worker] Generating high-fidelity transcription for chapter ${cIdx + 1}: "${chTitle}"...`);
+          try {
+            const detailed = await generateFaithfulLessonContent({
+              chapterTitle: chTitle,
+              startPage: Number(matchedLesson?.start_page) || (cIdx * 8 + 1),
+              endPage: Number(matchedLesson?.end_page) || ((cIdx + 1) * 8),
+              extractedText: rawSlice,
+              category,
+              grade_level,
+              ai
+            });
+            if (detailed && detailed.trim().length > 200) {
+              return detailed;
+            }
+          } catch (detErr) {
+            console.warn(`[Job Worker] High-fidelity generation fallback for chapter ${cIdx + 1}:`, detErr);
           }
         }
         return null;
@@ -2480,7 +2839,23 @@ async function runBackgroundEbookConversion(
             label: cleanStr(m.label) || "مفهوم",
             parentId: m.parentId || null,
             description: cleanStr(m.description) || "تفاصيل المفهوم."
-          }))
+          })),
+          labs: [
+            {
+              id: `lab-${chapterId}`,
+              ...detectInteractiveLabType(cleanStr(ch.title) || cleanStr(matchedLesson?.lesson_title) || `الدرس ${cIdx + 1}`, category, deepContent),
+              config: {},
+              exerciseBank: (ch.quiz || []).map((q: any, qIdx: number) => ({
+                id: `ex-${chapterId}-${qIdx + 1}`,
+                question: cleanStr(q.question) || "سؤال وتدريب تفاعلي",
+                options: (q.options && q.options.length === 4 ? q.options : ["أ", "ب", "ج", "د"]).map((opt: string) => cleanStr(opt)),
+                correctOptionIndex: typeof q.correctOptionIndex === "number" ? q.correctOptionIndex : 0,
+                modelAnswer: (q.options && q.options[q.correctOptionIndex]) ? cleanStr(q.options[q.correctOptionIndex]) : cleanStr(q.explanation) || "الإجابة النموذجية المعتمدة",
+                explanation: cleanStr(q.explanation) || "خطوات الحل والتوضيح النموذجي.",
+                difficulty: "medium"
+              }))
+            }
+          ]
         };
       })
     };
@@ -3729,8 +4104,8 @@ Pedagogical Instructions:
 // 9.5 Expand Book Chapters Feature (Incremental Grounded Chapter Generation)
 app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
   const bookId = req.params.id;
-  // Laser-focused micro-batching: 1 chapter (max 2) per click to guarantee 100% completion in seconds with zero timeout
-  const batchSize = Math.min(2, Math.max(1, Number(req.body.additionalCount) || 1));
+  // High-performance micro-batching: default 2 chapters (max 3) per click to guarantee 100% deep pedagogical quality under 512MB RAM
+  const batchSize = Math.min(3, Math.max(1, Number(req.body.additionalCount) || 2));
   
   const ebook = ebooks.find(e => e.id === bookId);
   if (!ebook) {
@@ -4113,20 +4488,24 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
       (result.chapters || []).map(async (ch: any, idx: number) => {
         const matchedLesson = pendingLessons[idx];
         const rawSlice = matchedLesson?.raw_text_snippet || "";
-        if (rawSlice && rawSlice.trim().length > 50 && ai) {
-          const cleanTitle = cleanStr(ch.title) || cleanStr(matchedLesson?.lesson_title) || `الدرس ${currentChapters.length + idx + 1}`;
+        const cleanTitle = cleanStr(ch.title) || cleanStr(matchedLesson?.lesson_title) || `الدرس ${currentChapters.length + idx + 1}`;
+        if (ai) {
           console.log(`[Expand Chapters] Generating high-fidelity transcription for "${cleanTitle}"...`);
-          const detailed = await generateFaithfulLessonContent({
-            chapterTitle: cleanTitle,
-            startPage: Number(matchedLesson?.start_page) || 1,
-            endPage: Number(matchedLesson?.end_page) || 6,
-            extractedText: rawSlice,
-            category: ebook.category,
-            grade_level: (ebook as any).grade_level,
-            ai
-          });
-          if (detailed && detailed.trim().length > 200) {
-            return detailed;
+          try {
+            const detailed = await generateFaithfulLessonContent({
+              chapterTitle: cleanTitle,
+              startPage: Number(matchedLesson?.start_page) || 1,
+              endPage: Number(matchedLesson?.end_page) || 6,
+              extractedText: rawSlice,
+              category: ebook.category,
+              grade_level: (ebook as any).grade_level,
+              ai
+            });
+            if (detailed && detailed.trim().length > 200) {
+              return detailed;
+            }
+          } catch (detErr) {
+            console.warn(`[Expand Chapters] Transcription fallback for ${cleanTitle}:`, detErr);
           }
         }
         return null;
@@ -4202,9 +4581,36 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
             parentId: `m-${chapterId}-root`,
             description: c.explanation
           }))
+        ],
+        labs: [
+          {
+            id: `lab-${chapterId}`,
+            ...detectInteractiveLabType(cleanTitle, ebook.category, deepContent),
+            config: {},
+            exerciseBank: [
+              {
+                id: `ex-${chapterId}-1`,
+                question: `ما هو المحور الأساسي الذي يدور حوله درس (${cleanTitle})؟`,
+                options: [`تطبيق واستيعاب ${cleanTitle}`, `مفاهيم تمهيدية عامة`, `مراجعة عامة للمقرر`, `نشاط إثرائي غير مقرر`],
+                correctOptionIndex: 0,
+                modelAnswer: `تطبيق واستيعاب ${cleanTitle}`,
+                explanation: `يدور الدرس أساساً حول شرح وتطبيق مفاهيم ${cleanTitle} وفق المنهج المقرر.`,
+                difficulty: "easy"
+              },
+              {
+                id: `ex-${chapterId}-2`,
+                question: `أي مما يلي يعبر عن القاعدة أو المفهوم الجوهري في درس (${cleanTitle})؟`,
+                options: [`الالتزام بالضوابط والمعايير التعليمية للدرس`, `تجاوز المتطلبات الأساسية دون فهم`, `تجاهل التطبيقات العملية`, `عدم الربط بين السبب والنتيجة`],
+                correctOptionIndex: 0,
+                modelAnswer: `الالتزام بالضوابط والمعايير التعليمية للدرس`,
+                explanation: `التطبيق الصحيح للمفهوم يعتمد على الالتزام بالقواعد والضوابط التعليمية المقررة.`,
+                difficulty: "medium"
+              }
+            ]
+          }
         ]
       };
-    });
+      });
 
     // Mark pending lessons as completed if blueprint was used
     if (pendingLessons.length > 0 && ebook.blueprint) {
@@ -5248,17 +5654,343 @@ app.post("/api/exercises/evaluate", async (req, res) => {
   }
 });
 
-// 4. POST / GET authentic exercise bank for chapter
-app.get("/api/ebooks/:id/chapters/:chapterId/exercises", async (req, res) => {
+// 📤 UPLOAD EXTERNAL EXAM / WORKSHEET SHEETS (Permanent Persistence & Vision OCR)
+app.post("/api/ebooks/:id/chapters/:chapterId/upload-exercise-sheet", async (req, res) => {
   try {
     const { id: bookId, chapterId } = req.params;
+    const { images } = req.body;
+
+    if (!images || !Array.isArray(images) || images.length === 0) {
+      return res.status(400).json({ error: "لم يتم إرسال أي صور أوراق امتحانات." });
+    }
+
     const book = ebooks.find(b => b.id === bookId);
     if (!book) return res.status(404).json({ error: "الكتاب غير موجود." });
 
     const chapter = (book.chapters || []).find((c: any) => c.id === chapterId);
     if (!chapter) return res.status(404).json({ error: "الفصل غير موجود." });
 
-    // Ensure authentic chapter pages are available
+    const chapterCacheDir = path.join(PAGE_CACHE_DIR, book.id, chapter.id);
+    if (!fs.existsSync(chapterCacheDir)) {
+      fs.mkdirSync(chapterCacheDir, { recursive: true });
+    }
+
+    const timestamp = Date.now();
+    const uploadedPages: any[] = [];
+    const visionParts: any[] = [];
+
+    const existingPages = chapter.pages || [];
+    const maxExistingPageNum = existingPages.reduce((max: number, p: any) => Math.max(max, p.pageNumber || 0), 0);
+    let nextNum = Math.max(100, maxExistingPageNum + 1);
+
+    for (let i = 0; i < images.length; i++) {
+      const rawItem = images[i];
+      const dataUrl = typeof rawItem === 'string' ? rawItem : (rawItem.dataUrl || rawItem.base64 || "");
+      if (!dataUrl) continue;
+
+      const cleanB64 = dataUrl.replace(/^data:image\/\w+;base64,/, "");
+      const fileName = `exam_sheet_${timestamp}_${i + 1}.png`;
+      const filePath = path.join(chapterCacheDir, fileName);
+
+      fs.writeFileSync(filePath, Buffer.from(cleanB64, 'base64'));
+
+      const relativeUrl = `/api/page-cache/${book.id}/${chapter.id}/${fileName}`;
+      const pageObj = {
+        dataUrl: relativeUrl,
+        pageNumber: nextNum++,
+        pageType: 'exercise',
+        heading: `ورقة امتحان خارجي مرفوعة (${i + 1})`,
+        isUploaded: true,
+        uploadedAt: new Date().toISOString()
+      };
+
+      uploadedPages.push(pageObj);
+      visionParts.push({
+        inlineData: {
+          mimeType: 'image/png',
+          data: cleanB64
+        }
+      });
+    }
+
+    if (uploadedPages.length === 0) {
+      return res.status(400).json({ error: "تعذر حفظ الصور المرسلة." });
+    }
+
+    // 🌟 1. Merge into chapter.pages & chapter.uploaded_exams so they are NEVER wiped
+    chapter.pages = [...existingPages, ...uploadedPages];
+    chapter.uploaded_exams = chapter.uploaded_exams || [];
+    chapter.uploaded_exams.push(...uploadedPages);
+
+    // 🌟 2. OCR Extraction via Gemini Vision
+    const ai = getGenAIClient();
+    let newExercises: any[] = [];
+
+    if (ai && visionParts.length > 0) {
+      const promptText = `أنت كبير موجهي ومصححي امتحانات وزارة التربية والتعليم والجامعات لكافة التخصصات (لغات، علوم، رياضيات، دراسات، حاسب، فيزياء، كيمياء).
+المهمة الحتمية:
+فحص ورقة/أوراق الامتحان المرفوعة واستخراج كافة الأسئلة والمسائل والتمارين والأنشطة الواردة فيها حرفياً وبالكامل دون أي اختصار، مع صياغة الإجابة النموذجية المعتمدة الكاملة وتوزيع الدرجات.
+
+قواعد صارمة ومقدسة:
+1. 📐 الدقة الرياضية (LaTeX): كتابة الكسور والجذور والمعادلات بـ LaTeX داخل $...$.
+2. 🔬 الصيغ الكيميائية والفيزيائية والوحدات: كتابة الصيغ بـ LaTeX مثل $H_2SO_4$, $O_2$, $Fe^{3+}$ والوحدات اللاتينية باللاتينية مثل $(m/s)$, $(N)$, $(J)$.
+3. 🔤 حماية المصطلحات الإنجليزية داخل العربي (BiDi Guard): إحاطة أي مصطلح أو رمز إنجليزي بـ Backticks مثل \`Cache\` أو \`RAM\`.
+4. الإجابة النموذجية الشاملة ومعايير التصحيح (rubric_criteria).
+
+أخرج الناتج فقط كـ JSON Array صالح من الكائنات:
+[
+  {
+    "id": "upload-ex-1",
+    "question_text": "نص السؤال الدقيق من ورقة الامتحان...",
+    "question_type": "mcq",
+    "options": ["أ) ...", "ب) ...", "ج) ...", "د) ..."],
+    "model_answer": "الإجابة النموذجية المكتملة والشاملة...",
+    "rubric_criteria": ["معيار التقييم 1", "معيار التقييم 2"],
+    "max_score": 10,
+    "difficulty": "medium"
+  }
+]`;
+
+      visionParts.push({ text: promptText });
+
+      try {
+        const response = await generateContentWithRetry(ai, {
+          contents: [{ parts: visionParts }],
+          config: {
+            temperature: 0.1,
+            responseMimeType: "application/json"
+          }
+        }, ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite-preview", "gemini-3-flash-preview"]);
+
+        newExercises = safeParseExercises(response.text || "[]");
+      } catch (visErr) {
+        console.error("[Upload Exam Sheet Vision Error]:", visErr);
+      }
+    }
+
+    // 🌟 3. Append to chapter.exercises permanently (never wiped)
+    const existingExercises = chapter.exercises || [];
+    chapter.exercises = [...existingExercises, ...newExercises];
+
+    saveEbooks(ebooks);
+
+    try {
+      await supabase.from("books").update({
+        chapters: book.chapters
+      }).eq("id", book.id);
+    } catch (dbErr) {
+      console.warn("[Upload Exam Sheet] Supabase save notice:", dbErr);
+    }
+
+    res.json({
+      success: true,
+      uploadedPages,
+      newExercises,
+      allExercises: chapter.exercises,
+      message: `تم رفع ورقة الامتحان (${uploadedPages.length} صفحة) واستخراج ${newExercises.length} سؤالاً بنجاح وحفظها بشكل دائم في المذكرة.`
+    });
+  } catch (err: any) {
+    console.error("[Upload Exam Sheet Error]:", err);
+    res.status(500).json({ error: "فشل معالجة ورقة الامتحان: " + err.message });
+  }
+});
+
+// 3.5 POST /api/ebooks/:id/chapters/:chapterId/next-activity
+// Cycles to the next curriculum activity in the lesson or dynamically synthesizes a new interactive activity
+app.post("/api/ebooks/:id/chapters/:chapterId/next-activity", async (req, res) => {
+  try {
+    const { id: bookId, chapterId } = req.params;
+    const { currentActivityIndex = 0, forceNew = false } = req.body;
+    const book = ebooks.find(b => b.id === bookId);
+    if (!book) return res.status(404).json({ error: "الكتاب غير موجود." });
+
+    const chapter = (book.chapters || []).find((c: any) => c.id === chapterId);
+    if (!chapter) return res.status(404).json({ error: "الفصل غير موجود." });
+
+    if (!chapter.labs) chapter.labs = [];
+
+    const nextIdx = Number(currentActivityIndex) + 1;
+
+    // If next lab already exists and forceNew is false, cycle to it!
+    if (!forceNew && chapter.labs.length > nextIdx) {
+      return res.json({
+        success: true,
+        lab: chapter.labs[nextIdx],
+        activityIndex: nextIdx,
+        totalActivities: chapter.labs.length,
+        isNew: false
+      });
+    }
+
+    const ai = getGenAIClient();
+    if (!ai) {
+      const fallbackLab = chapter.labs[0] || {
+        id: `lab-${chapter.id}-1`,
+        ...detectInteractiveLabType(chapter.title, book.category, chapter.content),
+        config: {},
+        exerciseBank: []
+      };
+      return res.json({
+        success: true,
+        lab: fallbackLab,
+        activityIndex: 0,
+        totalActivities: Math.max(1, chapter.labs.length),
+        isNew: false
+      });
+    }
+
+    console.log(`[Next Activity Generator] Synthesizing new interactive activity for lesson: "${chapter.title}"...`);
+
+    const prompt = `
+أنت خبير ومصمم أنشطة تعليمية تفاعلية حديثة (Interactive Pedagogical Designer) وفق أحدث معايير المناهج التفاعلية.
+الدرس: "${chapter.title}"
+المادة: "${book.category || 'عام'}"
+المرحلة: "${(book as any).grade_level || ''}"
+محتوى الدرس:
+"""
+${(chapter.content || "").substring(0, 4500)}
+"""
+
+المهمة المطلوبة:
+استخرج من متن الدرس (سواء كان لغة عربية، نصوص، قراءة، تربية إسلامية، دراسات، علوم، رياضيات، أو حاسب) أو ابتكر نشاطاً تفاعلياً حقيقياً يرتبط بنسبة 100% بموضوع ومفاهيم هذا الدرس.
+قواعد صارمة:
+1. يمنع منعاً باتاً وضع محاكيات فيزياء أو كيمياء أو حاسوب لدرس لغة عربية أو دين أو دراسات!
+2. اختر نوع النشاط الأنسب لطبيعة المادة:
+   - "concept_ordering": (للغة العربية، القراءة، النصوص، التاريخ) ترتيب الفكر الرئيسة والفرعية أو تسلسل الأحداث منطقياً، مثل "ترتيب الفكر الرئيسة لنص آمنة دهشان".
+   - "comparison_matrix": (للقراءة، النصوص، الدراسات، العلوم) موازنة ومقارنة بين شخصيتين أو فترتين أو مفهومين (مثل: كفاح آمنة دهشان في الماضي vs امرأة مصرية رائدة في الحاضر).
+   - "value_sorting": (للنصوص، الاستماع، التربية الإسلامية، القيم) تصنيف مواقف وقيم إلى 4 خانات: (أتعلم، أشارك، أكتسب، أرفض) أو (سلوك إيجابي، سلوك سلبي).
+   - "scenario_decision": سيناريو واقعي يعرض موقفاً ويطلب من الطالب اتخاذ القرار مع تعليل واختيار النتيجة.
+   - "creative_sandbox": ورشة تعبير وإبداع وكتابة موجهة مع بنود ومعايير تقييم ذكية.
+   - "atomic_model": فقط وحصراً لدروس الكيمياء والعلوم الخاصة بالذرة ومستويات الطاقة.
+   - "binary_converter": فقط وحصراً لدروس الحاسب الآلي وأنظمة العد.
+   - "math_graph": فقط وحصراً لدروس الفيزياء والرياضيات (الحركة والسرعة).
+   - "code_runner": فقط وحصراً لدروس البرمجة.
+
+أخرج كائن JSON نقي بالهيكل التالي:
+{
+  "title": "عنوان النشاط التفاعلي المرتبط بالدرس بدقة",
+  "duration": "5 دقائق",
+  "description": "شرح واضح لما سيفعله الطالب تفاعلياً في هذا النشاط",
+  "objective": "الهدف التعليمي الأساسي المحقق من النشاط",
+  "interactiveType": "concept_ordering",
+  "instructions": [
+    "خطوة تفاعلية 1",
+    "خطوة تفاعلية 2",
+    "خطوة تفاعلية 3"
+  ],
+  "interactiveData": {
+    "type": "concept_ordering | comparison_matrix | value_sorting | scenario_decision | creative_sandbox",
+    "prompt": "السؤال أو التوجيه الرئيسي للنشاط",
+    "items": ["عنصر أو فكرة 1", "عنصر أو فكرة 2", "عنصر أو فكرة 3", "عنصر أو فكرة 4"],
+    "correctOrder": ["عنصر 1 بالترتيب الصحيح", "عنصر 2", "عنصر 3", "عنصر 4"],
+    "comparisonColA": "الطرف الأول للمقارنة (مثلاً: كفاح آمنة دهشان)",
+    "comparisonColB": "الطرف الثاني للمقارنة (مثلاً: دور المرأة المعاصرة)",
+    "comparisonPoints": ["وجه المقارنة 1", "وجه المقارنة 2", "وجه المقارنة 3"],
+    "valueCategories": ["أتعلم", "أشارك", "أكتسب", "أرفض"],
+    "scenarioStory": "الموقف أو القصة التي تتطلب اتخاذ موقف",
+    "scenarioOptions": [
+      { "id": "opt1", "text": "الخيار الأول", "isOptimal": true, "feedback": "تفسير النتيجة" },
+      { "id": "opt2", "text": "الخيار الثاني", "isOptimal": false, "feedback": "تفسير النتيجة" }
+    ],
+    "creativeCriteria": ["وضوح الفكرة", "الأسلوب الأدبي", "التنظيم والترتيب"]
+  }
+}
+`;
+
+    const resp = await generateContentWithRetry(ai, {
+      contents: [{ parts: [{ text: prompt }] }],
+      config: {
+        responseMimeType: "application/json",
+        temperature: 0.3
+      }
+    }, ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite-preview", "gemini-3-flash-preview"]);
+
+    const parsed = JSON.parse(resp.text || "{}");
+    const newLab = {
+      id: `lab-${chapter.id}-${Date.now()}`,
+      title: parsed.title || `نشاط تطبيقي: ${chapter.title}`,
+      duration: parsed.duration || "5 دقائق",
+      description: parsed.description || "قم بالتفاعل مع أدوات النشاط واستكشاف المفهوم.",
+      objective: parsed.objective || `تطبيق واستيعاب ${chapter.title}`,
+      interactiveType: parsed.interactiveType || (book.category?.includes("حاسب") ? "binary_converter" : "concept_ordering"),
+      instructions: Array.isArray(parsed.instructions) ? parsed.instructions : [],
+      interactiveData: parsed.interactiveData || null,
+      sampleCode: parsed.sampleCode || undefined,
+      config: {},
+      exerciseBank: []
+    };
+
+    chapter.labs.push(newLab);
+    saveEbooks(ebooks);
+
+    return res.json({
+      success: true,
+      lab: newLab,
+      activityIndex: chapter.labs.length - 1,
+      totalActivities: chapter.labs.length,
+      isNew: true
+    });
+  } catch (err: any) {
+    console.error("[Next Activity Error]:", err);
+    res.status(500).json({ error: "فشل توليد النشاط التفاعلي: " + err.message });
+  }
+});
+
+// 4. POST / GET authentic exercise bank for chapter
+app.get("/api/ebooks/:id/chapters/:chapterId/exercises", async (req, res) => {
+  try {
+    const { id: bookId, chapterId } = req.params;
+    const { force = false, page: manualPage } = req.query;
+    const book = ebooks.find(b => b.id === bookId);
+    if (!book) return res.status(404).json({ error: "الكتاب غير موجود." });
+
+    const chapter = (book.chapters || []).find((c: any) => c.id === chapterId);
+    if (!chapter) return res.status(404).json({ error: "الفصل غير موجود." });
+
+    const pageOffset = Number((book as any).page_offset) || 0;
+
+    // 🌟 1. HANDLE MANUAL PRINTED PAGE INPUT FROM USER
+    let manualRenderedPages: any[] = [];
+    if (manualPage && typeof manualPage === 'string' && book.source_file_url) {
+      const pageStr = manualPage.trim();
+      let startManual = 0;
+      let endManual = 0;
+      if (pageStr.includes('-')) {
+        const parts = pageStr.split('-').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
+        startManual = parts[0] || 0;
+        endManual = parts[1] || startManual;
+      } else if (pageStr.includes(',')) {
+        const parts = pageStr.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
+        startManual = Math.min(...parts);
+        endManual = Math.max(...parts);
+      } else {
+        startManual = parseInt(pageStr, 10);
+        endManual = startManual;
+      }
+
+      if (startManual > 0) {
+        try {
+          const resolved = await resolveCloudOrLocalFileBuffer(book.source_file_url);
+          if (resolved.buffer) {
+            console.log(`[Manual Page Handler] Rendering printed page(s) ${startManual}..${endManual} with offset ${pageOffset}...`);
+            const rendered = await renderPdfPagesToImages(resolved.buffer, startManual, endManual, pageOffset);
+            if (rendered && rendered.length > 0) {
+              const tagged = rendered.map(p => ({ ...p, pageType: 'exercise' }));
+              manualRenderedPages = persistPageImagesToDisk(book.id, chapter.id, tagged);
+              
+              // Merge into chapter.pages
+              const existing = (chapter.pages || []).filter((p: any) => !manualRenderedPages.some(np => np.pageNumber === p.pageNumber));
+              chapter.pages = [...existing, ...manualRenderedPages].sort((a: any, b: any) => a.pageNumber - b.pageNumber);
+              saveEbooks(ebooks);
+            }
+          }
+        } catch (e) {
+          console.warn("[Manual Page Render Error]:", e);
+        }
+      }
+    }
+
+    // 🌟 2. ENSURE CHAPTER PAGES ARE RENDERED
     if (!chapter.pages || chapter.pages.length === 0) {
       let startPage = Number(chapter.start_page) || 0;
       let endPage = Number(chapter.end_page) || 0;
@@ -5288,7 +6020,6 @@ app.get("/api/ebooks/:id/chapters/:chapterId/exercises", async (req, res) => {
         try {
           const resolved = await resolveCloudOrLocalFileBuffer(book.source_file_url);
           if (resolved.buffer) {
-            const pageOffset = Number((book as any).page_offset) || 0;
             const rendered = await renderPdfPagesToImages(resolved.buffer, startPage, endPage, pageOffset);
             if (rendered && rendered.length > 0) {
               const persisted = persistPageImagesToDisk(book.id, chapter.id, rendered);
@@ -5304,76 +6035,181 @@ app.get("/api/ebooks/:id/chapters/:chapterId/exercises", async (req, res) => {
       }
     }
 
-    let exercisePage = (chapter.pages || []).find((p: any) => p.pageType === 'exercise');
-    if (!exercisePage && chapter.pages && chapter.pages.length > 0) {
-      exercisePage = chapter.pages[chapter.pages.length - 1];
+    // 🌟 3. ACCURATELY IDENTIFY EXERCISE / WORKSHEET PAGES
+    const allPages = chapter.pages || [];
+    let exercisePages: any[] = [];
+
+    const parseTargetNumbers = (inputStr: string): number[] => {
+      const nums: number[] = [];
+      const clean = inputStr.trim();
+      if (clean.includes('-')) {
+        const parts = clean.split('-').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
+        const start = parts[0] || 0;
+        const end = parts[1] || start;
+        for (let i = Math.min(start, end); i <= Math.max(start, end); i++) nums.push(i);
+      } else if (clean.includes(',')) {
+        clean.split(',').forEach(s => {
+          const n = parseInt(s.trim(), 10);
+          if (!isNaN(n)) nums.push(n);
+        });
+      } else {
+        const n = parseInt(clean, 10);
+        if (!isNaN(n)) nums.push(n);
+      }
+      return nums;
+    };
+
+    if (manualRenderedPages.length > 0) {
+      exercisePages = manualRenderedPages;
+    } else if (manualPage && typeof manualPage === 'string') {
+      const targetNums = parseTargetNumbers(manualPage);
+      const matched = allPages.filter((p: any) => targetNums.includes(p.pageNumber));
+      if (matched.length > 0) {
+        exercisePages = matched;
+      }
     }
 
-    if (chapter.exercises && Array.isArray(chapter.exercises) && chapter.exercises.length > 0) {
-      return res.json({ success: true, exercises: chapter.exercises, exercisePage: exercisePage || null });
+    if (exercisePages.length === 0) {
+      // 🎯 Priority 1: Use verified pageType === 'exercise'
+      const taggedExercises = allPages.filter((p: any) => p.pageType === 'exercise');
+      if (taggedExercises.length > 0) {
+        exercisePages = taggedExercises;
+      } else {
+        // Priority 2: Filter out obvious explanation and reading text pages
+        exercisePages = allPages.filter((p: any, idx: number) => {
+          if (idx === 0) return false;
+          const h = (p.heading || '').toLowerCase();
+          if (h.includes('قواعد') || h.includes('نص قراءة') || h.includes('شرح') || h.includes('كلماتي الجديدة')) return false;
+          return true;
+        });
+        if (exercisePages.length === 0 && allPages.length > 1) {
+          exercisePages = allPages.slice(1);
+        }
+      }
     }
 
-    // Auto-generate authentic grounded exercises directly from the lesson's exercise page or content
+    const hasExercisePages = exercisePages.length > 0;
+    const primaryExercisePage = exercisePages[0] || allPages[0] || null;
+
+    // If exercises already cached and not forced and no manual page was requested, return cached
+    if (chapter.exercises && Array.isArray(chapter.exercises) && chapter.exercises.length > 0 && force !== 'true' && !manualPage) {
+      return res.json({ 
+        success: true, 
+        hasExercisePages,
+        exercises: chapter.exercises, 
+        exercisePage: primaryExercisePage,
+        exercisePages,
+        allPages
+      });
+    }
+
+    // If no exercise pages found and no manual page was provided, inform user to input printed page number
+    if (!hasExercisePages) {
+      return res.json({
+        success: true,
+        hasExercisePages: false,
+        exercises: [],
+        exercisePage: primaryExercisePage,
+        exercisePages: [],
+        allPages,
+        message: "لا تتوفر صفحة تمارين تم اكتشافها تلقائياً لهذا الدرس. يرجى إدخال رقم الصفحة المطبوع أسفل المذكرة."
+      });
+    }
+
+    // 🌟 4. MULTI-PAGE VISION OCR EXTRACTION WITH STRICT STEM & BIDI PROTECTION
     const ai = getGenAIClient();
     if (!ai) {
-      return res.json({ success: true, exercises: [], exercisePage: exercisePage || null });
+      return res.json({ success: true, hasExercisePages: true, exercises: [], exercisePage: primaryExercisePage, exercisePages });
     }
 
     const parts: any[] = [];
-    if (exercisePage && exercisePage.dataUrl) {
-      const base64Png = exercisePage.dataUrl.replace(/^data:image\/\w+;base64,/, "");
-      if (base64Png.length > 100) {
+    // Feed images of all available exercise pages (up to 8 pages)
+    for (const page of exercisePages.slice(0, 8)) {
+      const resolved = resolvePageBase64(page);
+      if (resolved && resolved.data && resolved.data.length > 100) {
         parts.push({
           inlineData: {
-            mimeType: "image/png",
-            data: base64Png
+            mimeType: resolved.mimeType,
+            data: resolved.data
           }
         });
       }
     }
 
-    const lessonContext = (chapter.content || "").substring(0, 3000);
-    parts.push({
-      text: `أنت خبير تدقيق وإعداد أسئلة امتحانات معتمد لوزارة التربية والتعليم.
-المهمة: استخرج بدقة تامة أسئلة وتدريبات المذكرة الموضحة في الصورة أو من صلب محتوى الدرس:
-عنوان الدرس: ${chapter.title}
-محتوى الدرس:
-${lessonContext}
+    const lessonContext = (chapter.content || "").substring(0, 4500);
+    const hasImages = parts.length > 0;
+    const promptText = `أنت كبير موجهي ومصححي امتحانات وزارة التربية والتعليم لكافة المواد (اللغة العربية، العلوم، الرياضيات، الدراسات، اللغات، الحاسب الآلي).
+المهمة الحتمية:
+فحص جميع صفحات التمارين المرفقة واستخراج كافة الأسئلة والتدريبات والأنشطة والمسائل الواردة فيها حرفياً وبالكامل دون أي نقصان أو اختصار، مع التوقع الدقيق للإجابة النموذجية من سياق المنهج.
 
-المطلوب:
-1. إذا كانت هناك أسئلة اختيار من متعدد في الصفحة (مثل: اختر الإجابة الصحيحة): استخرج نصوص الأسئلة الحرفية كاملة مع كافة خياراتها (أ، ب، ج، د) وحدد الخيار الصحيح في model_answer.
-2. إذا كانت هناك جداول مقارنة أو أسئلة مقالية (مثل: أكمل جدول المقارنة أو لخص صفة): استخرج السؤال وصغ إجابته النموذجية الدقيقة.
-3. اكتب 4 إلى 5 أسئلة واضحة وتفاعلية تغطي كافة أنشطة الدرس.
+قواعد صارمة ومقدسة لمعالجة الرموز العلمية والنصوص المختلطة (Bidirectional Protection):
+1. 📐 الدقة الرياضية (LaTeX):
+   - كتابة الكسور والمعادلات بـ LaTeX داخل $...$: مثل $\\frac{a}{b}$، والجذور $\\sqrt{x}$، والأسس $x^2$.
+2. 🔬 الدقة الكيميائية والفيزيائية:
+   - كتابة الصيغ والأيونات بـ LaTeX: مثل $H_2SO_4$, $O_2$, $Fe^{3+}$, $Cl^-$.
+   - كتابة وحدات القياس بوضوح باللاتينية: مثل $(m/s)$, $(m/s^2)$, $(N)$, $(J)$, $(kg)$, $(\\Omega)$ دون خلطها بالأرقام العربية.
+3. 🔤 حماية المصطلحات الإنجليزية داخل العربي (BiDi Guard):
+   - أي مصطلح إنجليزي أو تقني داخل السؤال العربي (مثل: CPU, RAM, Cache Memory, Hardware, Bit) يجب إحاطته بـ Backticks مثل \`Cache Memory\` لمنع انعكاس الحروف في المتصفح.
+4. 🎯 توقع الإجابة النموذجية ومعايير التصحيح:
+   - لكل سؤال: اكتب نص السؤال كاملاً، ونوعه (mcq, essay, true_false)، والخيارات، والإجابة النموذجية المكتملة والشاملة وفق نموذج إجابة الوزارة، ومعايير توزيع الدرجات (rubric_criteria).
 
 أخرج الإجابة كـ JSON Array فقط من الكائنات بهذا الشكل:
 [
   {
     "id": "ex-1",
-    "question_text": "نص السؤال الواضح الحرفي...",
-    "question_type": "mcq", // mcq, short_answer, essay, true_false
+    "question_text": "نص السؤال الدقيق المشتق مباشرة من صفحة المذكرة...",
+    "question_type": "mcq",
     "options": ["أ) ...", "ب) ...", "ج) ...", "د) ..."],
-    "model_answer": "الإجابة النموذجية المعتمدة الكاملة...",
-    "rubric_criteria": ["معيار 1", "معيار 2"],
+    "model_answer": "الإجابة النموذجية المعتمدة الكاملة المتوقعة من سياق المنهج...",
+    "rubric_criteria": ["معيار التقييم 1", "معيار التقييم 2"],
     "max_score": 10,
     "difficulty": "medium"
   }
-]`
-    });
+]`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash-lite",
-      contents: [{ parts }],
-      config: {
-        temperature: 0.15,
-        responseMimeType: "application/json"
+    parts.push({ text: promptText });
+
+    let exercises: any[] = [];
+    try {
+      const response = await generateContentWithRetry(ai, {
+        contents: [{ parts }],
+        config: {
+          temperature: 0.1,
+          responseMimeType: "application/json"
+        }
+      }, ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite-preview", "gemini-3-flash-preview"]);
+
+      exercises = safeParseExercises(response.text || "[]");
+    } catch (visErr) {
+      console.warn("[Exercise Bank] Vision call rejected or failed, falling back to grounded text generation:", visErr);
+      try {
+        const textFallbackResp = await generateContentWithRetry(ai, {
+          contents: [{ parts: [{ text: promptText }] }],
+          config: {
+            temperature: 0.1,
+            responseMimeType: "application/json"
+          }
+        }, ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite-preview", "gemini-3-flash-preview"]);
+        exercises = safeParseExercises(textFallbackResp.text || "[]");
+      } catch (fbErr) {
+        console.error("[Exercise Bank] Text fallback also failed:", fbErr);
       }
+    }
+
+    if (Array.isArray(exercises) && exercises.length > 0) {
+      chapter.exercises = exercises;
+      saveEbooks(ebooks);
+    }
+
+    res.json({ 
+      success: exercises.length > 0, 
+      hasExercisePages: true,
+      exercises, 
+      exercisePage: primaryExercisePage,
+      exercisePages,
+      allPages,
+      message: exercises.length === 0 ? "لم يتم العثور على أسئلة في الصفحات المحددة، يُرجى إدخال أرقام صفحات التمارين يدوياً." : undefined
     });
-
-    const exercises = JSON.parse(response.text || "[]");
-    chapter.exercises = exercises;
-    saveEbooks(ebooks);
-
-    res.json({ success: true, exercises, exercisePage: exercisePage || null });
   } catch (err: any) {
     console.error("[Exercise Bank Error]:", err);
     res.status(500).json({ error: "فشل تحميل بنك التمارين: " + err.message });

@@ -121,6 +121,31 @@ export interface CurriculumMindMapPayload {
   generatedAt: string;
 }
 
+export interface InteractiveLabExercise {
+  id: string;
+  question: string;
+  options?: string[];
+  correctOptionIndex?: number;
+  modelAnswer: string;
+  explanation: string;
+  difficulty?: 'easy' | 'medium' | 'hard';
+}
+
+export interface InteractiveLab {
+  id: string;
+  title: string;
+  type: 'simulation' | 'code_runner' | 'concept_lab';
+  duration: string;
+  description: string;
+  objective: string;
+  interactiveType: 'binary_converter' | 'atomic_model' | 'reaction_lab' | 'math_graph' | 'language_lab' | 'concept_ordering' | 'comparison_matrix' | 'value_sorting' | 'scenario_decision' | 'creative_sandbox' | 'general_simulation';
+  instructions?: string[];
+  sampleCode?: string;
+  interactiveData?: any;
+  config?: any;
+  exerciseBank: InteractiveLabExercise[];
+}
+
 export interface Chapter {
   id: string;
   title: string;
@@ -141,6 +166,12 @@ export interface Chapter {
   examTraps?: any[];
   questions?: any[];
   learningObjectives?: any[];
+  labs?: InteractiveLab[];
+  start_page?: number;
+  end_page?: number;
+  physical_start_page?: number;
+  pages?: Array<{ pageNumber: number; dataUrl: string; pageType?: string }>;
+  exercises?: any[];
 }
 
 export interface FeatureToggles {

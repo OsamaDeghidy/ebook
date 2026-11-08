@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Sparkles, CheckCircle2, XCircle, Award, Target, Brain, 
   HelpCircle, RefreshCw, Send, Check, ChevronDown, ChevronUp,
-  FileCheck2, AlertCircle, BookOpen, Star, Zap
+  FileCheck2, AlertCircle, BookOpen, Star, Zap, Search, Layers, FileText,
+  Upload, ImageIcon
 } from 'lucide-react';
 import { fireConfetti } from '../utils/confetti';
+import MathRenderer from './MathRenderer';
 
 export interface ExerciseItem {
   id: string;
@@ -45,6 +47,9 @@ export default function AuthenticExerciseBank({
 }: AuthenticExerciseBankProps) {
   const [exercises, setExercises] = useState<ExerciseItem[]>([]);
   const [exercisePage, setExercisePage] = useState<any>(null);
+  const [exercisePages, setExercisePages] = useState<any[]>([]);
+  const [allPages, setAllPages] = useState<any[]>([]);
+  const [selectedPageIndex, setSelectedPageIndex] = useState<number>(0);
   const [showWorksheetImage, setShowWorksheetImage] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [studentAnswers, setStudentAnswers] = useState<Record<string, string>>({});
@@ -53,59 +58,149 @@ export default function AuthenticExerciseBank({
   const [revealedModelAnswers, setRevealedModelAnswers] = useState<Record<string, boolean>>({});
   const [isGeneratingMore, setIsGeneratingMore] = useState(false);
 
-  useEffect(() => {
-    let isMounted = true;
-    setIsLoading(true);
+  // Manual Page Input State (Human-in-the-Loop Fallback)
+  const [manualPageInput, setManualPageInput] = useState('');
+  const [hasExercisePages, setHasExercisePages] = useState<boolean | null>(null);
+  const [serverNotice, setServerNotice] = useState<string>('');
+  const [pageViewFilter, setPageViewFilter] = useState<'exercises' | 'all'>('exercises');
 
-    fetch(`/api/ebooks/${bookId}/chapters/${chapterId}/exercises`)
+  // External Exam Sheet Upload State
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [isUploadingExam, setIsUploadingExam] = useState(false);
+  const [uploadNotice, setUploadNotice] = useState<string>('');
+
+  const fetchExercises = (force = false, pageNum?: string) => {
+    setIsGeneratingMore(true);
+    let url = `/api/ebooks/${bookId}/chapters/${chapterId}/exercises?`;
+    if (force) url += 'force=true&';
+    if (pageNum) url += `page=${encodeURIComponent(pageNum)}&`;
+
+    fetch(url)
       .then(res => res.json())
       .then(data => {
-        if (!isMounted) return;
-        if (data.exercisePage) {
+        if (typeof data.hasExercisePages === 'boolean') {
+          setHasExercisePages(data.hasExercisePages);
+        }
+        if (data.message) {
+          setServerNotice(data.message);
+        }
+        if (Array.isArray(data.allPages)) {
+          setAllPages(data.allPages);
+        }
+        if (Array.isArray(data.exercisePages) && data.exercisePages.length > 0) {
+          setExercisePages(data.exercisePages);
+          setExercisePage(data.exercisePages[0]);
+          setSelectedPageIndex(0);
+          setHasExercisePages(true);
+        } else if (data.exercisePage) {
+          setExercisePages([data.exercisePage]);
           setExercisePage(data.exercisePage);
+          setSelectedPageIndex(0);
+          setHasExercisePages(true);
+        } else if (Array.isArray(data.allPages) && data.allPages.length > 0) {
+          setExercisePages(data.allPages);
+          setExercisePage(data.allPages[0]);
+          setSelectedPageIndex(0);
+        } else {
+          setExercisePages([]);
+          setExercisePage(null);
+          if (data.hasExercisePages === false) {
+            setHasExercisePages(false);
+          }
         }
         if (data.success && Array.isArray(data.exercises) && data.exercises.length > 0) {
           setExercises(data.exercises);
         } else {
-          // Provide default grounded questions
-          setExercises(getDefaultQuestions(chapterTitle));
+          setExercises([]);
         }
       })
       .catch(() => {
-        if (!isMounted) return;
-        setExercises(getDefaultQuestions(chapterTitle));
+        setExercises([]);
+        setHasExercisePages(false);
       })
       .finally(() => {
-        if (isMounted) setIsLoading(false);
+        setIsLoading(false);
+        setIsGeneratingMore(false);
       });
+  };
 
-    return () => { isMounted = false; };
+  useEffect(() => {
+    fetchExercises(false);
   }, [bookId, chapterId, chapterTitle]);
 
-  const getDefaultQuestions = (title: string): ExerciseItem[] => [
-    {
-      id: 'ex-1',
-      question_text: `اختر الإجابة الصحيحة: ما هو المفهوم الجوهري الذي يدور حوله درس "${title}"؟`,
-      question_type: 'mcq',
-      options: [
-        'أ) تطبيق القواعد الأساسية المذكورة في صلب الدرس بدقة واستدلال.',
-        'ب) الاعتماد على الحفظ المجرد دون فهم السياق.',
-        'ج) إهمال النماذج والمسائل التدريبية.',
-        'د) الاقتصار على التعريفات العامة دون التطبيق.'
-      ],
-      model_answer: 'أ) تطبيق القواعد الأساسية المذكورة في صلب الدرس بدقة واستدلال.',
-      rubric_criteria: ['تحديد الفكرة المحورية', 'دقة الاختيار'],
-      max_score: 10
-    },
-    {
-      id: 'ex-2',
-      question_text: `استنتج من سياق درس "${title}" أهم نتيجة تعليمية أو قاعدة ضابطة يجب على الطالب استحضارها في الامتحان؟`,
-      question_type: 'essay',
-      model_answer: 'استحضار القاعدة الحاكمة والشواهد التطبيقية المباشرة الواردة في المذكرة، مع التمييز الدقيق بين الحالات المختلفة وتطبيق خطوات الحل المنطقية خطوة بخطوة.',
-      rubric_criteria: ['ذكر القاعدة بدقة', 'صياغة تربوية سليمة', 'الاستدلال بالأمثلة'],
-      max_score: 10
+  const handleManualPageSubmit = () => {
+    if (!manualPageInput.trim()) return;
+    setIsLoading(true);
+    fetchExercises(true, manualPageInput.trim());
+  };
+
+  const handleExtractSinglePage = (pageNumber: number | string) => {
+    setIsLoading(true);
+    fetchExercises(true, String(pageNumber));
+  };
+
+  const handleUploadExamSheets = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploadingExam(true);
+    setUploadNotice('جاري قراءة الصور وفحص ورقة الامتحان بالذكاء الاصطناعي...');
+
+    try {
+      const readAsBase64 = (file: File): Promise<string> => {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      };
+
+      const imagesDataUrls: string[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const b64 = await readAsBase64(files[i]);
+        imagesDataUrls.push(b64);
+      }
+
+      const res = await fetch(`/api/ebooks/${bookId}/chapters/${chapterId}/upload-exercise-sheet`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ images: imagesDataUrls })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        if (Array.isArray(data.uploadedPages)) {
+          setAllPages(prev => [...prev, ...data.uploadedPages]);
+          setExercisePages(prev => [...prev, ...data.uploadedPages]);
+          setExercisePage(data.uploadedPages[0]);
+          setSelectedPageIndex(0);
+          setHasExercisePages(true);
+        }
+        if (Array.isArray(data.newExercises) && data.newExercises.length > 0) {
+          setExercises(prev => [...data.newExercises, ...prev]);
+          fireConfetti();
+        }
+        setUploadNotice(data.message || 'تم فحص ورقة الامتحان واستخراج الأسئلة بنجاح وحفظها بالمذكرة!');
+        setTimeout(() => setUploadNotice(''), 6000);
+      } else {
+        setUploadNotice(data.error || 'فشل فحص ورقة الامتحان.');
+      }
+    } catch (err: any) {
+      setUploadNotice('حدث خطأ أثناء رفع ورقة الامتحان: ' + err.message);
+    } finally {
+      setIsUploadingExam(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
-  ];
+  };
+
+  const handleRevealAllAnswers = () => {
+    const allRevealed: Record<string, boolean> = {};
+    exercises.forEach(ex => {
+      allRevealed[ex.id] = true;
+    });
+    setRevealedModelAnswers(allRevealed);
+  };
 
   const handleEvaluateAnswer = async (exercise: ExerciseItem) => {
     const answer = studentAnswers[exercise.id];
@@ -136,8 +231,7 @@ export default function AuthenticExerciseBank({
           ...prev,
           [exercise.id]: data.evaluation
         }));
-
-        if (data.evaluation.isPassed && data.evaluation.score >= 8.5) {
+        if (data.evaluation.isPassed) {
           fireConfetti();
         }
       }
@@ -161,6 +255,9 @@ export default function AuthenticExerciseBank({
   const maxPossible = evaluatedList.length * 10;
   const avgPercentage = maxPossible > 0 ? Math.round((totalScore / maxPossible) * 100) : 0;
 
+  // Active pages list based on filter
+  const displayedPages = pageViewFilter === 'exercises' && exercisePages.length > 0 ? exercisePages : (allPages.length > 0 ? allPages : exercisePages);
+
   return (
     <div className="space-y-6 animate-fade-in" dir="rtl">
       
@@ -180,6 +277,82 @@ export default function AuthenticExerciseBank({
           <p className="text-xs text-indigo-200">
             أجب عن الأسئلة، واضغط على "تصحيح إجابتي" ليقوم الذكاء الاصطناعي برصد درجاتك وتوجيهك للإجابة النموذجية.
           </p>
+
+          {/* Action Buttons for Extracting Questions & Revealing Answers */}
+          <div className="flex flex-wrap items-center gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => fetchExercises(true)}
+              disabled={isGeneratingMore}
+              className="px-4 py-2 bg-gradient-to-r from-amber-400 to-orange-400 hover:from-amber-300 hover:to-orange-300 text-slate-950 font-black text-xs rounded-xl transition flex items-center gap-1.5 shadow-md cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isGeneratingMore ? 'animate-spin' : ''}`} />
+              <span>{isGeneratingMore ? 'جاري فحص واستخراج الأسئلة...' : '⚡ استخراج أسئلة كافة صفحات التمارين'}</span>
+            </button>
+
+            {/* Manual Page Input Toolbar */}
+            <div className="flex items-center gap-1.5 bg-white/10 px-2.5 py-1 rounded-xl border border-white/15">
+              <span className="text-[11px] text-indigo-200 font-bold shrink-0">رقم الصفحة:</span>
+              <input
+                type="text"
+                value={manualPageInput}
+                onChange={(e) => setManualPageInput(e.target.value)}
+                placeholder="مثلاً: 12 أو 12-14"
+                className="w-24 px-2 py-0.5 bg-black/40 border border-white/20 rounded-lg text-xs text-white text-center font-bold outline-none focus:border-amber-400 placeholder:text-slate-400"
+                onKeyDown={(e) => e.key === 'Enter' && handleManualPageSubmit()}
+              />
+              <button
+                type="button"
+                onClick={handleManualPageSubmit}
+                disabled={!manualPageInput.trim() || isGeneratingMore}
+                className="px-2.5 py-1 bg-amber-400 hover:bg-amber-300 disabled:opacity-40 text-slate-950 text-xs font-black rounded-lg transition cursor-pointer flex items-center gap-1"
+                title="جلب ورندرة صفحة التمارين ذات هذا الرقم المطبوع"
+              >
+                <Search className="w-3 h-3" />
+                <span>جلب</span>
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleRevealAllAnswers}
+              className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 border border-white/20 cursor-pointer"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span>💡 حل وإظهار الإجابات النموذجية لجميع الأسئلة</span>
+            </button>
+
+            {/* 📤 Upload Exam Sheet Button */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleUploadExamSheets}
+              multiple
+              accept="image/*"
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploadingExam}
+              className="px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 shadow-md cursor-pointer border border-emerald-400/30 disabled:opacity-50"
+            >
+              {isUploadingExam ? (
+                <RefreshCw className="w-3.5 h-3.5 animate-spin text-white" />
+              ) : (
+                <Upload className="w-3.5 h-3.5 text-emerald-200" />
+              )}
+              <span>{isUploadingExam ? 'جاري فحص الامتحان...' : '📤 رفع ورقة امتحان أو أسئلة خارجية'}</span>
+            </button>
+          </div>
+
+          {/* Upload Status Banner */}
+          {uploadNotice && (
+            <div className="mt-3 p-3 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 text-xs font-bold flex items-center gap-2 animate-fade-in">
+              <Sparkles className="w-4 h-4 text-emerald-300 shrink-0" />
+              <span>{uploadNotice}</span>
+            </div>
+          )}
         </div>
 
         {/* Live Score Pill */}
@@ -206,15 +379,17 @@ export default function AuthenticExerciseBank({
 
         {/* 📄 RIGHT PANE: AUTHENTIC BOOKLET WORKSHEET PAGE VIEWER (STICKY ON DESKTOP) */}
         {exercisePage && exercisePage.dataUrl && (
-          <div className="lg:col-span-6 xl:col-span-7 lg:sticky lg:top-24 bg-slate-900 rounded-3xl p-4 sm:p-5 border border-slate-800 shadow-2xl space-y-3">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800 text-white">
+          <div className="lg:col-span-6 xl:col-span-7 lg:sticky lg:top-24 bg-slate-900 rounded-3xl p-4 sm:p-5 border border-slate-800 shadow-2xl space-y-4">
+            
+            {/* Top Bar with Page Type & View Toggles */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800 text-white">
               <div className="flex items-center gap-2.5">
                 <span className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-base">
                   📜
                 </span>
                 <div>
                   <h4 className="text-xs sm:text-sm font-black text-white flex items-center gap-2">
-                    <span>ورقة أنشطة المذكرة المعتمدة</span>
+                    <span>صفحة المذكرة الأصلية</span>
                     {exercisePage.pageNumber && (
                       <span className="px-2 py-0.5 rounded-md bg-amber-400/20 text-amber-300 text-[10px] border border-amber-400/30">
                         ص {exercisePage.pageNumber}
@@ -222,20 +397,99 @@ export default function AuthenticExerciseBank({
                     )}
                   </h4>
                   <p className="text-[11px] text-slate-400">
-                    المصدر الأصلي للأسئلة بدون أي تحريف أو هلوسة
+                    المصدر الأصلي للأسئلة بدون أي تحريف
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowWorksheetImage(!showWorksheetImage)}
-                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer border border-slate-700"
-              >
-                <span>{showWorksheetImage ? 'طي' : 'عرض'}</span>
-                {showWorksheetImage ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              </button>
+
+              <div className="flex items-center gap-2">
+                {/* Single Page Extract Trigger */}
+                {exercisePage.pageNumber && (
+                  <button
+                    type="button"
+                    onClick={() => handleExtractSinglePage(exercisePage.pageNumber)}
+                    disabled={isGeneratingMore}
+                    className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl transition flex items-center gap-1 cursor-pointer disabled:opacity-40"
+                    title="استخراج أسئلة هذه الصفحة فقط المعروضة أمامك حالياً"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>فحص ص {exercisePage.pageNumber} ⚡</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setShowWorksheetImage(!showWorksheetImage)}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer border border-slate-700"
+                >
+                  <span>{showWorksheetImage ? 'طي' : 'عرض'}</span>
+                  {showWorksheetImage ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
+            {/* 📑 Comprehensive Page Selector Strip (All Pages + Exercises) */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-[11px]">
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-400 font-bold">عرض الصفحات:</span>
+                  <div className="flex items-center gap-1 bg-slate-800 p-0.5 rounded-lg border border-slate-700">
+                    <button
+                      type="button"
+                      onClick={() => setPageViewFilter('exercises')}
+                      className={`px-2 py-0.5 rounded-md font-bold transition cursor-pointer ${
+                        pageViewFilter === 'exercises' ? 'bg-amber-400 text-slate-950 font-black' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      صفحات التمارين ({exercisePages.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPageViewFilter('all')}
+                      className={`px-2 py-0.5 rounded-md font-bold transition cursor-pointer ${
+                        pageViewFilter === 'all' ? 'bg-indigo-600 text-white font-black' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      كافة صفحات الدرس ({allPages.length || exercisePages.length})
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Horizontal Page Tabs */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full">
+                {displayedPages.map((page, pIdx) => {
+                  const isSelected = exercisePage?.pageNumber === page.pageNumber;
+                  const isExPage = exercisePages.some(ep => ep.pageNumber === page.pageNumber);
+                  return (
+                    <button
+                      key={pIdx}
+                      type="button"
+                      onClick={() => {
+                        setSelectedPageIndex(pIdx);
+                        setExercisePage(page);
+                      }}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-black transition cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                        isSelected
+                          ? 'bg-amber-400 text-slate-950 shadow-md ring-2 ring-amber-300 font-bold'
+                          : isExPage
+                            ? 'bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30'
+                            : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                      }`}
+                    >
+                      <span>ص {page.pageNumber || pIdx + 1}</span>
+                      <span className={`text-[9px] px-1 py-0.2 rounded ${
+                        isSelected ? 'bg-slate-950/20 text-slate-950' : isExPage ? 'bg-amber-400/20 text-amber-300' : 'bg-slate-700 text-slate-400'
+                      }`}>
+                        {isExPage ? 'تدريبات' : 'شرح'}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Rendered Physical Page Image */}
             {showWorksheetImage && (
               <div className="flex justify-center bg-slate-950 p-2 rounded-2xl border border-slate-800 overflow-y-auto max-h-[750px] shadow-inner">
                 <img
@@ -255,10 +509,40 @@ export default function AuthenticExerciseBank({
               <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin mx-auto" />
               <h5 className="text-sm font-black text-slate-900">جاري تحميل تدريبات وتمارين الدرس المعتمدة...</h5>
             </div>
-          ) : exercises.length === 0 ? (
-            <div className="py-16 text-center space-y-3 bg-white rounded-3xl border border-gray-100 p-8 shadow-xs">
-              <BookOpen className="w-10 h-10 text-gray-400 mx-auto" />
-              <h5 className="text-sm font-black text-slate-700">لا توجد تمارين مسجلة لهذا الفصل حالياً</h5>
+          ) : hasExercisePages === false || (exercises.length === 0 && !exercisePage) ? (
+            /* ⚠️ CASE: NO EXERCISE PAGES DETECTED - PROMPT USER FOR PRINTED PAGE NUMBER */
+            <div className="py-12 px-6 text-center space-y-4 bg-white rounded-3xl border-2 border-dashed border-amber-300 shadow-xs max-w-xl mx-auto">
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+                <AlertCircle className="w-6 h-6" />
+              </div>
+              <div className="space-y-1.5">
+                <h5 className="text-base font-black text-slate-800">
+                  لا تتوفر صفحة تمارين تم اكتشافها تلقائياً لهذا الدرس
+                </h5>
+                <p className="text-xs text-slate-500 leading-relaxed max-w-md mx-auto">
+                  يرجى إدخال رقم الصفحة المكتوب أسفل صفحة المذكرة في يدك، وسيقوم النظام بمعايرتها وعرضها واستخراج كافة أسئلتها بدقة:
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 max-w-sm mx-auto pt-2">
+                <input
+                  type="text"
+                  value={manualPageInput}
+                  onChange={(e) => setManualPageInput(e.target.value)}
+                  placeholder="رقم الصفحة مثلاً: 12 أو 12-14"
+                  className="flex-1 p-3 rounded-xl border-2 border-slate-200 focus:border-indigo-600 outline-none text-xs sm:text-sm font-bold text-center"
+                  onKeyDown={(e) => e.key === 'Enter' && handleManualPageSubmit()}
+                />
+                <button
+                  type="button"
+                  onClick={handleManualPageSubmit}
+                  disabled={!manualPageInput.trim() || isGeneratingMore}
+                  className="px-5 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-black text-xs sm:text-sm rounded-xl transition shadow-md shadow-indigo-600/20 cursor-pointer shrink-0 flex items-center gap-1.5"
+                >
+                  {isGeneratingMore ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-amber-300" />}
+                  <span>فحص واستخراج</span>
+                </button>
+              </div>
             </div>
           ) : (
             <div className="space-y-6">
@@ -280,7 +564,7 @@ export default function AuthenticExerciseBank({
                           {index + 1}
                         </span>
                         <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700">
-                          {ex.question_type === 'mcq' ? 'اختيار من متعدد' : ex.question_type === 'essay' ? 'سؤال تطبيقي' : 'إجابة قصيرة'}
+                          {ex.question_type === 'mcq' ? 'اختيار من متعدد' : ex.question_type === 'true_false' ? 'صح أو خطأ' : ex.question_type === 'essay' ? 'سؤال تطبيقي' : 'إجابة قصيرة'}
                         </span>
                       </div>
 
@@ -298,13 +582,35 @@ export default function AuthenticExerciseBank({
                       </div>
                     </div>
 
-                    {/* Question Text */}
-                    <h4 className="text-sm font-black text-slate-900 leading-relaxed">
-                      {ex.question_text}
-                    </h4>
+                    {/* Question Text with KaTeX & MathRenderer Support */}
+                    <div className="text-sm font-black text-slate-900 leading-relaxed">
+                      <MathRenderer text={ex.question_text} />
+                    </div>
 
                     {/* Input Modes */}
-                    {ex.question_type === 'mcq' && Array.isArray(ex.options) && ex.options.length > 0 ? (
+                    {ex.question_type === 'true_false' ? (
+                      <div className="grid grid-cols-2 gap-3 pt-1">
+                        {['(✓) صواب / صح', '(✗) خطأ'].map((choice, cIdx) => {
+                          const isSelected = currentAnswer === choice;
+                          return (
+                            <button
+                              key={cIdx}
+                              type="button"
+                              onClick={() => handleSelectOption(ex.id, choice)}
+                              className={`p-3.5 rounded-xl border-2 font-black text-xs sm:text-sm transition flex items-center justify-center gap-2 cursor-pointer ${
+                                isSelected
+                                  ? choice.includes('صواب')
+                                    ? 'border-emerald-600 bg-emerald-50 text-emerald-950 ring-2 ring-emerald-300 shadow-xs'
+                                    : 'border-rose-600 bg-rose-50 text-rose-950 ring-2 ring-rose-300 shadow-xs'
+                                  : 'border-gray-200 hover:border-indigo-300 bg-gray-50/70 hover:bg-white text-gray-800'
+                              }`}
+                            >
+                              <span>{choice}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : ex.question_type === 'mcq' && Array.isArray(ex.options) && ex.options.length > 0 ? (
                       <div className="space-y-2.5 pt-1">
                         <div className="grid grid-cols-1 gap-2.5">
                           {ex.options.map((opt, oIdx) => {
@@ -327,7 +633,9 @@ export default function AuthenticExerciseBank({
                                   }`}>
                                     {letterCode}
                                   </span>
-                                  <span className="leading-snug">{opt}</span>
+                                  <div className="leading-snug">
+                                    <MathRenderer text={opt} inline={true} />
+                                  </div>
                                 </div>
                                 <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
                                   isSelected ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-gray-300 bg-white'
@@ -388,46 +696,41 @@ export default function AuthenticExerciseBank({
                           : 'bg-rose-50/60 border-rose-200 text-rose-950'
                       }`}>
                         <div className="flex items-center justify-between">
-                          <span className="font-black text-xs flex items-center gap-1.5">
-                            <Award className="w-4 h-4 text-indigo-600" />
-                            <span>تقرير التقييم البيداغوجي:</span>
+                          <span className="font-black text-xs">
+                            {evaluation.isPassed ? 'إجابة مجتازة ومعتمدة 🎯' : 'تحتاج إجابتك إلى تدقيق ⚠️'}
                           </span>
                           <span className="text-xs font-black">
-                            النسبة: {evaluation.percentage}%
+                            الدرجة: {evaluation.score} من {evaluation.maxScore} ({evaluation.percentage}%)
                           </span>
                         </div>
+                        <p className="text-xs font-medium leading-relaxed">{evaluation.feedback}</p>
 
-                        <p className="text-xs font-medium leading-relaxed bg-white/80 p-2.5 rounded-lg border border-gray-100">
-                          💡 {evaluation.feedback}
-                        </p>
-
-                        {evaluation.strengths?.length > 0 && (
-                          <div className="space-y-0.5">
-                            <span className="text-[10px] font-black text-emerald-700 block">نقاط القوة 🌟:</span>
-                            <ul className="text-xs space-y-0.5 list-disc list-inside text-emerald-900 font-medium">
-                              {evaluation.strengths.map((str, sIdx) => <li key={sIdx}>{str}</li>)}
-                            </ul>
-                          </div>
-                        )}
-
-                        {evaluation.missingPoints?.length > 0 && (
-                          <div className="space-y-0.5">
-                            <span className="text-[10px] font-black text-amber-700 block">ما ينقصك للدرجة النهائية ⚠️:</span>
-                            <ul className="text-xs space-y-0.5 list-disc list-inside text-amber-900 font-medium">
-                              {evaluation.missingPoints.map((mis, mIdx) => <li key={mIdx}>{mis}</li>)}
+                        {evaluation.missingPoints && evaluation.missingPoints.length > 0 && (
+                          <div className="pt-2 border-t border-current/10 text-[11px] space-y-1">
+                            <span className="font-bold block">ما ينقصك للدرجة النهائية:</span>
+                            <ul className="list-disc list-inside space-y-0.5 opacity-90">
+                              {evaluation.missingPoints.map((pt, i) => (
+                                <li key={i}>{pt}</li>
+                              ))}
                             </ul>
                           </div>
                         )}
                       </div>
                     )}
 
-                    {/* Model Answer */}
+                    {/* Model Answer Preview with Math Support */}
                     {isModelRevealed && (
-                      <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl text-xs text-amber-950 space-y-1 animate-in fade-in-50">
-                        <span className="font-black block text-amber-800">الإجابة النموذجية المعتمدة:</span>
-                        <p className="leading-relaxed font-medium">{ex.model_answer}</p>
+                      <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200 text-xs text-amber-950 space-y-1.5 animate-in fade-in-50">
+                        <span className="font-black flex items-center gap-1.5 text-amber-900">
+                          <Award className="w-3.5 h-3.5" />
+                          <span>الإجابة النموذجية المعتمدة وفق المنهج:</span>
+                        </span>
+                        <div className="font-medium leading-relaxed">
+                          <MathRenderer text={ex.model_answer} />
+                        </div>
                       </div>
                     )}
+
                   </div>
                 );
               })}
