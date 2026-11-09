@@ -2849,7 +2849,9 @@ async function resolveCloudOrLocalFileBuffer(fileUrl: string): Promise<{ buffer:
   // 2. Check if it's a Google Cloud Storage URL (gs://, storage.googleapis.com, storage.cloud.google.com)
   const gcsInfo = parseGcsBucketAndKey(cleanUrl);
   if (gcsInfo) {
-    const rawKeyName = path.basename(gcsInfo.key);
+    // Strip query parameters and clean key name
+    const sanitizedKey = gcsInfo.key.split("?")[0];
+    const rawKeyName = path.basename(sanitizedKey);
     const baseKeyName = rawKeyName.replace(/[^a-zA-Z0-9._-]/g, "_");
     const rawLocalPath = path.join(PERSISTENT_UPLOADS_DIR, rawKeyName);
     const cachedLocalPath = path.join(PERSISTENT_UPLOADS_DIR, baseKeyName);
@@ -2869,7 +2871,7 @@ async function resolveCloudOrLocalFileBuffer(fileUrl: string): Promise<{ buffer:
     // 2b. Download from GCS using authenticated S3Client (works on private "Not public" buckets!)
     if (process.env.GCS_ACCESS_KEY && process.env.GCS_SECRET_KEY) {
       try {
-        console.log(`[Storage Resolver] Downloading gs://${gcsInfo.bucket}/${gcsInfo.key} via authenticated GCS client...`);
+        console.log(`[Storage Resolver] Downloading gs://${gcsInfo.bucket}/${sanitizedKey} via authenticated GCS client...`);
         const s3 = new S3Client({
           endpoint: "https://storage.googleapis.com",
           region: "auto",
@@ -2883,7 +2885,7 @@ async function resolveCloudOrLocalFileBuffer(fileUrl: string): Promise<{ buffer:
         const getRes = await s3.send(
           new GetObjectCommand({
             Bucket: gcsInfo.bucket,
-            Key: gcsInfo.key,
+            Key: sanitizedKey,
           })
         );
 
@@ -2891,28 +2893,51 @@ async function resolveCloudOrLocalFileBuffer(fileUrl: string): Promise<{ buffer:
         if (byteArray && byteArray.length > 0) {
           const buf = Buffer.from(byteArray);
           try {
+            if (!fs.existsSync(PERSISTENT_UPLOADS_DIR)) {
+              fs.mkdirSync(PERSISTENT_UPLOADS_DIR, { recursive: true });
+            }
             fs.writeFileSync(cachedLocalPath, buf);
           } catch (cacheErr) { }
           console.log(`[Storage Resolver] Downloaded & cached GCS object (${(buf.length / 1048576).toFixed(1)}MB) -> ${cachedLocalPath}`);
           return { buffer: buf, resolvedFileName: baseKeyName };
         }
       } catch (s3Err: any) {
-        console.warn(`[Storage Resolver] Authenticated GCS download warning for ${gcsInfo.key}:`, s3Err?.message || s3Err);
+        console.warn(`[Storage Resolver] Authenticated GCS download warning for ${sanitizedKey}:`, s3Err?.message || s3Err);
       }
     }
   }
 
-  // 3. Fallback to standard HTTP fetch (for public URLs / Supabase URLs)
-  if (cleanUrl.startsWith("http://") || cleanUrl.startsWith("https://")) {
+  // 3. Fallback to standard HTTP fetch (normalize storage.cloud.google.com to direct storage.googleapis.com API)
+  let directFetchUrl = cleanUrl;
+  if (directFetchUrl.includes("storage.cloud.google.com/")) {
+    directFetchUrl = directFetchUrl.replace("storage.cloud.google.com/", "storage.googleapis.com/");
+  }
+
+  if (directFetchUrl.startsWith("http://") || directFetchUrl.startsWith("https://")) {
     try {
-      const fileRes = await fetch(cleanUrl);
+      console.log(`[Storage Resolver] Attempting direct fetch from URL: ${directFetchUrl}...`);
+      const fileRes = await fetch(directFetchUrl);
       if (fileRes.ok) {
         const arrayBuf = await fileRes.arrayBuffer();
         const buf = Buffer.from(arrayBuf);
-        console.log(`[Storage Resolver] Downloaded via HTTP fetch (${(buf.length / 1048576).toFixed(1)}MB)`);
-        return { buffer: buf };
+        // Verify it's actually a PDF or binary, not an HTML error or redirect page
+        if (buf.length > 100 && buf.toString("utf8", 0, 5).startsWith("%PDF")) {
+          console.log(`[Storage Resolver] Successfully downloaded authentic PDF via HTTP fetch (${(buf.length / 1048576).toFixed(1)}MB)`);
+          // Cache locally for instant page rendering
+          try {
+            const fallbackName = `${Date.now()}_cloud_download.pdf`;
+            const localSave = path.join(PERSISTENT_UPLOADS_DIR, fallbackName);
+            if (!fs.existsSync(PERSISTENT_UPLOADS_DIR)) fs.mkdirSync(PERSISTENT_UPLOADS_DIR, { recursive: true });
+            fs.writeFileSync(localSave, buf);
+          } catch (e) { }
+          return { buffer: buf };
+        } else if (buf.length > 0 && !buf.toString("utf8", 0, 15).includes("<!DOCTYPE") && !buf.toString("utf8", 0, 15).includes("<html")) {
+          return { buffer: buf };
+        } else {
+          console.warn(`[Storage Resolver] HTTP fetch returned HTML instead of raw PDF (Authentication or permissions required for URL: ${directFetchUrl})`);
+        }
       } else {
-        console.warn(`[Storage Resolver] HTTP fetch returned status ${fileRes.status} for ${cleanUrl}`);
+        console.warn(`[Storage Resolver] HTTP fetch returned status ${fileRes.status} for ${directFetchUrl}`);
       }
     } catch (fetchErr: any) {
       console.warn(`[Storage Resolver] HTTP fetch error:`, fetchErr?.message || fetchErr);
@@ -3509,6 +3534,19 @@ async function runBackgroundEbookConversion(
         }
 
         if (buffer) {
+          try {
+            const safeName = `${Date.now()}-${(effectiveFileName || "cloud_doc").replace(/[^a-zA-Z0-9._-]/g, "_")}${effectiveFileName?.toLowerCase().endsWith(".pdf") ? "" : ".pdf"}`;
+            const localDest = path.join(PERSISTENT_UPLOADS_DIR, safeName);
+            if (!fs.existsSync(localDest)) {
+              if (!fs.existsSync(PERSISTENT_UPLOADS_DIR)) fs.mkdirSync(PERSISTENT_UPLOADS_DIR, { recursive: true });
+              fs.writeFileSync(localDest, buffer);
+            }
+            savedLocalFile = localDest;
+            console.log(`[Job Worker] 🛡️ Cached cloud document locally for instant page rendering: ${localDest}`);
+          } catch (cacheErr) {
+            console.warn("[Job Worker] Local caching warning:", cacheErr);
+          }
+
           const isPdfDoc =
             fileType === "application/pdf" ||
             effectiveFileName.toLowerCase().endsWith(".pdf") ||
@@ -6378,8 +6416,9 @@ app.get("/api/ebooks/:id/chapters/:chapterId/pages", async (req, res) => {
 
     // 3. Resolve source document buffer
     let pdfBuffer: Buffer | null = null;
-    if (book.source_file_url) {
-      const resolved = await resolveCloudOrLocalFileBuffer(book.source_file_url);
+    const sourceUrlCandidate = book.source_file_url || book.external_url || (book as any).fileUrl;
+    if (sourceUrlCandidate) {
+      const resolved = await resolveCloudOrLocalFileBuffer(sourceUrlCandidate);
       if (resolved.buffer) {
         pdfBuffer = resolved.buffer;
       }

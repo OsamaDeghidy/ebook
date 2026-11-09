@@ -31,6 +31,7 @@
     "multer": "^2.4.0",
     "node-edge-tts": "^1.2.10",
     "pdf-parse": "^2.4.5",
+    "playwright-core": "^1.65.0",
     "qrcode": "^1.5.4",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
@@ -39,6 +40,7 @@
     "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
+    "roughjs": "^4.6.6",
     "vite": "^6.2.3"
   },
   "devDependencies": {
