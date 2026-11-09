@@ -348,7 +348,7 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
                 <span>العمق التدريسي وعدد المشاهد:</span>
               </label>
               <span className="text-[10px] text-purple-700 font-bold bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
-                {videoTopicOption === 'masterclass' ? '🔥 15 - 25 مشهداً (8 - 15 دقيقة)' : videoTopicOption === 'exercises' ? '✍️ 12 - 20 مشهداً' : videoTopicOption === 'concepts' ? '📺 8 - 12 مشهداً' : '⚡ 3 - 5 مشاهد'}
+                {videoTopicOption === 'masterclass' ? '🔥 10 - 15 مشهداً (5 دقائق كاملة)' : videoTopicOption === 'exercises' ? '✍️ 8 - 12 مشهداً' : videoTopicOption === 'concepts' ? '📺 6 - 8 مشاهد' : '⚡ 3 - 5 مشاهد'}
               </span>
             </div>
 
@@ -364,8 +364,8 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
               >
                 <span className="text-lg shrink-0">🏆</span>
                 <div>
-                  <div className="text-xs font-black">ماستر كلاس شامل (15 - 25 مشهداً)</div>
-                  <div className="text-[10px] opacity-85 font-normal">كورس كامل وشامل لكل أفكار وقوانين الدرس (8 - 15 دقيقة)</div>
+                  <div className="text-xs font-black">حصة كاملة مركزة (10 - 15 مشهداً)</div>
+                  <div className="text-[10px] opacity-85 font-normal">شرح مفصل 5 دقائق بدون أي تكرار مع رسوم وأمثلة</div>
                 </div>
               </button>
 

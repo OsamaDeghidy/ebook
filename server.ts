@@ -1857,19 +1857,17 @@ app.post("/api/explainroo/generate-lesson-video", async (req, res) => {
     const isReels = videoType === "reels";
     const targetSceneCount = isReels
       ? "3 إلى 5 مشاهد كبسولة سريعة ومكثفة (60-90 ثانية) تناسب الشورتس والهاتف (9:16)"
-      : videoType === "exercise_drill"
-        ? "15 إلى 20 مشهداً لحل التمارين والمسائل النموذجية خطوة بخطوة بالتفصيل الكامل مع توضيح القوانين والخطوات بالأرقام والناتج (مدة 8 إلى 12 دقيقة)"
-        : "15 إلى 25 مشهداً أكاديمياً متسلسلاً ووافياً وشاملاً لكافة مفاهيم وقوانين الدرس وأمثلته وتمارينه بالتفصيل كحصة تدريسية كاملة ومفصلة من 8 إلى 15 دقيقة";
+      : "10 إلى 15 مشهداً تعليمياً دقيقاً ومكثفاً بحد أقصى (مدة 5 دقائق كاملة) بدون أي حشو أو تكرار للكلام، يركز على الرسوم والمفاهيم والأمثلة العملية";
 
     const prompt = `
 أنت المخرج البيداغوجي والسيناريست التعليمي المتخصص لمنصة Osera AI.
-المهمة الصارمة: تحويل نص الشرح المكتوب أدناه إلى سكريبت فيديو تعليمي تفصيلي، غني ومتنوع المشاهد 100% مستمد من هذا النص تحديداً بدون أي هلوسة بصرية (Zero Hallucination).
+المهمة الصارمة: تحويل نص الشرح المكتوب أدناه إلى سكريبت فيديو تعليمي تفصيلي، غني بالرسوم والمخططات 100% مستمد من هذا النص تحديداً بدون أي هلوسة بصرية وبدون أي تكرار للكلام.
 المقرر المعتمد: "${book?.title || 'مقرر دراسي'}"
 المادة والمرحلة: "${subjectName || book?.category || 'عام'}"
 الفصل / الدرس المطلوب: "${chapter.title}"
 ${specificTopicPrompt}
 أبعاد الفيديو المطلوبة: ${aspectRatio} (${isVertical ? 'Vertical Reels 1080x1920' : 'Landscape 1920x1080'})
-العمق البيداغوجي المطلوب: ${targetSceneCount}.
+العمق البيداغوجي المحدد: ${targetSceneCount}.
 
 النص الأصلي المعتمد للشرح من صلب المذكرة (المصدر الحصري والوحيد):
 """
@@ -1880,20 +1878,19 @@ ${chapterRawText.substring(0, 15000)}
 1. **تجريد الصوت نهائياً من أسماء الأشخاص والترحيبات:**
    - يمنع منعاً باتاً ومطلقاً ذكر اسم أي شخص (سواء المعلم أو الطالب) في الشرح الصوتي إطلاقاً!
    - ممنوع المقدمات الترحيبية (أهلاً بك يا فلان، معكم المستر، إلخ). ابدأ فوراً ومباشرة في صلب المادة العلمية.
-   - لغة الإلقاء: لغة عربية فصحى مشكولة ومضبوطة بدقة بالتشكيل الكامل لنطق سليم 100% من محرك الصوت.
+   - لغة الإلقاء: لغة عربية فصحى مشكولة ومضبوطة بدقة بالتشكيل الكامل لنطق سليم 100% من محرك الصوت البشري بدون أي تداخل صوتي.
 
-2. **التفصيل الأكاديمي الشامل (من 15 إلى 25 مشهداً):**
-   - قسّم الدرس إلى تسلسل متكامل ومفصل لا يقل عن 15 إلى 25 مشهداً يغطي:
-     * المشاهد 1 إلى 4: التأسيس، الدافع، المفاهيم والمصطلحات الأساسية.
-     * المشاهد 5 إلى 9: القوانين والمعادلات والتصنيفات الدقيقة مع صيغ TeX الرياضية.
-     * المشاهد 10 إلى 18: حل المسائل والتمارين التطبيقية والتعويض الحسابي والخطوات بالأرقام.
-     * المشاهد 19 إلى 22: فخاخ وتريكات الامتحانات الشائعة وكيفية تفاديها (Exam Traps).
-     * المشاهد 23 إلى 25: التلخيص النهائي، الخرائط الذهنية، والقواعد الذهبية الشاملة.
+2. **منع التكرار نهائياً وضبط العدد بـ 10 إلى 15 مشهداً (مدة 5 دقائق):**
+   - قسّم الدرس إلى تسلسل متكامل ومفصل لا يزيد عن 10 إلى 15 مشهداً بحد أقصى، حيث يناقش كل مشهد فكرة جديدة تماماً دون تكرار أي عبارات:
+     * المشاهد 1 إلى 3: الفكرة المحورية والدافع والتعريف الأساسي.
+     * المشاهد 4 إلى 7: القواعد والمعادلات وصيغ TeX والمقارنات التوضيحية.
+     * المشاهد 8 إلى 12: الأمثلة والمسائل الحسابية والخطوات العملية بالأرقام.
+     * المشاهد 13 إلى 15: فخ الامتحان الشائع والخلاصة الذهبية النهائية.
    - إذا كان الفيديو "reels": التزم بـ 3 إلى 5 مشاهد كبسولة سريعة ومكثفة.
-   - لكل مشهد: صِغ تعليقاً صوتياً وافياً ومشكولاً (من 35 إلى 55 كلمة، 2 إلى 4 جمل تعليمية قوية ومترابطة).
+   - لكل مشهد: صِغ تعليقاً صوتياً وافياً ومشكولاً (من 35 إلى 50 كلمة منتقاة بعناية) لتكون مدة الفيديو الإجمالية في حدود 5 دقائق متوازنة.
 
 3. **تنوع التخطيط البصري وقواعد النصوص داخل البطاقات (Card Formatting):**
-   - في حقل "boxes": اكتب نص كل بطاقة بتركيز شديد وإيجاز ذكي (من 5 إلى 10 كلمات كحد أقصى) لتظهر البطاقة بسطر أو سطرين دون أي تكدس أو تداخل.
+   - في حقل "boxes": اكتب نص كل بطاقة بتركيز شديد وإيجاز ذكي (من 5 إلى 9 كلمات كحد أقصى) لتظهر البطاقة بسطر أو سطرين دون أي تكدس أو تداخل.
    - نوّع layoutType لكل مشهد بين:
      * "concept_hero": عنوان + معادلة TeX في المنتصف + بطاقة شرح واضحة في الأسفل.
      * "split_comparison": بطاقتان متجاورتان للمقارنة الثنائية.
@@ -1915,7 +1912,7 @@ ${chapterRawText.substring(0, 15000)}
       "layoutType": "concept_hero",
       "mathFormula": "\\mathbb{R} = \\mathbb{Q} \\cup \\mathbb{Q}'",
       "icon": "calculator",
-      "narration": "نص الشرح الصوتي المفصل للفقرة بالفصحى المشكولة (شرح تعليمي يبدأ فوراً بتعريف المفهوم دون أي أسماء).",
+      "narration": "نص الشرح الصوتي المفصل للفقرة بالفصحى المشكولة (شرح تعليمي يبدأ فوراً بتعريف المفهوم دون أي أسماء وبدون أي تكرار).",
       "boxes": [
         { "label": "المفهوم الأساسي في سطر مكثف وواضح", "icon": "check", "color": "teal" }
       ]
@@ -1933,13 +1930,37 @@ ${chapterRawText.substring(0, 15000)}
       }
     });
 
+    // Robust text sanitizer for Explainroo script.md narration
+    // Explainroo strictly treats {...} as pronunciation overrides {shown|spoken}.
+    // Any math curly braces like \frac{a}{b} or {3, 5} or markdown symbols break the parser!
+    const sanitizeNarrationForScript = (rawText: string): string => {
+      if (!rawText) return "";
+      let s = String(rawText);
+      // Convert TeX fractions like \frac{a}{b} to plain Arabic 'a على b'
+      s = s.replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '$1 على $2');
+      // Convert TeX \mathbb{R} to R
+      s = s.replace(/\\mathbb\{([A-Za-z])\}/g, '$1');
+      // Strip markdown headers, bolding, math dollar signs, and backslashes
+      s = s.replace(/[*#$\\]/g, ' ');
+      // Replace any curly braces { } with parentheses ( ) to prevent Explainroo ScriptError
+      s = s.replace(/\{([^|}]*)\}/g, '($1)');
+      // Strip any isolated curly braces
+      s = s.replace(/[{}]/g, '');
+      return s.replace(/\s+/g, ' ').trim();
+    };
+
     // Robust JSON Parser with TeX and escape sequence healing
     const sanitizeGeminiJson = (rawText: string): any => {
       if (!rawText) return null;
       let cleaned = rawText.trim();
       cleaned = cleaned.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/i, '').trim();
 
-      // Escape stray backslashes that are invalid in JSON string literals (e.g. \mathbb, \cup, \text)
+      // Try direct parse first
+      try {
+        return JSON.parse(cleaned);
+      } catch (e0) {}
+
+      // Escape stray backslashes that are invalid in JSON string literals
       cleaned = cleaned.replace(/\\(?!["\\/bfnrt]|u[0-9a-fA-F]{4})/g, "\\\\");
 
       try {
@@ -1965,12 +1986,12 @@ ${chapterRawText.substring(0, 15000)}
 
     let scriptData: any = sanitizeGeminiJson(geminiRes?.text || "");
 
-    // Comprehensive Grounded Fallback: If Gemini fails, construct 12 to 16 rich scenes directly from chapter content!
+    // Comprehensive Grounded Fallback: If Gemini fails, construct 12 to 15 rich scenes directly from chapter content!
     if (!scriptData || !Array.isArray(scriptData.scenes) || scriptData.scenes.length === 0) {
       console.log(`[Explainroo Fallback] Generating comprehensive grounded scenes from chapter content for: ${chapter.title}`);
-      const rawLines = chapterRawText.split(/\n+/).map((l: string) => l.trim()).filter((l: string) => l.length > 20);
+      const rawLines = chapterRawText.split(/\n+/).map((l: string) => sanitizeNarrationForScript(l)).filter((l: string) => l.length > 20);
       const generatedScenes: any[] = [];
-      const totalScenesToBuild = Math.min(16, Math.max(8, rawLines.length));
+      const totalScenesToBuild = Math.min(15, Math.max(8, rawLines.length));
 
       for (let sIdx = 0; sIdx < totalScenesToBuild; sIdx++) {
         const lineText = rawLines[sIdx % rawLines.length] || `شرح ومفاهيم ${chapter.title}`;
@@ -1982,7 +2003,7 @@ ${chapterRawText.substring(0, 15000)}
           heading: sIdx === 0 ? chapter.title : `المحور ${sIdx + 1}: ${lineText.substring(0, 35)}...`,
           layoutType: chosenLayout,
           icon: book?.category?.includes("رياض") ? "calculator" : (book?.category?.includes("حاسب") ? "cpu" : "book-open"),
-          narration: `نتناول في هذا المحور من درس ${chapter.title} التفاصيل الأساسية التالية: ${lineText}. وتعتبر هذه النقطة من الركائز الجوهرية لفهم المنهج والتفوق في الاختبارات.`,
+          narration: `نتناول في هذا المحور من درس ${chapter.title} التفاصيل التالية: ${lineText}. وتعتبر هذه النقطة من الركائز الجوهرية لفهم المنهج والتفوق في الاختبارات.`,
           boxes: chosenLayout === 'step_by_step' ? [
             { label: "الخطوة 1: استيعاب المفهوم وتحديد المعطيات بدقة", icon: "layers", color: "teal" },
             { label: "الخطوة 2: تطبيق القاعدة الرياضية المعتمدة", icon: "calculator", color: "purple" },
@@ -1991,7 +2012,7 @@ ${chapterRawText.substring(0, 15000)}
             { label: "الحالة الأولى: تطبيق القاعدة في الوضع المباشر", icon: "check", color: "teal" },
             { label: "الحالة المقابلة: الحالات الخاصة والتطبيقات الاستثنائية", icon: "scale", color: "yellow" }
           ] : [
-            { label: lineText.substring(0, 50), icon: "check", color: "teal" }
+            { label: lineText.substring(0, 45), icon: "check", color: "teal" }
           ]
         });
       }
@@ -2035,7 +2056,8 @@ ${chapterRawText.substring(0, 15000)}
     let scriptMd = `# ${scriptData.title || chapter.title}\n\n`;
     for (const sc of scriptData.scenes) {
       scriptMd += `## ${sc.id}\n`;
-      const words = (sc.narration || "").split(/\s+/).filter(Boolean);
+      const cleanNarrationText = sanitizeNarrationForScript(sc.narration || "");
+      const words = cleanNarrationText.split(/\s+/).filter(Boolean);
       const boxesCount = Array.isArray(sc.boxes) ? sc.boxes.length : 0;
 
       // Calculate evenly spaced marks across the full narration words
