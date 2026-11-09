@@ -766,10 +766,16 @@ export default function BookDetailsRoute({
       const data = await res.json();
       if (data.newChapters && data.newChapters.length > 0) {
         const updatedChapters = [...(book.chapters || []), ...data.newChapters];
-        setEbooks(prev => prev.map(b => b.id === book.id ? { ...b, chapters: updatedChapters, blueprint: data.book?.blueprint || (b as any).blueprint } as any : b));
+        const updatedBlueprint = data.book?.blueprint || (book as any).blueprint;
+        setEbooks(prev => prev.map(b => b.id === book.id ? { ...b, chapters: updatedChapters, blueprint: updatedBlueprint } as any : b));
         try {
-          await supabase.from('books').update({ chapters: updatedChapters }).eq('id', book.id);
-        } catch (e) {}
+          await supabase.from('books').update({ 
+            chapters: updatedChapters,
+            blueprint: updatedBlueprint
+          }).eq('id', book.id);
+        } catch (syncErr) {
+          console.warn("[BookDetails] Supabase chapter expand sync notice:", syncErr);
+        }
 
         const newCh = data.newChapters[0];
         if (newCh?.id) {

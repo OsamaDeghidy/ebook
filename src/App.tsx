@@ -618,6 +618,10 @@ function AppContent() {
         semester: payload.semester || '',
         academic_year: payload.academic_year || '',
         source_file_name: payload.fileName,
+        source_file_url: generatedEbook.source_file_url || payload.fileUrl || undefined,
+        blueprint: generatedEbook.blueprint || undefined,
+        page_offset: generatedEbook.page_offset || 0,
+        original_text: generatedEbook.original_text || undefined,
         tags: combinedSeoTags,
         price: Number(payload.price) || 0,
         preview_video_url: payload.preview_video_url,
@@ -668,7 +672,10 @@ function AppContent() {
           exams: newBook.exams || [],
           pregeneration_status: 'completed',
           pregeneration_percent: 100,
-          preview_video_url: newBook.preview_video_url || null
+          preview_video_url: newBook.preview_video_url || null,
+          source_file_url: newBook.source_file_url || generatedEbook.source_file_url || payload.fileUrl || null,
+          blueprint: newBook.blueprint || generatedEbook.blueprint || null,
+          page_offset: (newBook as any).page_offset || (generatedEbook as any).page_offset || 0
         };
 
         const { error: insertError } = await supabase.from('books').upsert(fullDbPayload);

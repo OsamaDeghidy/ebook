@@ -887,9 +887,11 @@ async function syncBookToSupabase(book: any) {
     basePayload.pregeneration_status = book.pregeneration_status || 'completed';
     basePayload.pregeneration_percent = book.pregeneration_percent !== undefined ? book.pregeneration_percent : 100;
     if (book.is_stem_enhanced !== undefined) basePayload.is_stem_enhanced = book.is_stem_enhanced;
+    if (book.blueprint) basePayload.blueprint = book.blueprint;
+    if (book.page_offset !== undefined) basePayload.page_offset = Number(book.page_offset) || 0;
 
     let { error } = await supabase.from('books').upsert(basePayload, { onConflict: 'id' });
-    if (error && (error.message.includes('academic_system') || error.message.includes('curriculum_') || error.message.includes('language') || error.message.includes('column'))) {
+    if (error && (error.message.includes('academic_system') || error.message.includes('curriculum_') || error.message.includes('language') || error.message.includes('column') || error.message.includes('blueprint'))) {
       // If columns are not yet created in Supabase, retry with core fields
       const fallbackPayload = { ...basePayload };
       delete fallbackPayload.academic_system;
@@ -902,6 +904,8 @@ async function syncBookToSupabase(book: any) {
       delete fallbackPayload.pregeneration_status;
       delete fallbackPayload.pregeneration_percent;
       delete fallbackPayload.is_stem_enhanced;
+      delete fallbackPayload.blueprint;
+      delete fallbackPayload.page_offset;
       const retryResult = await supabase.from('books').upsert(fallbackPayload, { onConflict: 'id' });
       error = retryResult.error;
     }
@@ -5288,6 +5292,26 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
     return res.status(404).json({ error: "Ebook not found" });
   }
 
+  // 🛡️ REHYDRATE METADATA FROM SUPABASE ON STATELESS/COLD CLOUD RUN CONTAINER
+  if (!ebook.blueprint || !ebook.source_file_url) {
+    try {
+      const { data: dbData } = await supabase
+        .from('books')
+        .select('blueprint, source_file_url, page_offset, original_text')
+        .eq('id', ebook.id)
+        .maybeSingle();
+      if (dbData) {
+        if (dbData.blueprint && !ebook.blueprint) ebook.blueprint = dbData.blueprint;
+        if (dbData.source_file_url && !ebook.source_file_url) ebook.source_file_url = dbData.source_file_url;
+        if (dbData.page_offset !== undefined && (ebook as any).page_offset === undefined) (ebook as any).page_offset = dbData.page_offset;
+        if (dbData.original_text && !ebook.original_text) ebook.original_text = dbData.original_text;
+        console.log(`[Expand Chapters] 🛡️ Successfully rehydrated blueprint & cloud assets from Supabase for "${ebook.title}"`);
+      }
+    } catch (rehydrateErr) {
+      console.warn("[Expand Chapters] Supabase rehydration notice:", rehydrateErr);
+    }
+  }
+
   const ai = getGenAIClient();
   if (!ai) {
     return res.status(400).json({ error: "Gemini API key is required." });
@@ -5595,6 +5619,14 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
       const cleanGrade = (ebook as any).grade_level || 'المرحلة المقررة';
 
       if (!remainingSlice) {
+        if (!sourceFileUrl && (!fullText || fullText.length < 50)) {
+          return res.json({
+            success: true,
+            newChapters: [],
+            book: ebook,
+            message: "تم بالفعل استكمال وتغطية كافة فصول ومحتويات المذكرة المتاحة بنجاح! لا توجد فصول إضافية مسجلة في الفهرس الأصلي."
+          });
+        }
         remainingSlice = `الدرس ${nextOrder} من مقرر ${ebook.title} المعتمد لمرحلة ${cleanGrade}. يركز المحتوى بدقة وأصالة على شرح النظريات والمفاهيم العلمية والتطبيقية المقررة لهذا الترتيب الدراسي وفق المنهج الوطني دون أي استطراد عام.`;
       }
 
@@ -5819,23 +5851,22 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
     });
     console.log("\x1b[35m=======================================================\n\x1b[0m");
 
-    // Save to Supabase asynchronously (fire-and-forget, non-blocking)
+    // 🛡️ GUARANTEED SYNCHRONOUS PERSISTENCE TO SUPABASE (Never fire-and-forget on Cloud Run!)
     try {
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(ebook.id));
       if (isUuid) {
-        Promise.resolve(
-          supabase.from('books').update({
-            chapters: ebook.chapters,
-            blueprint: ebook.blueprint
-          }).eq('id', ebook.id)
-        ).then(() => {
-          console.log(`[Supabase Async] Successfully synced expanded chapters for "${ebook.title}"`);
-        }).catch((dbErr: any) => {
-          console.warn("[Supabase Async] chapters update error:", dbErr?.message || dbErr);
-        });
+        const { error: syncErr } = await supabase.from('books').update({
+          chapters: ebook.chapters,
+          blueprint: ebook.blueprint
+        }).eq('id', ebook.id);
+        if (syncErr) {
+          console.warn("[Supabase Sync] Chapters update notice:", syncErr.message);
+        } else {
+          console.log(`[Supabase Sync] 🛡️ Guaranteed persistence of expanded chapters for "${ebook.title}"`);
+        }
       }
     } catch (dbErr) {
-      console.warn("Supabase chapters async trigger error:", dbErr);
+      console.warn("Supabase chapters sync exception:", dbErr);
     }
 
     const pendingInBlueprint = ebook.blueprint && Array.isArray(ebook.blueprint.lessons) ? ebook.blueprint.lessons.filter(l => l.status === "pending").length : 0;
@@ -6443,6 +6474,15 @@ app.get("/api/ebooks/:id/chapters/:chapterId/pages", async (req, res) => {
 
     // 3. Resolve source document buffer
     let pdfBuffer: Buffer | null = null;
+    if (!book.source_file_url) {
+      try {
+        const { data: dbBook } = await supabase.from('books').select('source_file_url, page_offset, external_url').eq('id', book.id).maybeSingle();
+        if (dbBook?.source_file_url) {
+          book.source_file_url = dbBook.source_file_url;
+          if (dbBook.page_offset !== undefined) (book as any).page_offset = dbBook.page_offset;
+        }
+      } catch (e) {}
+    }
     const sourceUrlCandidate = book.source_file_url || book.external_url || (book as any).fileUrl;
     if (sourceUrlCandidate) {
       const resolved = await resolveCloudOrLocalFileBuffer(sourceUrlCandidate);
