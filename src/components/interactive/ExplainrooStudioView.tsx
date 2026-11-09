@@ -62,6 +62,12 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
   const [lessonVideoUrl, setLessonVideoUrl] = useState<string | null>(null);
   const [lessonVideoSizeMb, setLessonVideoSizeMb] = useState<number>(0);
 
+  // Batch Video Generation State
+  const [batchJob, setBatchJob] = useState<any | null>(null);
+  const [isStartingBatch, setIsStartingBatch] = useState<boolean>(false);
+  const [totalChaptersCount, setTotalChaptersCount] = useState<number>(0);
+  const [chaptersWithVideoCount, setChaptersWithVideoCount] = useState<number>(0);
+
   // Live generation state
   const [isGeneratingLesson, setIsGeneratingLesson] = useState<boolean>(false);
   const [generationStep, setGenerationStep] = useState<string>('');
@@ -69,6 +75,22 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
   const [generationError, setGenerationError] = useState<string | null>(null);
 
   const cleanChapterId = String(chapter.id || 'chapter').replace(/[^a-zA-Z0-9_-]/g, '_');
+
+  const fetchBatchStatus = async () => {
+    try {
+      const res = await fetch(`/api/explainroo/batch-status/${book.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setTotalChaptersCount(data.totalChaptersInBook || (book.chapters?.length || 0));
+        setChaptersWithVideoCount(data.chaptersWithVideo || 0);
+        if (data.job) {
+          setBatchJob(data.job);
+        }
+      }
+    } catch (e) {
+      console.warn('Error fetching batch status:', e);
+    }
+  };
 
   const fetchChapterVideos = async () => {
     try {
@@ -89,11 +111,76 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
     }
   };
 
-  // Check if lesson video already exists on mount
+  // Check if lesson video already exists on mount & poll batch status
   useEffect(() => {
     checkLessonVideoStatus();
     fetchChapterVideos();
-  }, [chapter.id]);
+    fetchBatchStatus();
+  }, [chapter.id, book.id]);
+
+  useEffect(() => {
+    if (batchJob?.status === 'running') {
+      const interval = setInterval(() => {
+        fetchBatchStatus();
+        fetchChapterVideos();
+      }, 4000);
+      return () => clearInterval(interval);
+    }
+  }, [batchJob?.status, book.id]);
+
+  const handleStartBatchVideoGeneration = async (forceAll = false) => {
+    setIsStartingBatch(true);
+    try {
+      const computedTopic = videoTopicOption === 'masterclass'
+        ? 'حصة تدريسية شاملة وكاملة من 10 إلى 15 مشهداً تغطي كافة المفاهيم والقوانين والتمارين بالتفصيل الأكاديمي'
+        : videoTopicOption === 'exercises' 
+          ? 'حل المسائل والتمارين النموذجية للدرس وتطبيق القوانين بالتفصيل خطوة بخطوة' 
+          : videoTopicOption === 'reels' 
+            ? 'ملخص سريع ومركز للدرس كبسولة سريعة' 
+            : 'شرح مفاهيم الدرس الأساسية والمصطلحات العلمية';
+
+      const computedType = videoTopicOption === 'reels' ? 'reels' : videoTopicOption === 'exercises' ? 'exercise_drill' : 'explainer';
+
+      const res = await fetch('/api/explainroo/batch-generate-book', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bookId: book.id,
+          aspectRatio,
+          videoTopic: computedTopic,
+          videoType: computedType,
+          theme: selectedTheme,
+          musicStyle,
+          teacherName,
+          teacherPhone,
+          subjectName,
+          isDraft: true,
+          onlyMissing: !forceAll
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.job) {
+          setBatchJob(data.job);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to trigger batch video generation:', e);
+    } finally {
+      setIsStartingBatch(false);
+      fetchBatchStatus();
+    }
+  };
+
+  const handleCancelBatchVideo = async () => {
+    try {
+      const res = await fetch(`/api/explainroo/batch-cancel/${book.id}`, { method: 'POST' });
+      if (res.ok) {
+        fetchBatchStatus();
+      }
+    } catch (e) {}
+  };
 
   const checkLessonVideoStatus = async () => {
     try {
@@ -261,6 +348,104 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
             </div>
           )}
         </div>
+      </div>
+
+      {/* 2.5 BATCH VIDEO MANAGER (توليد فيديوهات المنهج كاملاً في الخلفية) */}
+      <div className="bg-gradient-to-br from-indigo-950 via-slate-900 to-purple-950 rounded-3xl p-6 border border-indigo-500/30 shadow-xl text-white space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300 shrink-0">
+              <Sparkles className="w-6 h-6 text-amber-300" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm sm:text-base font-black">
+                  توليد فيديوهات جميع فصول المقرر في الخلفية (Batch Video Engine)
+                </h3>
+                {batchJob?.status === 'running' && (
+                  <span className="px-2.5 py-0.5 rounded-full bg-amber-400/20 border border-amber-400/40 text-amber-300 text-[10px] font-black animate-pulse flex items-center gap-1">
+                    <RefreshCw className="w-3 h-3 animate-spin" />
+                    <span>قيد المعالجة الآن</span>
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-300/80 mt-0.5">
+                ينتج السيرفر فيديوهات لجميع الفصول تباعاً دون تجميد المتصفح، مع أولوية مطلقة لأي فيديو فردي تطلبه.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/10 text-xs font-bold text-slate-200">
+              جاهز: <span className="font-mono text-emerald-300 font-black">{chaptersWithVideoCount}</span> / <span className="font-mono">{totalChaptersCount || (book.chapters?.length || 0)}</span> فصول
+            </span>
+          </div>
+        </div>
+
+        {/* Live Progress Bar if Batch is Running */}
+        {batchJob?.status === 'running' ? (
+          <div className="p-4 rounded-2xl bg-black/30 border border-white/10 space-y-3">
+            <div className="flex items-center justify-between text-xs font-bold">
+              <div className="flex items-center gap-2 text-indigo-200">
+                <RefreshCw className="w-4 h-4 animate-spin text-amber-300" />
+                <span className="line-clamp-1">{batchJob.currentStep || 'جاري معالجة الفصول في الخلفية...'}</span>
+              </div>
+              <span className="font-mono text-amber-300 font-black">{batchJob.progressPercent || 0}%</span>
+            </div>
+
+            <div className="w-full h-2.5 rounded-full bg-slate-800 overflow-hidden p-0.5 border border-white/5">
+              <div 
+                className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-amber-400 rounded-full transition-all duration-500"
+                style={{ width: `${Math.max(5, batchJob.progressPercent || 0)}%` }}
+              />
+            </div>
+
+            <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+              <span>الفصل الحالي: <strong className="text-white">{batchJob.currentChapterTitle || 'قيد البدء'}</strong></span>
+              <button
+                type="button"
+                onClick={handleCancelBatchVideo}
+                className="text-rose-400 hover:text-rose-300 font-bold transition cursor-pointer"
+              >
+                إيقاف مؤقت
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-white/10">
+            <div className="text-xs text-slate-300 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>
+                {chaptersWithVideoCount >= totalChaptersCount && totalChaptersCount > 0
+                  ? 'رائع! جميع فصول هذا المقرر لديها فيديوهات شرح جاهزة.'
+                  : `يتبقى ${Math.max(0, totalChaptersCount - chaptersWithVideoCount)} فصول تحتاج إلى توليد فيديوهات.`}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => handleStartBatchVideoGeneration(false)}
+              disabled={isStartingBatch || isGeneratingLesson}
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 transition active:scale-98 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              {isStartingBatch ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>جاري جدولة الفصول...</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-4 h-4 fill-current" />
+                  <span>
+                    {chaptersWithVideoCount >= totalChaptersCount && totalChaptersCount > 0
+                      ? 'إعادة توليد جميع الفصول من جديد'
+                      : `توليد فيديوهات الفصول المتبقية (${Math.max(0, totalChaptersCount - chaptersWithVideoCount)}) 🚀`}
+                  </span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 3. ONE-TOUCH CUSTOMIZATION STRIP (شريط التحكم والتشغيل الموحد) */}

@@ -1861,8 +1861,111 @@ app.post("/api/explainroo/render", async (req, res) => {
   }
 });
 
-// 🎬 Explainroo Arabized Lesson Video Generator (Dynamic Pedagogical Pipeline + Video Library)
-app.post("/api/explainroo/generate-lesson-video", async (req, res) => {
+// 🔒 Priority Lock & Preemption for Video Rendering
+let activeInteractiveRendersCount = 0;
+
+function isInteractiveRenderingActive(): boolean {
+  return activeInteractiveRendersCount > 0;
+}
+
+function acquireInteractiveRenderSlot(): void {
+  activeInteractiveRendersCount++;
+  console.log(`[Video Priority Lock] Interactive render slot acquired. Total active: ${activeInteractiveRendersCount}`);
+}
+
+function releaseInteractiveRenderSlot(): void {
+  activeInteractiveRendersCount = Math.max(0, activeInteractiveRendersCount - 1);
+  console.log(`[Video Priority Lock] Interactive render slot released. Total active: ${activeInteractiveRendersCount}`);
+}
+
+/**
+ * Asynchronous, Non-Blocking Explainroo Render Process Runner.
+ * Replaces blocking execSync to prevent freezing the Node.js event loop
+ * and allows high-concurrency requests to proceed normally across multi-core systems.
+ */
+function runAsyncExplainrooRender(
+  explainrooPath: string,
+  renderFolder: string,
+  renderFlags: string,
+  sizeFlag: string,
+  targetOutMp4: string,
+  workerCount: number
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const extraArgs: string[] = [];
+    if (renderFlags) extraArgs.push(...renderFlags.trim().split(/\s+/));
+    if (sizeFlag) extraArgs.push(...sizeFlag.trim().split(/\s+/));
+
+    const args = [
+      "bin/explainroo.js",
+      "render",
+      renderFolder,
+      ...extraArgs,
+      "--out",
+      targetOutMp4,
+      "--workers",
+      String(workerCount)
+    ];
+
+    console.log(`[Explainroo Async Spawn] Spawning: node ${args.join(" ")} (Workers: ${workerCount})...`);
+
+    const child = spawn("node", args, {
+      cwd: explainrooPath,
+      env: {
+        ...process.env,
+        EXPLAINROO_CHROME: process.env.EXPLAINROO_CHROME || (process.platform === 'linux' ? '/usr/bin/chromium' : undefined)
+      }
+    });
+
+    let stderr = "";
+    let stdout = "";
+
+    child.stdout?.on("data", (data) => {
+      stdout += data.toString();
+    });
+
+    child.stderr?.on("data", (data) => {
+      stderr += data.toString();
+    });
+
+    child.on("error", (err) => {
+      console.error("[Explainroo Spawn Error]:", err);
+      reject(err);
+    });
+
+    child.on("close", (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        console.error(`[Explainroo Render Error Details Code ${code}]:`, { stderr, stdout });
+        reject(new Error(`فشل ريندر الفيديو على السيرفر (كود ${code}): ${stderr || stdout || "فشل غير محدد"}`));
+      }
+    });
+  });
+}
+
+/**
+ * Core Reusable Pedagogical Video Generation Engine
+ * Used by single interactive renders (VIP priority) and the background batch worker.
+ */
+async function generateLessonVideoCore(params: {
+  bookId: string;
+  chapterId: string;
+  chapterTitle?: string;
+  chapterContent?: string;
+  aspectRatio?: string;
+  voice?: string;
+  videoTopic?: string;
+  videoType?: string;
+  theme?: string;
+  musicStyle?: string;
+  teacherName?: string;
+  teacherPhone?: string;
+  subjectName?: string;
+  isDraft?: boolean;
+  force?: boolean;
+  runId?: string;
+}) {
   const {
     bookId,
     chapterId,
@@ -1880,10 +1983,10 @@ app.post("/api/explainroo/generate-lesson-video", async (req, res) => {
     isDraft = false,
     force = false,
     runId = `run_${Date.now()}`
-  } = req.body;
+  } = params;
 
   if (!chapterId) {
-    return res.status(400).json({ error: "chapterId مطلوب لتوليد الفيديو." });
+    throw new Error("chapterId مطلوب لتوليد الفيديو.");
   }
 
   // Load book & chapter details
@@ -2510,24 +2613,15 @@ ${chapterRawText.substring(0, 15000)}
 
     const sizeFlag = isVertical ? "--size 9:16" : "--size 16:9";
     const workerCount = Math.max(1, Math.min(os.cpus()?.length || 2, 2));
-    const renderCmd = `node bin/explainroo.js render "${renderFolder}" ${renderFlags} ${sizeFlag} --out "${targetOutMp4}" --workers ${workerCount}`;
 
-    console.log(`[Explainroo] Executing render command: ${renderCmd} (Workers: ${workerCount})...`);
-    try {
-      execSync(renderCmd, { 
-        cwd: explainrooPath, 
-        stdio: "pipe",
-        env: {
-          ...process.env,
-          EXPLAINROO_CHROME: process.env.EXPLAINROO_CHROME || (process.platform === 'linux' ? '/usr/bin/chromium' : undefined)
-        }
-      });
-    } catch (renderErr: any) {
-      const stderr = renderErr?.stderr?.toString('utf8') || '';
-      const stdout = renderErr?.stdout?.toString('utf8') || '';
-      console.error(`[Explainroo Render Error Details]:`, { stderr, stdout, message: renderErr.message });
-      throw new Error(`فشل ريندر الفيديو على السيرفر: ${stderr || stdout || renderErr.message}`);
-    }
+    await runAsyncExplainrooRender(
+      explainrooPath,
+      renderFolder,
+      renderFlags,
+      sizeFlag,
+      targetOutMp4,
+      workerCount
+    );
 
     // Also copy to canonical chapter video path so player always loads latest
     const canonicalDir = path.join(EXPLAINROO_PROJECTS_DIR, cleanChapterId);
@@ -2605,6 +2699,7 @@ ${chapterRawText.substring(0, 15000)}
         if (!Array.isArray(targetCh.videos)) targetCh.videos = [];
         targetCh.videos.unshift(newVideoItem);
         saveEbooks(allBooks);
+        syncBookToSupabase(targetBook).catch(e => console.warn("[Supabase Sync Video Item Warning]:", e));
       }
     }
 
@@ -2615,7 +2710,7 @@ ${chapterRawText.substring(0, 15000)}
       videoUrl
     });
 
-    res.json({
+    return {
       success: true,
       chapterId: cleanChapterId,
       video: newVideoItem,
@@ -2623,7 +2718,7 @@ ${chapterRawText.substring(0, 15000)}
       aspectRatio,
       quality: isDraft ? "draft" : "full",
       message: "تم توليد الفيديو وإضافته إلى مكتبة وسائط الدرس بنجاح!"
-    });
+    };
   } catch (err: any) {
     console.error("[Explainroo Generation Error]:", err);
     explainrooProgressMap.set(cleanChapterId, {
@@ -2632,8 +2727,258 @@ ${chapterRawText.substring(0, 15000)}
       progress: 0,
       error: err.message
     });
-    res.status(500).json({ error: err.message || "حدث خطأ أثناء توليد فيديو الشرح." });
+    throw err;
   }
+}
+
+// 🎬 Explainroo Arabized Lesson Video Generator (Interactive VIP Route)
+app.post("/api/explainroo/generate-lesson-video", async (req, res) => {
+  acquireInteractiveRenderSlot();
+  try {
+    const result = await generateLessonVideoCore(req.body);
+    return res.json(result);
+  } catch (err: any) {
+    console.error("[Explainroo Route Error]:", err);
+    return res.status(500).json({ error: err.message || "حدث خطأ أثناء توليد فيديو الشرح." });
+  } finally {
+    releaseInteractiveRenderSlot();
+  }
+});
+
+// 🎬 Background Video Manager & Priority Batch Queue Architecture
+interface BatchVideoJob {
+  bookId: string;
+  status: 'idle' | 'running' | 'paused' | 'completed' | 'error';
+  totalChapters: number;
+  completedChapters: number;
+  currentChapterIndex: number;
+  currentChapterId: string | null;
+  currentChapterTitle: string | null;
+  currentStep: string;
+  progressPercent: number;
+  startedAt: string;
+  completedAt?: string;
+  error?: string;
+  videosCreated: Array<{
+    chapterId: string;
+    chapterTitle: string;
+    videoUrl: string;
+    sizeMb: number;
+  }>;
+}
+
+const batchVideoJobs = new Map<string, BatchVideoJob>();
+
+async function runBatchVideoWorker(bookId: string, options: any = {}) {
+  const existingJob = batchVideoJobs.get(bookId);
+  if (existingJob && existingJob.status === 'running') {
+    console.warn(`[Batch Video Worker] Batch job already running for book ${bookId}`);
+    return;
+  }
+
+  const ebooks = loadEbooks();
+  const book = ebooks.find((b: any) => b.id === bookId);
+  if (!book || !Array.isArray(book.chapters) || book.chapters.length === 0) {
+    batchVideoJobs.set(bookId, {
+      bookId,
+      status: 'error',
+      totalChapters: 0,
+      completedChapters: 0,
+      currentChapterIndex: 0,
+      currentChapterId: null,
+      currentChapterTitle: null,
+      currentStep: 'الكتاب غير موجود أو لا يحتوي على فصول دراسية.',
+      progressPercent: 0,
+      startedAt: new Date().toISOString(),
+      error: 'الكتاب غير موجود أو لا يحتوي على فصول',
+      videosCreated: []
+    });
+    return;
+  }
+
+  // Filter chapters if onlyMissing is specified (default true)
+  const onlyMissing = options.onlyMissing !== false;
+  let targetChapters = book.chapters;
+  if (onlyMissing) {
+    targetChapters = book.chapters.filter((c: any) => !Array.isArray(c.videos) || c.videos.length === 0);
+  }
+
+  const totalChapters = targetChapters.length;
+  if (totalChapters === 0) {
+    batchVideoJobs.set(bookId, {
+      bookId,
+      status: 'completed',
+      totalChapters: book.chapters.length,
+      completedChapters: book.chapters.length,
+      currentChapterIndex: book.chapters.length,
+      currentChapterId: null,
+      currentChapterTitle: null,
+      currentStep: 'جميع فصول الكتاب لديها فيديوهات جاهزة بالفعل! 🎉',
+      progressPercent: 100,
+      startedAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+      videosCreated: []
+    });
+    return;
+  }
+
+  const job: BatchVideoJob = {
+    bookId,
+    status: 'running',
+    totalChapters,
+    completedChapters: 0,
+    currentChapterIndex: 0,
+    currentChapterId: null,
+    currentChapterTitle: null,
+    currentStep: 'بدء طابور توليد فيديوهات الفصول في الخلفية...',
+    progressPercent: 0,
+    startedAt: new Date().toISOString(),
+    videosCreated: []
+  };
+  batchVideoJobs.set(bookId, job);
+
+  // Run in background without blocking Node event loop
+  (async () => {
+    try {
+      for (let idx = 0; idx < targetChapters.length; idx++) {
+        const currentJobState = batchVideoJobs.get(bookId);
+        if (currentJobState?.status === 'paused' || !currentJobState) {
+          console.log(`[Batch Video Worker] Job for book ${bookId} was paused or cancelled.`);
+          return;
+        }
+
+        const chapter = targetChapters[idx];
+        job.currentChapterIndex = idx + 1;
+        job.currentChapterId = chapter.id;
+        job.currentChapterTitle = chapter.title;
+        job.currentStep = `جاري معالجة الفصل (${idx + 1}/${totalChapters}): "${chapter.title}"...`;
+        job.progressPercent = Math.round((idx / totalChapters) * 100);
+
+        // Preemptive VIP check: yield if an interactive single-video render is running
+        while (isInteractiveRenderingActive()) {
+          console.log(`[Batch Video Worker] VIP single video interactive render in progress. Yielding 5 seconds...`);
+          job.currentStep = `في وضع الانتظار المؤقت لإعطاء الأسبقية لتوليد فيديو فردي مطلوب... (${chapter.title})`;
+          await new Promise(r => setTimeout(r, 5000));
+        }
+
+        console.log(`[Batch Video Worker] Generating video for chapter ${idx + 1}/${totalChapters}: "${chapter.title}"`);
+        try {
+          const videoResult = await generateLessonVideoCore({
+            bookId,
+            chapterId: chapter.id,
+            chapterTitle: chapter.title,
+            chapterContent: chapter.content,
+            aspectRatio: options.aspectRatio || "16:9",
+            theme: options.theme || "paper",
+            musicStyle: options.musicStyle || "warm",
+            videoType: options.videoType || "explainer",
+            teacherName: options.teacherName || "",
+            teacherPhone: options.teacherPhone || "",
+            subjectName: options.subjectName || "",
+            isDraft: options.isDraft !== undefined ? options.isDraft : true,
+            force: true,
+            runId: `batch_${Date.now()}_${idx}`
+          });
+
+          if (videoResult && videoResult.video) {
+            job.videosCreated.push({
+              chapterId: chapter.id,
+              chapterTitle: chapter.title,
+              videoUrl: videoResult.videoUrl,
+              sizeMb: videoResult.video.sizeMb || 0
+            });
+            job.completedChapters++;
+            job.progressPercent = Math.round((job.completedChapters / totalChapters) * 100);
+            job.currentStep = `تم اكتمال فيديو "${chapter.title}" بنجاح (${job.completedChapters}/${totalChapters})!`;
+
+            // Immediate sync to Supabase for durability
+            const latestEbooks = loadEbooks();
+            const latestBook = latestEbooks.find((b: any) => b.id === bookId);
+            if (latestBook) {
+              await syncBookToSupabase(latestBook);
+              console.log(`[Batch Video Worker] Synced book ${bookId} to Supabase after chapter ${chapter.title}`);
+            }
+          }
+        } catch (chapterErr: any) {
+          console.error(`[Batch Video Worker] Error on chapter ${chapter.title}:`, chapterErr);
+          job.currentStep = `تخطي خطأ في الفصل "${chapter.title}": ${chapterErr.message || 'خطأ غير معروف'}`;
+        }
+
+        // Brief cooldown between chapters
+        await new Promise(r => setTimeout(r, 1000));
+      }
+
+      job.status = 'completed';
+      job.progressPercent = 100;
+      job.currentStep = `اكتمل توليد فيديوهات جميع الفصول بنجاح (${job.completedChapters}/${totalChapters})! 🎉`;
+      job.completedAt = new Date().toISOString();
+      console.log(`[Batch Video Worker] Completed batch job for book ${bookId}. Total created: ${job.completedChapters}`);
+    } catch (globalErr: any) {
+      console.error(`[Batch Video Worker Global Error]:`, globalErr);
+      job.status = 'error';
+      job.error = globalErr.message || 'فشل طابور التوليد الجماعي';
+      job.currentStep = `فشل الطابور: ${job.error}`;
+    }
+  })();
+}
+
+// 🎬 Batch Video Generation Endpoints
+app.post("/api/explainroo/batch-generate-book", async (req, res) => {
+  const { bookId, ...options } = req.body;
+  if (!bookId) {
+    return res.status(400).json({ error: "bookId مطلوب لتشغيل التوليد الجماعي للفصول." });
+  }
+  const existingJob = batchVideoJobs.get(bookId);
+  if (existingJob && existingJob.status === "running") {
+    return res.json({
+      success: true,
+      message: "طابور التوليد قيد التشغيل بالفعل لهذا المقرر.",
+      job: existingJob
+    });
+  }
+  runBatchVideoWorker(bookId, options);
+  return res.json({
+    success: true,
+    message: "تم بدء طابور توليد فيديوهات الفصول في الخلفية بنجاح.",
+    job: batchVideoJobs.get(bookId)
+  });
+});
+
+app.get("/api/explainroo/batch-status/:bookId", (req, res) => {
+  const { bookId } = req.params;
+  const job = batchVideoJobs.get(bookId);
+  const ebooks = loadEbooks();
+  const book = ebooks.find((b: any) => b.id === bookId);
+  const totalChaptersInBook = book?.chapters?.length || 0;
+  const chaptersWithVideo = (book?.chapters || []).filter((c: any) => Array.isArray(c.videos) && c.videos.length > 0).length;
+
+  return res.json({
+    success: true,
+    totalChaptersInBook,
+    chaptersWithVideo,
+    job: job || {
+      bookId,
+      status: chaptersWithVideo === totalChaptersInBook && totalChaptersInBook > 0 ? "completed" : "idle",
+      totalChapters: totalChaptersInBook,
+      completedChapters: chaptersWithVideo,
+      currentChapterIndex: 0,
+      currentChapterId: null,
+      currentChapterTitle: null,
+      progressPercent: totalChaptersInBook > 0 ? Math.round((chaptersWithVideo / totalChaptersInBook) * 100) : 0,
+      currentStep: chaptersWithVideo === totalChaptersInBook && totalChaptersInBook > 0 ? "جميع الفصول تمتلك فيديوهات جاهزة" : "جاهز لبدء التوليد الجماعي",
+      videosCreated: []
+    }
+  });
+});
+
+app.post("/api/explainroo/batch-cancel/:bookId", (req, res) => {
+  const { bookId } = req.params;
+  const job = batchVideoJobs.get(bookId);
+  if (job) {
+    job.status = "paused";
+    job.currentStep = "تم إيقاف طابور التوليد مؤقتاً بطلب من المستخدم.";
+  }
+  return res.json({ success: true, message: "تم إيقاف طابور التوليد.", job });
 });
 
 // 🎬 Get all videos in a chapter library
