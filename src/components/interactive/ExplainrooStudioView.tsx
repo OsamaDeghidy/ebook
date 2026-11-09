@@ -28,8 +28,8 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
     return localStorage.getItem('osera_music_style') || 'warm';
   });
 
-  // Video topic focus
-  const [videoTopicOption, setVideoTopicOption] = useState<'concepts' | 'exercises' | 'reels'>('concepts');
+  // Video topic focus & pedagogical depth
+  const [videoTopicOption, setVideoTopicOption] = useState<'masterclass' | 'exercises' | 'concepts' | 'reels'>('masterclass');
 
   // Teacher Personalization State (Collapsible & Persistent)
   const [showBranding, setShowBranding] = useState<boolean>(false);
@@ -126,11 +126,13 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
 
     const clientRunId = `run_${Date.now()}`;
 
-    const computedTopic = videoTopicOption === 'exercises' 
-      ? 'حل المسائل والتمارين النموذجية للدرس وتطبيق القوانين' 
-      : videoTopicOption === 'reels' 
-        ? 'ملخص سريع ومركز للدرس كبسولة سريعة' 
-        : 'شرح مفاهيم الدرس الأساسية والمصطلحات العلمية';
+    const computedTopic = videoTopicOption === 'masterclass'
+      ? 'حصة تدريسية شاملة وكاملة من 15 إلى 25 مشهداً تغطي كافة المفاهيم والقوانين والتمارين بالتفصيل الأكاديمي'
+      : videoTopicOption === 'exercises' 
+        ? 'حل المسائل والتمارين النموذجية للدرس وتطبيق القوانين بالتفصيل خطوة بخطوة' 
+        : videoTopicOption === 'reels' 
+          ? 'ملخص سريع ومركز للدرس كبسولة سريعة' 
+          : 'شرح مفاهيم الدرس الأساسية والمصطلحات العلمية';
 
     const computedType = videoTopicOption === 'reels' ? 'reels' : videoTopicOption === 'exercises' ? 'exercise_drill' : 'explainer';
 
@@ -338,14 +340,51 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
             </div>
           </div>
 
-          {/* B. أبعاد الفيديو وموضوعه (FORMAT & TOPIC) */}
+          {/* B. أبعاد الفيديو والعمق البيداغوجي (FORMAT & PEDAGOGICAL DEPTH) */}
           <div className="space-y-2.5">
-            <label className="text-xs font-black text-slate-800 flex items-center gap-1.5">
-              <Layers className="w-4 h-4 text-purple-600" />
-              <span>مقاس الفيديو ونوع الشرح:</span>
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                <Layers className="w-4 h-4 text-purple-600" />
+                <span>العمق التدريسي وعدد المشاهد:</span>
+              </label>
+              <span className="text-[10px] text-purple-700 font-bold bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
+                {videoTopicOption === 'masterclass' ? '🔥 15 - 25 مشهداً (8 - 15 دقيقة)' : videoTopicOption === 'exercises' ? '✍️ 12 - 20 مشهداً' : videoTopicOption === 'concepts' ? '📺 8 - 12 مشهداً' : '⚡ 3 - 5 مشاهد'}
+              </span>
+            </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => { setAspectRatio('16:9'); setVideoTopicOption('masterclass'); }}
+                className={`p-3 rounded-2xl border text-right transition cursor-pointer flex items-center gap-2.5 ${
+                  aspectRatio === '16:9' && videoTopicOption === 'masterclass'
+                    ? 'bg-purple-700 text-white border-purple-700 ring-2 ring-purple-400 font-black shadow-xs'
+                    : 'bg-white text-slate-700 border-slate-200 font-bold hover:bg-slate-50'
+                }`}
+              >
+                <span className="text-lg shrink-0">🏆</span>
+                <div>
+                  <div className="text-xs font-black">ماستر كلاس شامل (15 - 25 مشهداً)</div>
+                  <div className="text-[10px] opacity-85 font-normal">كورس كامل وشامل لكل أفكار وقوانين الدرس (8 - 15 دقيقة)</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setAspectRatio('16:9'); setVideoTopicOption('exercises'); }}
+                className={`p-3 rounded-2xl border text-right transition cursor-pointer flex items-center gap-2.5 ${
+                  aspectRatio === '16:9' && videoTopicOption === 'exercises'
+                    ? 'bg-emerald-600 text-white border-emerald-600 font-black shadow-xs'
+                    : 'bg-white text-slate-700 border-slate-200 font-bold hover:bg-slate-50'
+                }`}
+              >
+                <span className="text-lg shrink-0">✍️</span>
+                <div>
+                  <div className="text-xs font-bold">حل المسائل والتمارين (12 - 20 مشهداً)</div>
+                  <div className="text-[10px] opacity-85 font-normal">تطبيق القوانين وحل المسائل بالأرقام خطوة بخطوة</div>
+                </div>
+              </button>
+
               <button
                 type="button"
                 onClick={() => { setAspectRatio('16:9'); setVideoTopicOption('concepts'); }}
@@ -357,8 +396,8 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
               >
                 <Monitor className="w-5 h-5 shrink-0" />
                 <div>
-                  <div className="text-xs">حصة كاملة (16:9)</div>
-                  <div className="text-[10px] opacity-80 font-normal">شرح مفصل (4-5 دقائق)</div>
+                  <div className="text-xs font-bold">شرح مفاهيم مركز (8 - 12 مشهداً)</div>
+                  <div className="text-[10px] opacity-85 font-normal">تأسيس القواعد والمصطلحات الأساسية (4 - 6 دقائق)</div>
                 </div>
               </button>
 
@@ -366,30 +405,16 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
                 type="button"
                 onClick={() => { setAspectRatio('9:16'); setVideoTopicOption('reels'); }}
                 className={`p-3 rounded-2xl border text-right transition cursor-pointer flex items-center gap-2.5 ${
-                  aspectRatio === '9:16'
-                    ? 'bg-purple-600 text-white border-purple-600 font-black shadow-xs'
+                  aspectRatio === '9:16' && videoTopicOption === 'reels'
+                    ? 'bg-rose-600 text-white border-rose-600 font-black shadow-xs'
                     : 'bg-white text-slate-700 border-slate-200 font-bold hover:bg-slate-50'
                 }`}
               >
                 <Smartphone className="w-5 h-5 shrink-0" />
                 <div>
-                  <div className="text-xs">ريلز للهاتف (9:16)</div>
-                  <div className="text-[10px] opacity-80 font-normal">كبسولة سريعة (دقيقة)</div>
+                  <div className="text-xs font-bold">ريلز للهاتف (3 - 5 مشاهد)</div>
+                  <div className="text-[10px] opacity-85 font-normal">كبسولة سريعة ومكثفة (دقيقة ونصف)</div>
                 </div>
-              </button>
-            </div>
-
-            <div className="pt-1">
-              <button
-                type="button"
-                onClick={() => { setAspectRatio('16:9'); setVideoTopicOption('exercises'); }}
-                className={`w-full p-2.5 rounded-2xl border text-center transition cursor-pointer text-xs font-bold ${
-                  videoTopicOption === 'exercises'
-                    ? 'bg-emerald-600 text-white border-emerald-600 font-black'
-                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                }`}
-              >
-                <span>✍️ التبديل إلى نمط: حل المسائل والتمارين النموذجية خطوة بخطوة</span>
               </button>
             </div>
           </div>

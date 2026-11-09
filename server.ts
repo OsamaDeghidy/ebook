@@ -12,10 +12,10 @@ if (typeof (globalThis as any).DOMMatrix === 'undefined') {
   (globalThis as any).DOMMatrix = DOMMatrixMock;
 }
 if (typeof (globalThis as any).ImageData === 'undefined') {
-  (globalThis as any).ImageData = class ImageDataMock {};
+  (globalThis as any).ImageData = class ImageDataMock { };
 }
 if (typeof (globalThis as any).Path2D === 'undefined') {
-  (globalThis as any).Path2D = class Path2DMock {};
+  (globalThis as any).Path2D = class Path2DMock { };
 }
 
 import express from "express";
@@ -390,6 +390,11 @@ function cleanScientificTextForSpeech(input: string): string {
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
+// 🩺 Health check for Cloud Run & load balancers (instant 200 response)
+app.get(["/health", "/healthz", "/_health", "/ping"], (_req, res) => {
+  res.status(200).send("OK");
+});
+
 // 🛡️ Global Security Headers (HSTS, Anti-Clickjacking, MIME-Sniffing & XSS Protection)
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
@@ -403,7 +408,7 @@ app.use((req, res, next) => {
 // 🛡️ Security Rate Limiter (Protects AI & TTS endpoints from quota drain / DoS)
 const createRateLimiter = (maxRequests: number, windowMs: number, name: string = "limiter") => {
   const localMap = new Map<string, { count: number; resetTime: number }>();
-  
+
   // Cleanup stale keys every 5 minutes
   setInterval(() => {
     const now = Date.now();
@@ -414,12 +419,12 @@ const createRateLimiter = (maxRequests: number, windowMs: number, name: string =
 
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const ip = req.ip || req.socket.remoteAddress || "unknown_ip";
-    
+
     // Whitelist local loopback / development testing to prevent self-lockout
-    const isLocalhost = 
-      ip === "127.0.0.1" || 
-      ip === "::1" || 
-      ip === "::ffff:127.0.0.1" || 
+    const isLocalhost =
+      ip === "127.0.0.1" ||
+      ip === "::1" ||
+      ip === "::ffff:127.0.0.1" ||
       ip === "localhost" ||
       process.env.NODE_ENV !== "production";
 
@@ -567,7 +572,7 @@ const generateContentWithRetry = async (
 
     for (const model of modelsChain) {
       console.log(`[Gemini API] Dispatching to ${model} (Key #${keyIdx + 1}/${totalKeys})`);
-      
+
       try {
         const response = await client.models.generateContent({
           ...params,
@@ -785,7 +790,7 @@ function loadDeletedBookIds(): Set<string> {
       const list = JSON.parse(raw);
       if (Array.isArray(list)) return new Set(list.map(String));
     }
-  } catch (e) {}
+  } catch (e) { }
   return new Set();
 }
 
@@ -796,7 +801,7 @@ function recordDeletedBookId(id: string) {
     const dir = path.dirname(DELETED_BOOKS_FILE);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(DELETED_BOOKS_FILE, JSON.stringify(Array.from(set), null, 2), "utf-8");
-  } catch (e) {}
+  } catch (e) { }
 }
 
 function recordMultipleDeletedBookIds(ids: string[]) {
@@ -806,7 +811,7 @@ function recordMultipleDeletedBookIds(ids: string[]) {
     const dir = path.dirname(DELETED_BOOKS_FILE);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(DELETED_BOOKS_FILE, JSON.stringify(Array.from(set), null, 2), "utf-8");
-  } catch (e) {}
+  } catch (e) { }
 }
 
 // Asynchronously sync a book with full chapters, mindmap, questions, and media to Supabase
@@ -922,7 +927,7 @@ function saveEbooks(data: any[], targetBook?: any) {
           } catch (writeErr) {
             // Windows brief lock delay
             const start = Date.now();
-            while (Date.now() - start < 30) {}
+            while (Date.now() - start < 30) { }
           }
         }
         if (!saved) {
@@ -978,7 +983,7 @@ async function initSupabaseSync() {
       }
       try {
         fs.writeFileSync(EBOOKS_FILE, JSON.stringify(ebooks, null, 2), "utf-8");
-      } catch (e) {}
+      } catch (e) { }
     }
   } catch (err) {
     console.warn("[Supabase Init] Could not fetch remote books:", err);
@@ -1018,8 +1023,8 @@ const ebookResponseSchema = {
           title: { type: Type.STRING, description: "Official, authentic lesson or chapter title extracted directly from the textbook/PDF without inventing generic or artificial titles (e.g., 'كل منا له حلم', 'المادة وخواصها', 'أدوات تحديد الموقع'). If this is a free listening lesson, prefix with 'نص استماع متحرر: [العنوان]'." },
           originalContent: { type: Type.STRING, description: "The original, unaltered text segment extracted directly from the source document that corresponds to this chapter." },
           summary: { type: Type.STRING, description: "A concise but comprehensive summary of the chapter's key points." },
-          concepts: { 
-            type: Type.ARRAY, 
+          concepts: {
+            type: Type.ARRAY,
             description: "List of key concepts and their detailed explanations found in this chapter",
             items: {
               type: Type.OBJECT,
@@ -1108,7 +1113,7 @@ app.get("/api/admin/gemini/health", async (req, res) => {
     const key = keys[i];
     const maskedKey = key.substring(0, 8) + "..." + key.substring(key.length - 4);
     const client = getGenAIClient(key);
-    
+
     if (!client) {
       results.push({ keyIndex: i + 1, maskedKey, status: "invalid", message: "Client creation failed" });
       continue;
@@ -1257,7 +1262,7 @@ app.post("/api/ebooks/purge-all", async (req, res) => {
     saveEbooks(ebooks);
     try {
       await supabase.from("books").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-    } catch (e) {}
+    } catch (e) { }
     res.json({ success: true, message: "تم مسح جميع المذكرات وحظر استعادتها نهائياً.", count: allIds.length });
   } catch (err: any) {
     res.status(500).json({ error: err?.message || "خطأ أثناء تفريغ المذكرات" });
@@ -1267,7 +1272,7 @@ app.post("/api/ebooks/purge-all", async (req, res) => {
 // 4. Update or Upsert ebook
 app.put("/api/ebooks/:id", (req, res) => {
   const index = ebooks.findIndex((e) => e.id === req.params.id);
-  
+
   if (index === -1) {
     // If not found in local memory, create/upsert it directly
     const newEbook = {
@@ -1280,13 +1285,13 @@ app.put("/api/ebooks/:id", (req, res) => {
     saveEbooks(ebooks);
     return res.json(newEbook);
   }
-  
+
   const updatedEbook = {
     ...ebooks[index],
     ...req.body,
     id: req.params.id, // Ensure ID remains immutable
   };
-  
+
   ebooks[index] = updatedEbook;
   saveEbooks(ebooks);
   res.json(updatedEbook);
@@ -1311,9 +1316,9 @@ app.post("/api/ebooks/:id/chapters/save", async (req, res) => {
         // Was this chapter the latest/tail chapter of the book?
         const wasTail = previousChapters.length > 0 && previousChapters[previousChapters.length - 1].id === delCh.id;
 
-        const bpMatch = book.blueprint.lessons.find((l: any) => 
-          l.id === delCh.id || 
-          l.lesson_title === delCh.title || 
+        const bpMatch = book.blueprint.lessons.find((l: any) =>
+          l.id === delCh.id ||
+          l.lesson_title === delCh.title ||
           (l.lesson_title && delCh.title && (l.lesson_title.includes(delCh.title) || delCh.title.includes(l.lesson_title)))
         );
 
@@ -1432,7 +1437,7 @@ app.post("/api/ebooks/:id/exams/generate", async (req, res) => {
       effectiveTitle = ch.title;
     }
   } else if (scope === 'unit' && targetTitle) {
-    const matchingChs = (book.chapters || []).filter((c: any) => 
+    const matchingChs = (book.chapters || []).filter((c: any) =>
       c.title.includes(targetTitle) || (c.summary && c.summary.includes(targetTitle))
     );
     if (matchingChs.length > 0) {
@@ -1584,12 +1589,12 @@ app.post("/api/ebooks/:id/exams/generate", async (req, res) => {
 // Persistent local cache directory for uploaded and cloud-resolved curriculum files
 const PERSISTENT_UPLOADS_DIR = path.join(process.cwd(), "data", "uploads");
 if (!fs.existsSync(PERSISTENT_UPLOADS_DIR)) {
-  try { fs.mkdirSync(PERSISTENT_UPLOADS_DIR, { recursive: true }); } catch (e) {}
+  try { fs.mkdirSync(PERSISTENT_UPLOADS_DIR, { recursive: true }); } catch (e) { }
 }
 
 const PAGE_CACHE_DIR = path.join(process.cwd(), "data", "page-cache");
 if (!fs.existsSync(PAGE_CACHE_DIR)) {
-  try { fs.mkdirSync(PAGE_CACHE_DIR, { recursive: true }); } catch (e) {}
+  try { fs.mkdirSync(PAGE_CACHE_DIR, { recursive: true }); } catch (e) { }
 }
 app.use("/api/page-cache", express.static(PAGE_CACHE_DIR, { maxAge: "7d" }));
 
@@ -1598,10 +1603,10 @@ const EXPLAINROO_VIDEOS_DIR = path.join(process.cwd(), "explainroo", "videos");
 const EXPLAINROO_EXAMPLES_DIR = path.join(process.cwd(), "explainroo", "examples");
 const EXPLAINROO_PROJECTS_DIR = path.join(process.cwd(), "explainroo", "projects");
 if (!fs.existsSync(EXPLAINROO_VIDEOS_DIR)) {
-  try { fs.mkdirSync(EXPLAINROO_VIDEOS_DIR, { recursive: true }); } catch (e) {}
+  try { fs.mkdirSync(EXPLAINROO_VIDEOS_DIR, { recursive: true }); } catch (e) { }
 }
 if (!fs.existsSync(EXPLAINROO_PROJECTS_DIR)) {
-  try { fs.mkdirSync(EXPLAINROO_PROJECTS_DIR, { recursive: true }); } catch (e) {}
+  try { fs.mkdirSync(EXPLAINROO_PROJECTS_DIR, { recursive: true }); } catch (e) { }
 }
 app.use("/api/explainroo-videos", express.static(EXPLAINROO_VIDEOS_DIR));
 app.use("/api/explainroo-examples", express.static(EXPLAINROO_EXAMPLES_DIR));
@@ -1701,7 +1706,7 @@ app.get("/api/explainroo/chapter-status/:chapterId", (req, res) => {
       isReady = true;
       videoUrl = `/api/explainroo-projects/${cleanId}/video.mp4`;
       const target = fs.existsSync(p1) ? p1 : p2;
-      try { sizeMb = Number((fs.statSync(target).size / (1024 * 1024)).toFixed(1)); } catch (e) {}
+      try { sizeMb = Number((fs.statSync(target).size / (1024 * 1024)).toFixed(1)); } catch (e) { }
     }
   }
 
@@ -1780,7 +1785,7 @@ app.post("/api/explainroo/render", async (req, res) => {
       status: isAlreadyRendered ? "ready" : "rendering",
       exampleName,
       videoUrl: `/api/explainroo-examples/${exampleName}/video.mp4`,
-      message: isAlreadyRendered 
+      message: isAlreadyRendered
         ? `الفيديو جاهز للمعاينة فوراً! جاري إعادة تحسين المعيار القياسي في الخلفية.`
         : `تم بدء تشغيل خط إنتاج Explainroo الأصلي (${exampleName}) بكامل قدراته المعيارية.`
     });
@@ -1791,12 +1796,12 @@ app.post("/api/explainroo/render", async (req, res) => {
 
 // 🎬 Explainroo Arabized Lesson Video Generator (Dynamic Pedagogical Pipeline + Video Library)
 app.post("/api/explainroo/generate-lesson-video", async (req, res) => {
-  const { 
-    bookId, 
-    chapterId, 
-    chapterTitle, 
-    chapterContent, 
-    aspectRatio = "16:9", 
+  const {
+    bookId,
+    chapterId,
+    chapterTitle,
+    chapterContent,
+    aspectRatio = "16:9",
     voice = "ar-XA-Chirp3-HD-Fenrir",
     videoTopic = "",
     videoType = "explainer", // 'explainer' | 'reels' | 'exercise_drill'
@@ -1837,11 +1842,11 @@ app.post("/api/explainroo/generate-lesson-video", async (req, res) => {
   const projDir = path.join(EXPLAINROO_PROJECTS_DIR, `${cleanChapterId}_${videoInstanceId}`);
   fs.mkdirSync(projDir, { recursive: true });
 
-  explainrooProgressMap.set(cleanChapterId, { 
-    status: "generating", 
+  explainrooProgressMap.set(cleanChapterId, {
+    status: "generating",
     runId,
-    step: `تحليل محتوى درس "${chapter.title}" وتوليد الهيكل البيداغوجي الأكاديمي المتنوع...`, 
-    progress: 15 
+    step: `تحليل محتوى درس "${chapter.title}" وتوليد الهيكل البيداغوجي الأكاديمي المتنوع...`,
+    progress: 15
   } as any);
 
   try {
@@ -1849,11 +1854,12 @@ app.post("/api/explainroo/generate-lesson-video", async (req, res) => {
     const ai = getAiInstance();
     const specificTopicPrompt = videoTopic ? `التركيز الخاص في هذا الفيديو التكميلي: "${videoTopic}"` : "";
     const chapterRawText = (chapter.content || chapter.originalContent || "").trim();
-    const targetSceneCount = videoType === "reels" 
-      ? "2 إلى 3 مشاهد كبسولة سريعة ومكثفة (60-90 ثانية) تناسب الشورتس والهاتف (9:16)" 
+    const isReels = videoType === "reels";
+    const targetSceneCount = isReels
+      ? "3 إلى 5 مشاهد كبسولة سريعة ومكثفة (60-90 ثانية) تناسب الشورتس والهاتف (9:16)"
       : videoType === "exercise_drill"
-        ? "6 إلى 8 مشاهد لحل التمارين والمسائل النموذجية خطوة بخطوة بالتفصيل الكامل مع توضيح القوانين والخطوات والناتج (مدة 4 إلى 6 دقائق)"
-        : "6 إلى 8 مشاهد أكاديمية متسلسلة ووافية تغطي كافة مفاهيم وقوانين الدرس وأمثلته بالتفصيل في 4 إلى 6 دقائق كدرس يوتيوب كامل ومفصل";
+        ? "15 إلى 20 مشهداً لحل التمارين والمسائل النموذجية خطوة بخطوة بالتفصيل الكامل مع توضيح القوانين والخطوات بالأرقام والناتج (مدة 8 إلى 12 دقيقة)"
+        : "15 إلى 25 مشهداً أكاديمياً متسلسلاً ووافياً وشاملاً لكافة مفاهيم وقوانين الدرس وأمثلته وتمارينه بالتفصيل كحصة تدريسية كاملة ومفصلة من 8 إلى 15 دقيقة";
 
     const prompt = `
 أنت المخرج البيداغوجي والسيناريست التعليمي المتخصص لمنصة Osera AI.
@@ -1867,34 +1873,28 @@ ${specificTopicPrompt}
 
 النص الأصلي المعتمد للشرح من صلب المذكرة (المصدر الحصري والوحيد):
 """
-${chapterRawText.substring(0, 9500)}
+${chapterRawText.substring(0, 15000)}
 """
 
-قواعد الصوت والإلقاء الحتمية (STRICT AUDIO NARRATION RULES):
-1. **تجريد الصوت نهائياً من أسماء الأشخاص (تحذير حاسم):**
+قواعد الصوت والإلقاء والشمولية الحتمية:
+1. **تجريد الصوت نهائياً من أسماء الأشخاص والترحيبات:**
    - يمنع منعاً باتاً ومطلقاً ذكر اسم أي شخص (سواء المعلم أو الطالب) في الشرح الصوتي إطلاقاً!
-   - ممنوع تماماً المقدمات الترحيبية من نوع: (أهلاً بك يا فلان، أهلاً بك أيها الطالب، معكم المستر فلان، إلخ).
-   - ابدأ فوراً ومباشرة في صلب المادة العلمية وشرح المفهوم كشرح مباشر، علمي، رصين ووقور يليق بدرس أكاديمي متقن.
-   - لغة الإلقاء: لغة عربية فصحى مشكولة ومضبوطة بدقة بالتشكيل الكامل (خصوصاً أواخر الكلمات والضمائر) لضمان نطق سليم 100% من محرك الصوت البشري.
+   - ممنوع المقدمات الترحيبية (أهلاً بك يا فلان، معكم المستر، إلخ). ابدأ فوراً ومباشرة في صلب المادة العلمية.
+   - لغة الإلقاء: لغة عربية فصحى مشكولة ومضبوطة بدقة بالتشكيل الكامل لنطق سليم 100% من محرك الصوت.
 
-2. **العمق والشمولية ومنع التلخيص المخل:**
-   - قسّم نص الشرح وفق النمط المطلوب:
-     * إذا كان "explainer": من 6 إلى 8 مشاهد متسلسلة أكاديمياً (مدة الدرس 3 إلى 5 دقائق كاملة):
-       1. المشهد 1: المقدمة والتعريف الأساسي للمفهوم والربط التأسيسي
-       2. المشهد 2: القانون الرئيسي أو التصنيف الرياضي/العلمي (مع صيغة TeX)
-       3. المشهد 3: مقارنة ثنائية بين نوعين أو حالتين (مثل: الفترات المحدودة vs غير المحدودة، أو القوس المغلق vs المفتوح)
-       4. المشهد 4: المسألة النموذجية الأولى وتفكيك معطياتها
-       5. المشهد 5: خطوات الحل الحسابي الدقيقة والتعويض وصولاً للناتج
-       6. المشهد 6: التمثيل البياني أو الهندسي أو خط الأعداد
-       7. المشهد 7: تريكات الامتحان وفخاخ الأسئلة الشائعة وتنبيهات الأخطاء
-       8. المشهد 8: الخلاصة الذهبية والقاعدة الجامعة
-     * إذا كان "reels": 3 مشاهد سريعة ومكثفة (كبسولة ملخصة 60-90 ثانية).
-     * إذا كان "exercise_drill": 6 إلى 8 مشاهد لحل المسائل خطوة بخطوة بالتفصيل الكامل.
-   - لكل مشهد: صِغ تعليقاً صوتياً وافياً ومشكولاً (من 45 إلى 75 كلمة، 3 إلى 5 جمل تعليمية قوية ومترابطة).
+2. **التفصيل الأكاديمي الشامل (من 15 إلى 25 مشهداً):**
+   - قسّم الدرس إلى تسلسل متكامل ومفصل لا يقل عن 15 إلى 25 مشهداً يغطي:
+     * المشاهد 1 إلى 4: التأسيس، الدافع، المفاهيم والمصطلحات الأساسية.
+     * المشاهد 5 إلى 9: القوانين والمعادلات والتصنيفات الدقيقة مع صيغ TeX الرياضية.
+     * المشاهد 10 إلى 18: حل المسائل والتمارين التطبيقية والتعويض الحسابي والخطوات بالأرقام.
+     * المشاهد 19 إلى 22: فخاخ وتريكات الامتحانات الشائعة وكيفية تفاديها (Exam Traps).
+     * المشاهد 23 إلى 25: التلخيص النهائي، الخرائط الذهنية، والقواعد الذهبية الشاملة.
+   - إذا كان الفيديو "reels": التزم بـ 3 إلى 5 مشاهد كبسولة سريعة ومكثفة.
+   - لكل مشهد: صِغ تعليقاً صوتياً وافياً ومشكولاً (من 35 إلى 55 كلمة، 2 إلى 4 جمل تعليمية قوية ومترابطة).
 
 3. **تنوع التخطيط البصري وقواعد النصوص داخل البطاقات (Card Formatting):**
-   - في حقل "boxes": اكتب نص كل بطاقة بتركيز شديد وإيجاز ذكي (من 6 إلى 12 كلمة كحد أقصى) لتظهر البطاقة بسطر أو سطرين دون أي تكدس أو تداخل مع البطاقات الأخرى.
-   - تنويع "layoutType":
+   - في حقل "boxes": اكتب نص كل بطاقة بتركيز شديد وإيجاز ذكي (من 5 إلى 10 كلمات كحد أقصى) لتظهر البطاقة بسطر أو سطرين دون أي تكدس أو تداخل.
+   - نوّع layoutType لكل مشهد بين:
      * "concept_hero": عنوان + معادلة TeX في المنتصف + بطاقة شرح واضحة في الأسفل.
      * "split_comparison": بطاقتان متجاورتان للمقارنة الثنائية.
      * "step_by_step": ثلاث خطوات متتابعة (الخطوة 1، الخطوة 2، الخطوة 3).
@@ -1903,7 +1903,7 @@ ${chapterRawText.substring(0, 9500)}
 4. **الرموز الرياضية وقواعد TeX الصارمة:**
    - ضع المعادلة الرياضية الصحيحة بصيغة TeX في حقل "mathFormula".
    - لا تستخدم علامة & مطلقاً في صيغ TeX ما لم تكن داخل بيئة matrix أو aligned.
-   - ممنوع استخدام أيقونات غير مناسبة لمادة الدرس.
+   - استخدم أيقونات متوافقة مع مادة الدرس فقط.
 
 المطلوب: أجب حصراً بكائن JSON صالح مطابق تماماً للبنية الآتية بدون أي نصوص أو كتل خارجها:
 {
@@ -1915,45 +1915,9 @@ ${chapterRawText.substring(0, 9500)}
       "layoutType": "concept_hero",
       "mathFormula": "\\mathbb{R} = \\mathbb{Q} \\cup \\mathbb{Q}'",
       "icon": "calculator",
-      "narration": "نص الشرح الصوتي المفصل للفقرة الأولى بالفصحى المشكولة (شرح تعليمي غني من 45-75 كلمة يبدأ فوراً بتعريف المفهوم دون أي أسماء).",
+      "narration": "نص الشرح الصوتي المفصل للفقرة بالفصحى المشكولة (شرح تعليمي يبدأ فوراً بتعريف المفهوم دون أي أسماء).",
       "boxes": [
         { "label": "المفهوم الأساسي في سطر مكثف وواضح", "icon": "check", "color": "teal" }
-      ]
-    },
-    {
-      "id": "scene2",
-      "heading": "مقارنة الحالات",
-      "layoutType": "split_comparison",
-      "mathFormula": "[a, b] \\quad \\text{مقابل} \\quad ]a, b[",
-      "icon": "scale",
-      "narration": "شرح مقارنة الحالتين بالتفصيل العلمي الدقيق بدون أي أسماء شخصية وبكلمات غنية.",
-      "boxes": [
-        { "label": "الحالة الأولى: العناصر وأطرافها تنتمي للمجموعة", "icon": "check", "color": "teal" },
-        { "label": "الحالة الثانية: الأطراف لا تنتمي للمجموعة", "icon": "layers", "color": "yellow" }
-      ]
-    },
-    {
-      "id": "scene3",
-      "heading": "خطوات حل المسألة التطبيقية",
-      "layoutType": "step_by_step",
-      "mathFormula": "[2, 6] \\cap [4, 8] = [4, 6]",
-      "icon": "calculator",
-      "narration": "شرح خطوات الحل الحسابي والتعويض بالتفصيل حتى الوصول للناتج بصوت علمي متقن ومفصل.",
-      "boxes": [
-        { "label": "الخطوة 1: كتابة المعطيات وتحديد الفترات على خط الأعداد", "icon": "layers", "color": "teal" },
-        { "label": "الخطوة 2: تحديد منطقة التقاطع المشتركة بين الفترتين", "icon": "calculator", "color": "purple" },
-        { "label": "الناتج النهائي: مجموعة الحل هي الفترة [4، 6]", "icon": "check", "color": "green" }
-      ]
-    },
-    {
-      "id": "scene4",
-      "heading": "فخاخ الامتحان والتريكات الهامة",
-      "layoutType": "golden_alert",
-      "mathFormula": "\\{3, 5\\} \\neq [3, 5]",
-      "icon": "award",
-      "narration": "توضيح الفرق الجوهري لتجنب خطأ الامتحان الشائع والتركيز على الدقة العلمية.",
-      "boxes": [
-        { "label": "انتبه: المجموعة عنصران فقط بينما الفترة تمثل مجالا متصلا لا نهائيا", "icon": "award", "color": "yellow" }
       ]
     }
   ]
@@ -1964,6 +1928,7 @@ ${chapterRawText.substring(0, 9500)}
       contents: [prompt],
       config: {
         responseMimeType: "application/json",
+        maxOutputTokens: 8192,
         temperature: 0.2
       }
     });
@@ -1991,7 +1956,7 @@ ${chapterRawText.substring(0, 9500)}
             try {
               const scenesArr = JSON.parse(scenesMatch[1].replace(/,\s*([}\]])/g, '$1'));
               return { title: chapter.title, scenes: scenesArr };
-            } catch (e3) {}
+            } catch (e3) { }
           }
           return null;
         }
@@ -2000,44 +1965,52 @@ ${chapterRawText.substring(0, 9500)}
 
     let scriptData: any = sanitizeGeminiJson(geminiRes?.text || "");
 
+    // Comprehensive Grounded Fallback: If Gemini fails, construct 12 to 16 rich scenes directly from chapter content!
     if (!scriptData || !Array.isArray(scriptData.scenes) || scriptData.scenes.length === 0) {
-      // Dynamic fallback constructed directly from chapter title
+      console.log(`[Explainroo Fallback] Generating comprehensive grounded scenes from chapter content for: ${chapter.title}`);
+      const rawLines = chapterRawText.split(/\n+/).map((l: string) => l.trim()).filter((l: string) => l.length > 20);
+      const generatedScenes: any[] = [];
+      const totalScenesToBuild = Math.min(16, Math.max(8, rawLines.length));
+
+      for (let sIdx = 0; sIdx < totalScenesToBuild; sIdx++) {
+        const lineText = rawLines[sIdx % rawLines.length] || `شرح ومفاهيم ${chapter.title}`;
+        const layoutTypes = ['concept_hero', 'step_by_step', 'split_comparison', 'golden_alert'];
+        const chosenLayout = layoutTypes[sIdx % layoutTypes.length];
+
+        generatedScenes.push({
+          id: `scene${sIdx + 1}`,
+          heading: sIdx === 0 ? chapter.title : `المحور ${sIdx + 1}: ${lineText.substring(0, 35)}...`,
+          layoutType: chosenLayout,
+          icon: book?.category?.includes("رياض") ? "calculator" : (book?.category?.includes("حاسب") ? "cpu" : "book-open"),
+          narration: `نتناول في هذا المحور من درس ${chapter.title} التفاصيل الأساسية التالية: ${lineText}. وتعتبر هذه النقطة من الركائز الجوهرية لفهم المنهج والتفوق في الاختبارات.`,
+          boxes: chosenLayout === 'step_by_step' ? [
+            { label: "الخطوة 1: استيعاب المفهوم وتحديد المعطيات بدقة", icon: "layers", color: "teal" },
+            { label: "الخطوة 2: تطبيق القاعدة الرياضية المعتمدة", icon: "calculator", color: "purple" },
+            { label: "الخطوة 3: التحقق من صحة الناتج النهائي", icon: "check", color: "green" }
+          ] : chosenLayout === 'split_comparison' ? [
+            { label: "الحالة الأولى: تطبيق القاعدة في الوضع المباشر", icon: "check", color: "teal" },
+            { label: "الحالة المقابلة: الحالات الخاصة والتطبيقات الاستثنائية", icon: "scale", color: "yellow" }
+          ] : [
+            { label: lineText.substring(0, 50), icon: "check", color: "teal" }
+          ]
+        });
+      }
+
       scriptData = {
         title: chapter.title,
-        scenes: [
-          {
-            id: "scene1",
-            heading: chapter.title,
-            layoutType: "concept_hero",
-            icon: book?.category?.includes("رياض") ? "calculator" : (book?.category?.includes("حاسب") ? "cpu" : "book-open"),
-            narration: `نتناول في هذا الدرس التعليمي موضوع ${chapter.title}. سنستعرض أهم المفاهيم والقواعد والمسائل التطبيقية المقررة في المنهج بعناية وتفصيل.`,
-            boxes: [
-              { label: `المفهوم الأساسي والمحاور الرئيسية في درس ${chapter.title}`, icon: "check", color: "teal" }
-            ]
-          },
-          {
-            id: "scene2",
-            heading: "الخلاصة والتطبيق العملي",
-            layoutType: "step_by_step",
-            icon: "award",
-            narration: "نصل إلى تلخيص القواعد الأساسية وأهم الإرشادات لحل التمارين والتفوق في اختبارات المنهج بثقة واقتدار.",
-            boxes: [
-              { label: "فهم التعريفات وتحديد المعطيات بدقة قبل البدء في الحل", icon: "layers", color: "teal" },
-              { label: "تطبيق القوانين الرياضية والخطوات المنهجية المعتمدة", icon: "calculator", color: "purple" },
-              { label: "مراجعة الناتج النهائي والتأكد من صحة الخطوات", icon: "award", color: "green" }
-            ]
-          }
-        ]
+        scenes: generatedScenes
       };
     }
+
+    console.log(`[Explainroo Engine] Total pedagogical scenes prepared: ${scriptData.scenes.length}`);
 
     // 2. Build video.json with selected theme and music
     const allowedThemes = ['paper', 'chalk', 'midnight', 'clean'];
     const activeTheme = allowedThemes.includes(theme) ? theme : 'paper';
 
     const allowedMusicStyles = ['warm', 'calm', 'upbeat', 'tech', 'playful'];
-    const activeMusicStyle = allowedMusicStyles.includes(musicStyle) 
-      ? musicStyle 
+    const activeMusicStyle = allowedMusicStyles.includes(musicStyle)
+      ? musicStyle
       : (activeTheme === 'paper' ? 'warm' : (activeTheme === 'clean' ? 'upbeat' : 'calm'));
 
     const transitionStyle = activeTheme === 'paper' ? 'brush' : (activeTheme === 'midnight' ? 'zoom' : (activeTheme === 'chalk' ? 'wipe' : 'fade'));
@@ -2064,7 +2037,7 @@ ${chapterRawText.substring(0, 9500)}
       scriptMd += `## ${sc.id}\n`;
       const words = (sc.narration || "").split(/\s+/).filter(Boolean);
       const boxesCount = Array.isArray(sc.boxes) ? sc.boxes.length : 0;
-      
+
       // Calculate evenly spaced marks across the full narration words
       const markPositions = new Map<number, string>();
       if (boxesCount === 1) {
@@ -2145,7 +2118,7 @@ ${chapterRawText.substring(0, 9500)}
     scenesJs += `export default {\n`;
     for (const sc of scriptData.scenes) {
       scenesJs += `  ${sc.id}(s) {\n`;
-      
+
       // Scene Title with display font
       const headerTitle = esc(sc.heading || chapter.title);
       scenesJs += `    s.text('${headerTitle}', { x: ${centerX}, y: ${isVertical ? 180 : 120}, size: ${isVertical ? 46 : 52}, font: 'display', color: 'yellow' });\n`;
@@ -2178,7 +2151,7 @@ ${chapterRawText.substring(0, 9500)}
           const boxIcon = esc(b.icon || (bIdx === 2 ? 'check' : 'calculator'));
           const boxColor = esc(b.color || (bIdx === 0 ? 'teal' : (bIdx === 1 ? 'purple' : 'green')));
           const markTag = `m${bIdx + 1}`;
-          
+
           if (isVertical) {
             // Vertical 1080x1920: 400px step delta
             const boxY = 600 + bIdx * 400;
@@ -2249,7 +2222,7 @@ ${chapterRawText.substring(0, 9500)}
             const boxIcon = esc(b.icon || "check");
             const boxColor = esc(b.color || (bIdx === 0 ? "teal" : "purple"));
             const markTag = `m${bIdx + 1}`;
-            
+
             if (isVertical) {
               const boxY = 780 + bIdx * 420;
               scenesJs += `    s.box('${boxLabel}', { id: '${boxId}', x: ${centerX}, y: ${boxY}, w: 940, size: 34, iconSize: 40, icon: '${boxIcon}', color: '${boxColor}', at: '#${markTag}' });\n`;
@@ -2275,10 +2248,10 @@ ${chapterRawText.substring(0, 9500)}
     fs.writeFileSync(path.join(projDir, "scenes.js"), scenesJs);
 
     // 5. Synthesize high-purity Arabic audio with Google Cloud Chirp3-HD
-    explainrooProgressMap.set(cleanChapterId, { 
-      status: "generating", 
-      step: "توليد التعليق الصوتي العربي عالي النقاء (Google Chirp3-HD)...", 
-      progress: 50 
+    explainrooProgressMap.set(cleanChapterId, {
+      status: "generating",
+      step: "توليد التعليق الصوتي العربي عالي النقاء (Google Chirp3-HD)...",
+      progress: 50
     });
 
     const voiceDir = path.join(projDir, "build", "voice");
@@ -2339,9 +2312,14 @@ ${chapterRawText.substring(0, 9500)}
       }));
 
       const marks: Record<string, number> = {};
+      let wordsCounted = 0;
+      const totalWords = Math.max(1, words.length);
       for (const u of sc.units) {
-        if (u.type === 'mark') {
-          marks[u.name] = Number((duration * 0.35).toFixed(2));
+        if (u.type === 'word') {
+          wordsCounted++;
+        } else if (u.type === 'mark') {
+          const ratio = Math.max(0.10, Math.min(0.92, wordsCounted / totalWords));
+          marks[u.name] = Number((duration * ratio).toFixed(2));
         }
       }
 
@@ -2361,10 +2339,10 @@ ${chapterRawText.substring(0, 9500)}
     }
 
     // 6. Execute Explainroo Render (Chromium Headless + Canvas + FFmpeg)
-    explainrooProgressMap.set(cleanChapterId, { 
-      status: "generating", 
-      step: "ريندر مشاهد الكانفاس والرسومات الحركية التفاعلية...", 
-      progress: 75 
+    explainrooProgressMap.set(cleanChapterId, {
+      status: "generating",
+      step: "ريندر مشاهد الكانفاس والرسومات الحركية التفاعلية...",
+      progress: 75
     });
 
     const explainrooPath = path.join(process.cwd(), "explainroo");
@@ -2392,7 +2370,7 @@ ${chapterRawText.substring(0, 9500)}
       if (fs.existsSync(targetOutMp4)) {
         sizeMb = Number((fs.statSync(targetOutMp4).size / (1024 * 1024)).toFixed(1));
       }
-    } catch (e) {}
+    } catch (e) { }
 
     // Register video in chapter.videos library to ensure persistence
     const newVideoItem = {
@@ -2423,11 +2401,11 @@ ${chapterRawText.substring(0, 9500)}
       }
     }
 
-    explainrooProgressMap.set(cleanChapterId, { 
-      status: "ready", 
-      step: "اكتمل توليد الفيديو وحفظه في مكتبة وسائط الدرس بنجاح! 🎉", 
-      progress: 100, 
-      videoUrl 
+    explainrooProgressMap.set(cleanChapterId, {
+      status: "ready",
+      step: "اكتمل توليد الفيديو وحفظه في مكتبة وسائط الدرس بنجاح! 🎉",
+      progress: 100,
+      videoUrl
     });
 
     res.json({
@@ -2441,11 +2419,11 @@ ${chapterRawText.substring(0, 9500)}
     });
   } catch (err: any) {
     console.error("[Explainroo Generation Error]:", err);
-    explainrooProgressMap.set(cleanChapterId, { 
-      status: "error", 
-      step: "فشل توليد الفيديو: " + (err.message || "خطأ غير متوقع"), 
+    explainrooProgressMap.set(cleanChapterId, {
+      status: "error",
+      step: "فشل توليد الفيديو: " + (err.message || "خطأ غير متوقع"),
       progress: 0,
-      error: err.message 
+      error: err.message
     });
     res.status(500).json({ error: err.message || "حدث خطأ أثناء توليد فيديو الشرح." });
   }
@@ -2555,7 +2533,7 @@ function safeParseExercises(rawText: string): any[] {
     const parsed = JSON.parse(cleaned);
     if (Array.isArray(parsed)) return parsed;
     if (parsed && Array.isArray(parsed.exercises)) return parsed.exercises;
-  } catch (e) {}
+  } catch (e) { }
 
   const startBracket = cleaned.indexOf('[');
   const endBracket = cleaned.lastIndexOf(']');
@@ -2569,7 +2547,7 @@ function safeParseExercises(rawText: string): any[] {
       try {
         const parsed = JSON.parse(fixedCommas);
         if (Array.isArray(parsed)) return parsed;
-      } catch (e2) {}
+      } catch (e2) { }
     }
   }
 
@@ -2580,7 +2558,7 @@ function safeParseExercises(rawText: string): any[] {
     try {
       const item = JSON.parse(match[0].replace(/,\s*([}\]])/g, '$1'));
       if (item && item.question_text) items.push(item);
-    } catch (e) {}
+    } catch (e) { }
   }
   return items;
 }
@@ -2650,7 +2628,7 @@ function parseGcsBucketAndKey(urlStr: string): { bucket: string; key: string } |
       const key = decodeURIComponent(u.pathname.replace(/^\/+/, ""));
       if (bucket && key) return { bucket, key };
     }
-  } catch (e) {}
+  } catch (e) { }
 
   return null;
 }
@@ -2718,7 +2696,7 @@ async function resolveCloudOrLocalFileBuffer(fileUrl: string): Promise<{ buffer:
           const buf = Buffer.from(byteArray);
           try {
             fs.writeFileSync(cachedLocalPath, buf);
-          } catch (cacheErr) {}
+          } catch (cacheErr) { }
           console.log(`[Storage Resolver] Downloaded & cached GCS object (${(buf.length / 1048576).toFixed(1)}MB) -> ${cachedLocalPath}`);
           return { buffer: buf, resolvedFileName: baseKeyName };
         }
@@ -3217,11 +3195,11 @@ async function runBackgroundEbookConversion(
     target_learning_language?: string;
   }
 ) {
-  const { 
-    promptText, fileUrl, fileBase64, fileName, fileType, 
-    category, subcategory, grade_level, semester, academic_year, 
-    price, preview_video_url, education_level, academic_system, 
-    language, is_language_learning, target_learning_language 
+  const {
+    promptText, fileUrl, fileBase64, fileName, fileType,
+    category, subcategory, grade_level, semester, academic_year,
+    price, preview_video_url, education_level, academic_system,
+    language, is_language_learning, target_learning_language
   } = payload;
   const job = conversionJobs[jobId];
   if (!job) return;
@@ -3231,7 +3209,7 @@ async function runBackgroundEbookConversion(
     // Simulator Mode processing (simulate steps to make it feel real, then complete)
     try {
       console.log(`[Job Worker] Running AI Simulator processing for job ${jobId}...`);
-      
+
       job.progressStep = "Validating study resources in AI simulation mode...";
       job.progressPercent = 20;
       await new Promise(r => setTimeout(r, 1200));
@@ -3287,7 +3265,7 @@ async function runBackgroundEbookConversion(
 
       ebooks.push(mockEbook);
       saveEbooks(ebooks, mockEbook);
-      
+
       job.progressPercent = 100;
       job.progressStep = "Ebook ready! Loading into bookshelf...";
       job.status = "completed";
@@ -3473,12 +3451,12 @@ async function runBackgroundEbookConversion(
     try {
       syllabusBlueprint = await extractDocumentBlueprint(
         extractedText || promptText || "",
-        { 
-          fileName: effectiveFileName, 
-          category, 
-          grade_level, 
-          semester, 
-          language: effectiveLanguage, 
+        {
+          fileName: effectiveFileName,
+          category,
+          grade_level,
+          semester,
+          language: effectiveLanguage,
           academic_system,
           fileUri: isGoogleCloudFile ? fileUrl : undefined,
           fileMimeType: fileType || "application/pdf"
@@ -3712,7 +3690,7 @@ async function runBackgroundEbookConversion(
 
     // Formulate a clean Ebook object with IDs
     const ebookId = crypto.randomUUID();
-    
+
     const finalizedEbook: any = {
       id: ebookId,
       title: cleanStr(parsedEbook?.title) || cleanStr(syllabusBlueprint?.book_title) || "مقرر تعليمي تفاعلي",
@@ -3876,7 +3854,7 @@ async function runBackgroundEbookConversion(
 // 4.9 Dedicated Large-File Upload Endpoint directly to Google Cloud Storage + Local Cache (up to 250MB)
 const uploadDir = path.join(os.tmpdir(), "ebook_uploads");
 if (!fs.existsSync(uploadDir)) {
-  try { fs.mkdirSync(uploadDir, { recursive: true }); } catch (e) {}
+  try { fs.mkdirSync(uploadDir, { recursive: true }); } catch (e) { }
 }
 
 const gcpUploader = multer({
@@ -3903,7 +3881,7 @@ app.post("/api/upload-to-gcp", gcpUploader.single("file"), async (req, res) => {
     } catch (moveErr) {
       // Fallback if cross-device link
       fs.copyFileSync(req.file.path, localFilePath);
-      try { fs.unlinkSync(req.file.path); } catch (e) {}
+      try { fs.unlinkSync(req.file.path); } catch (e) { }
     }
     const localFileUrl = `/data/uploads/${safeFileName}`;
 
@@ -3959,7 +3937,7 @@ app.post("/api/upload-to-gcp", gcpUploader.single("file"), async (req, res) => {
   } catch (err: any) {
     console.error("[Upload Error]:", err);
     if (req.file && fs.existsSync(req.file.path)) {
-      try { fs.unlinkSync(req.file.path); } catch (e) {}
+      try { fs.unlinkSync(req.file.path); } catch (e) { }
     }
     return res.status(500).json({ error: "فشل استلام الملف: " + (err?.message || err) });
   }
@@ -3967,21 +3945,21 @@ app.post("/api/upload-to-gcp", gcpUploader.single("file"), async (req, res) => {
 
 // 5. Convert content or create ebook from prompt / file upload (Synchronous & Serverless Resilient)
 app.post("/api/ebooks", async (req, res) => {
-  const { 
-    promptText, 
-    fileUrl, 
-    fileBase64, 
-    fileName, 
-    fileType, 
-    category, 
-    subcategory, 
-    grade_level, 
-    semester, 
-    academic_year, 
-    price, 
-    preview_video_url, 
-    userId, 
-    userRole, 
+  const {
+    promptText,
+    fileUrl,
+    fileBase64,
+    fileName,
+    fileType,
+    category,
+    subcategory,
+    grade_level,
+    semester,
+    academic_year,
+    price,
+    preview_video_url,
+    userId,
+    userRole,
     userEmail,
     language,
     academic_system,
@@ -3989,7 +3967,7 @@ app.post("/api/ebooks", async (req, res) => {
     is_language_learning,
     target_learning_language
   } = req.body;
-  
+
   if (!promptText && !fileBase64 && !fileUrl) {
     return res.status(400).json({ error: "Must provide either promptText, a file, or both to convert." });
   }
@@ -4015,18 +3993,18 @@ app.post("/api/ebooks", async (req, res) => {
   };
 
   try {
-    const finalizedEbook = await runBackgroundEbookConversion(jobId, { 
-      promptText, 
-      fileUrl, 
-      fileBase64, 
-      fileName, 
-      fileType, 
-      category, 
-      subcategory, 
-      grade_level, 
-      semester, 
-      academic_year, 
-      price, 
+    const finalizedEbook = await runBackgroundEbookConversion(jobId, {
+      promptText,
+      fileUrl,
+      fileBase64,
+      fileName,
+      fileType,
+      category,
+      subcategory,
+      grade_level,
+      semester,
+      academic_year,
+      price,
       preview_video_url,
       language,
       academic_system,
@@ -4045,7 +4023,7 @@ app.post("/api/ebooks", async (req, res) => {
         const quota = await getUserAiQuotaInfo(userId, userRole);
         const usageDb = loadTeacherAiUsageFile();
         const currentUsage = usageDb[userId] || { usedCount: 0, history: [] };
-        
+
         if (!quota.isFree && quota.costPerBook > 0) {
           // Deduct from wallet
           const newBal = Math.max(0, quota.walletBalance - quota.costPerBook);
@@ -4158,7 +4136,7 @@ app.post("/api/ebooks/:id/narrate", async (req, res) => {
 
     let styleInstructionAr = "بِنَبْرَةٍ دَافِئَةٍ وَإِيقَاعٍ مُرِيحٍ";
     let styleInstructionEn = "with natural pauses and warm cadence";
-    
+
     if (style === "teacher") {
       styleInstructionAr = "بِنَبْرَةِ مُعَلِّمٍ صَبُورٍ وَوَاضِحٍ يَشْرَحُ دَرْساً هَاماً بِثِقَةٍ";
       styleInstructionEn = "in the clear, patient, and confident voice of an expert teacher explaining an important lesson";
@@ -4211,9 +4189,9 @@ app.post("/api/ebooks/:id/narrate", async (req, res) => {
     const errMsg = error?.message || String(error);
     console.error("Error generating chapter TTS audio:", errMsg);
     const isRateLimit = errMsg.includes("429") || errMsg.includes("quota") || errMsg.includes("RESOURCE_EXHAUSTED");
-    res.status(isRateLimit ? 429 : 500).json({ 
+    res.status(isRateLimit ? 429 : 500).json({
       error: isRateLimit ? "Gemini TTS quota exceeded. Switching to browser voice." : "Failed to generate soundtrack. " + errMsg,
-      rateLimited: isRateLimit 
+      rateLimited: isRateLimit
     });
   }
 });
@@ -4270,9 +4248,9 @@ app.post("/api/narrate-text", async (req, res) => {
     const errMsg = error?.message || String(error);
     console.error("Error generating snippet TTS audio:", errMsg);
     const isRateLimit = errMsg.includes("429") || errMsg.includes("quota") || errMsg.includes("RESOURCE_EXHAUSTED");
-    res.status(isRateLimit ? 429 : 500).json({ 
+    res.status(isRateLimit ? 429 : 500).json({
       error: isRateLimit ? "Gemini TTS quota exceeded. Switching to browser voice." : "Failed to generate human voice audio. " + errMsg,
-      rateLimited: isRateLimit 
+      rateLimited: isRateLimit
     });
   }
 });
@@ -4281,22 +4259,22 @@ app.post("/api/narrate-text", async (req, res) => {
 function detectContentLanguage(text: string): 'ar' | 'en' | 'it' | 'fr' | 'de' {
   if (!text) return 'ar';
   const sample = text.substring(0, 3000);
-  
+
   // Count Arabic characters
   const arabicChars = (sample.match(/[\u0600-\u06FF]/g) || []).length;
   if (arabicChars > 40) return 'ar';
 
   const lower = sample.toLowerCase();
-  
+
   // Italian common words
   const itMatches = (lower.match(/\b(il|la|lo|i|gli|le|un|uno|una|della|delle|sono|perché|questo|questa|anche|dopo|sempre|come|ciao|grazie|molto|tutto|quando|tempo|fare|potere|volere)\b/g) || []).length;
-  
+
   // French common words
   const frMatches = (lower.match(/\b(le|la|les|un|une|des|du|dans|avec|pour|sont|cette|est|comme|nous|vous|mais|faire|tout|plus|pouvoir|aller|voir|bonjour|merci)\b/g) || []).length;
-  
+
   // German common words
   const deMatches = (lower.match(/\b(der|die|das|und|ist|in|den|von|zu|mit|sich|des|auf|für|eine|einem|nicht|werden|haben|können|wieder|machen|zeit|jahr)\b/g) || []).length;
-  
+
   // English common words
   const enMatches = (lower.match(/\b(the|is|and|of|in|to|a|that|it|for|on|with|as|this|are|from|at|by|an|have|from|or|one|had|by|word|but|not|what|all|were|we|when|your|can|said)\b/g) || []).length;
 
@@ -4439,7 +4417,7 @@ app.all("/api/tts/stream", async (req, res) => {
     if (!cleanedText) return res.status(400).json({ error: "Cleaned text is empty" });
 
     const isMale = speaker === "male" || speaker === "كريم" || speaker === "Alex" || speaker === "Marco" || speaker === "Julien" || speaker === "Felix" || requestedVoice.includes("Journey-D") || requestedVoice.includes("Neural2-B") || requestedVoice.includes("Neural2-C");
-    
+
     // Choose appropriate native voice for the language
     const langCfg = MULTILINGUAL_VOICE_CONFIGS[lang] || MULTILINGUAL_VOICE_CONFIGS.ar;
     let googleVoice = requestedVoice || (isMale ? langCfg.male : langCfg.female);
@@ -4478,7 +4456,7 @@ app.all("/api/tts/stream", async (req, res) => {
         fs.writeFileSync(cachedFilePath, googleAudioBuffer);
         res.setHeader("Content-Type", "audio/mpeg");
         res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-        uploadAudioFileToSupabase(cachedFilePath, `${textHash}.mp3`).catch(() => {});
+        uploadAudioFileToSupabase(cachedFilePath, `${textHash}.mp3`).catch(() => { });
         return fs.createReadStream(cachedFilePath).pipe(res);
       }
     }
@@ -4518,7 +4496,7 @@ app.all("/api/tts/stream", async (req, res) => {
 
       if (fs.existsSync(chunkFile)) {
         chunkBuffers.push(fs.readFileSync(chunkFile));
-        try { fs.unlinkSync(chunkFile); } catch (e) {}
+        try { fs.unlinkSync(chunkFile); } catch (e) { }
       }
     }
 
@@ -4532,9 +4510,9 @@ app.all("/api/tts/stream", async (req, res) => {
 
     res.setHeader("Content-Type", "audio/mpeg");
     res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-    
+
     // Background upload to Supabase Storage
-    uploadAudioFileToSupabase(cachedFilePath, `${textHash}.mp3`).catch(() => {});
+    uploadAudioFileToSupabase(cachedFilePath, `${textHash}.mp3`).catch(() => { });
 
     fs.createReadStream(cachedFilePath).pipe(res);
   } catch (err: any) {
@@ -4577,7 +4555,7 @@ app.post("/api/ebooks/:id/podcast", async (req, res) => {
   (async () => {
     try {
       console.log(`[Background] Generating 2-persona podcast script for chapter ${chapterId}...`);
-      
+
       const scriptPrompt = buildEducationalPodcastPrompt({
         chapterTitle: chapterTitle || "Educational Lesson",
         chapterContent: chapterContent || "",
@@ -4616,7 +4594,7 @@ app.post("/api/ebooks/:id/podcast", async (req, res) => {
 app.get("/api/ebooks/:id/podcast/status", (req, res) => {
   const { chapterId, chapterTitle } = req.query;
   const cacheKey = `podcast_${chapterId}_${chapterTitle || 'ch'}`;
-  
+
   if (podcastCache.has(cacheKey)) {
     return res.json({ success: true, ...podcastCache.get(cacheKey) });
   } else {
@@ -4641,7 +4619,7 @@ app.post("/api/ebooks/:id/generate-lab-activity", async (req, res) => {
   try {
     const isArabic = /[\u0600-\u06FF]/.test((chapterTitle || "") + (chapterContent || ""));
     const combinedStr = ((chapterTitle || "") + " " + (bookCategory || "") + " " + (chapterContent || "")).toLowerCase();
-    
+
     // Domain & Subject Classifiers
     const isMath = /رياض|حساب|أعداد|كسور|ضرب|قسمة|جمع|طرح|هندسة|قيمة مكانية|algebra|math|geometry|calculus/i.test(combinedStr);
     const isScience = /علوم|فيزياء|كيمياء|أحياء|بيولوجي|طب|صيدلة|مادة|تفاعل|خلية|طاقة|سرعة|قوة|science|physics|chemistry|biology/i.test(combinedStr);
@@ -4745,7 +4723,7 @@ ${(chapterContent || "").substring(0, 3000)}
       resultJson = JSON.parse(response.text?.trim() || "{}");
     } catch (apiErr) {
       console.warn("Gemini API Lab generation warning, building contextual interactive fallback:", apiErr);
-      
+
       if (isBusiness) {
         resultJson = {
           activityType: "business_financial_simulator",
@@ -4892,7 +4870,7 @@ ${(chapterContent || "").substring(0, 3000)}
         };
       }
     }
-    
+
     // Save to chapter if book exists
     const ebook = ebooks.find(e => e.id === bookId);
     if (ebook) {
@@ -4928,7 +4906,7 @@ app.post("/api/ebooks/:id/podcast/talk", async (req, res) => {
   // Fetch full book context for cross-chapter intelligence
   const ebook = ebooks.find((e) => e.id === req.params.id);
   const allChapters = ebook?.chapters || [];
-  
+
   const currentChapterIdx = allChapters.findIndex((c: any) => c.id === chapterId || c.title === chapterTitle);
   const currentChapterNum = currentChapterIdx !== -1 ? currentChapterIdx + 1 : 1;
 
@@ -5042,7 +5020,7 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
   const bookId = req.params.id;
   // High-performance micro-batching: default 2 chapters (max 3) per click to guarantee 100% deep pedagogical quality under 512MB RAM
   const batchSize = Math.min(3, Math.max(1, Number(req.body.additionalCount) || 2));
-  
+
   const ebook = ebooks.find(e => e.id === bookId);
   if (!ebook) {
     return res.status(404).json({ error: "Ebook not found" });
@@ -5147,7 +5125,7 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
                   ebook.source_file_url = fullPath;
                   console.log(`[Expand Chapters Self-Healing] Matched cached source file: ${fullPath} (${(recoveredBuffer.length / 1048576).toFixed(1)}MB)`);
                   break;
-                } catch (e) {}
+                } catch (e) { }
               }
             }
           }
@@ -5161,7 +5139,7 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
         try {
           const parsed = await parseDocumentBuffer(recoveredBuffer, "application/pdf", recoveredFileName);
           extracted = parsed.text;
-        } catch (e) {}
+        } catch (e) { }
 
         if (!extracted || extracted.length < 350) {
           const visionRes = await extractPdfTextViaVisionPages(
@@ -5395,10 +5373,10 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
               summary: { type: Type.STRING, description: "Concise summary of key points" },
               content: { type: Type.STRING, description: "Deep, thorough chapter content in Markdown adhering to the subject's pedagogical structure" },
               audioNarration: { type: Type.STRING, description: "A continuous, spoken-ready educational Arabic explanation script (200-400 words) without markdown symbols, bullet points or raw equations, perfectly suited for Voice Narration / TTS." },
-              keyConcepts: { 
-                type: Type.ARRAY, 
-                items: { type: Type.STRING }, 
-                description: "3-5 key concepts covered in this lesson" 
+              keyConcepts: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+                description: "3-5 key concepts covered in this lesson"
               }
             },
             required: ["title", "content"]
@@ -5461,11 +5439,11 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
       const conceptsList: Array<{ concept: string; explanation: string }> = Array.isArray(ch.keyConcepts) && ch.keyConcepts.length > 0
         ? ch.keyConcepts.map((k: string) => ({ concept: cleanStr(k), explanation: `المفهوم والمحور التعليمي لدرس ${cleanTitle}.` }))
         : (deepContent || "").match(/###\s+([^\n]+)/g)?.slice(0, 4).map((h: string) => ({
-            concept: cleanStr(h.replace(/###\s+/, '')),
-            explanation: `من المحاور الجوهرية المقررة في درس ${cleanTitle}.`
-          })) || [
-            { concept: cleanTitle, explanation: `المفهوم التعليمي الأساسي لدرس ${cleanTitle}.` }
-          ];
+          concept: cleanStr(h.replace(/###\s+/, '')),
+          explanation: `من المحاور الجوهرية المقررة في درس ${cleanTitle}.`
+        })) || [
+          { concept: cleanTitle, explanation: `المفهوم التعليمي الأساسي لدرس ${cleanTitle}.` }
+        ];
 
       return {
         id: chapterId,
@@ -5546,7 +5524,7 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
           }
         ]
       };
-      });
+    });
 
     // Mark pending lessons as completed if blueprint was used
     if (pendingLessons.length > 0 && ebook.blueprint) {
@@ -5630,7 +5608,7 @@ app.post("/api/ebooks/:id/pregenerate-all-assets", async (req, res) => {
 
       for (let i = 0; i < chapters.length; i++) {
         const ch = chapters[i];
-        
+
         // 1. Pre-generate EdgeTTS chapter narrative audio (with instant circuit breaker)
         pregenJobs[bookId].currentStep = `تجهيز التسجيل الصوتي للراوي (الفصل ${i + 1}: ${ch.title})...`;
         const cleanedText = cleanScientificTextForSpeech(ch.content || ch.summary || "");
@@ -5849,9 +5827,9 @@ app.post("/api/v2/generate-interactive-explanation", async (req, res) => {
       payload.timeline = payload.timeline.map((step: any, idx: number) => {
         const words = (step.audio_text || "").split(/\s+/).filter(Boolean);
         const estimatedDur = Math.max(2.0, Math.round(words.length * durationFactor * 10) / 10);
-        
-        const trigTime = typeof step.trigger_time_seconds === 'number' && step.trigger_time_seconds > 0 
-          ? step.trigger_time_seconds 
+
+        const trigTime = typeof step.trigger_time_seconds === 'number' && step.trigger_time_seconds > 0
+          ? step.trigger_time_seconds
           : cumulativeTime;
 
         cumulativeTime = trigTime + estimatedDur;
@@ -5966,7 +5944,7 @@ app.post("/api/activities/generate", async (req, res) => {
       try {
         const { data: dbBook } = await supabase.from("books").select("*").eq("id", bookId).maybeSingle();
         if (dbBook) book = dbBook;
-      } catch (e) {}
+      } catch (e) { }
     }
     if (!book) return res.status(404).json({ error: "الكتاب غير موجود." });
 
@@ -6060,7 +6038,7 @@ app.post("/api/activities/:bookId/:chapterId/submit", async (req, res) => {
 
       try {
         await supabase.from("books").update({ chapters: book.chapters }).eq("id", book.id);
-      } catch (e) {}
+      } catch (e) { }
 
       // Telemetry log
       try {
@@ -6084,7 +6062,7 @@ app.post("/api/activities/:bookId/:chapterId/submit", async (req, res) => {
           arr.push(telemetryEntry);
           fs.writeFileSync(telemetryPath, JSON.stringify(arr, null, 2), "utf8");
         }
-      } catch (e) {}
+      } catch (e) { }
 
       return res.json({
         success: true,
@@ -6130,13 +6108,13 @@ app.get("/api/ebooks/:id/chapters/:chapterId/pages", async (req, res) => {
 
     if (!startPage || !endPage) {
       // Check blueprint on the book
-      const lessonsList = Array.isArray(book.blueprint) 
-        ? book.blueprint 
+      const lessonsList = Array.isArray(book.blueprint)
+        ? book.blueprint
         : (book.blueprint && Array.isArray((book.blueprint as any).lessons) ? (book.blueprint as any).lessons : []);
 
-      const bpMatch = lessonsList.find((bp: any) => 
-        bp.lesson_title === chapter.title || 
-        bp.title === chapter.title || 
+      const bpMatch = lessonsList.find((bp: any) =>
+        bp.lesson_title === chapter.title ||
+        bp.title === chapter.title ||
         bp.id === chapter.id ||
         (bp.lesson_title && chapter.title && (bp.lesson_title.includes(chapter.title) || chapter.title.includes(bp.lesson_title))) ||
         (bp.title && chapter.title && (bp.title.includes(chapter.title) || chapter.title.includes(bp.title)))
@@ -6182,15 +6160,15 @@ app.get("/api/ebooks/:id/chapters/:chapterId/pages", async (req, res) => {
             if (f.endsWith(".pdf")) {
               const fLower = f.toLowerCase();
               const matchSubject = (isScience && fLower.includes("science")) ||
-                                   (isMath && fLower.includes("math")) ||
-                                   (isSocial && fLower.includes("social"));
+                (isMath && fLower.includes("math")) ||
+                (isSocial && fLower.includes("social"));
               const matchGrade = !isPrep2 || (fLower.includes("prep2") || fLower.includes("prp2"));
               if (matchSubject && matchGrade) {
                 try {
                   pdfBuffer = fs.readFileSync(path.join(dir, f));
                   console.log(`[Chapter Pages] Smart match local PDF: ${f} for "${book.title}"`);
                   break;
-                } catch (e) {}
+                } catch (e) { }
               }
             }
           }
@@ -6200,10 +6178,10 @@ app.get("/api/ebooks/:id/chapters/:chapterId/pages", async (req, res) => {
     }
 
     if (!pdfBuffer) {
-      return res.json({ 
-        success: true, 
-        pages: [], 
-        message: "لم يتم العثور على ملف الـ PDF الأصلي لقص الصفحات، يُرجى فحص مسار الملف المصدر." 
+      return res.json({
+        success: true,
+        pages: [],
+        message: "لم يتم العثور على ملف الـ PDF الأصلي لقص الصفحات، يُرجى فحص مسار الملف المصدر."
       });
     }
 
@@ -6237,13 +6215,13 @@ app.get("/api/ebooks/:id/chapters/:chapterId/pages", async (req, res) => {
       chapter.end_page = endPage;
       saveEbooks(ebooks);
 
-      return res.json({ 
-        success: true, 
-        pages: persistedImages, 
+      return res.json({
+        success: true,
+        pages: persistedImages,
         pageOffset,
-        startPage, 
-        endPage, 
-        source: "pdf_render" 
+        startPage,
+        endPage,
+        source: "pdf_render"
       });
     }
 
@@ -6301,13 +6279,13 @@ app.post("/api/ebooks/:id/chapters/:chapterId/transcribe", async (req, res) => {
     let endPage = Number(chapter.end_page) || 0;
 
     if (!startPage || !endPage) {
-      const lessonsList = Array.isArray(book.blueprint) 
-        ? book.blueprint 
+      const lessonsList = Array.isArray(book.blueprint)
+        ? book.blueprint
         : (book.blueprint && Array.isArray((book.blueprint as any).lessons) ? (book.blueprint as any).lessons : []);
 
-      const bpMatch = lessonsList.find((bp: any) => 
-        bp.lesson_title === chapter.title || 
-        bp.title === chapter.title || 
+      const bpMatch = lessonsList.find((bp: any) =>
+        bp.lesson_title === chapter.title ||
+        bp.title === chapter.title ||
         bp.id === chapter.id ||
         (bp.lesson_title && chapter.title && (bp.lesson_title.includes(chapter.title) || chapter.title.includes(bp.lesson_title))) ||
         (bp.title && chapter.title && (bp.title.includes(chapter.title) || chapter.title.includes(bp.title)))
@@ -6351,14 +6329,14 @@ app.post("/api/ebooks/:id/chapters/:chapterId/transcribe", async (req, res) => {
             if (f.endsWith(".pdf")) {
               const fLower = f.toLowerCase();
               const matchSubject = (isScience && fLower.includes("science")) ||
-                                   (isMath && fLower.includes("math")) ||
-                                   (isSocial && fLower.includes("social"));
+                (isMath && fLower.includes("math")) ||
+                (isSocial && fLower.includes("social"));
               const matchGrade = !isPrep2 || (fLower.includes("prep2") || fLower.includes("prp2"));
               if (matchSubject && matchGrade) {
                 try {
                   pdfBuffer = fs.readFileSync(path.join(dir, f));
                   break;
-                } catch (e) {}
+                } catch (e) { }
               }
             }
           }
@@ -6453,10 +6431,10 @@ app.post("/api/paragraphs/narrate", async (req, res) => {
           await fallbackTts.ttsPromise(cleanText, audioPath);
         } catch (fbErr: any) {
           console.warn("[Paragraph TTS] EdgeTTS cloud network error/403, signaling client Web Speech fallback:", fbErr?.message || fbErr);
-          return res.json({ 
-            success: true, 
-            fallbackToWebSpeech: true, 
-            cleanText 
+          return res.json({
+            success: true,
+            fallbackToWebSpeech: true,
+            cleanText
           });
         }
       }
@@ -6581,7 +6559,7 @@ app.post("/api/exercises/evaluate", async (req, res) => {
         });
         fs.writeFileSync(telemetryPath, JSON.stringify(arr, null, 2), "utf8");
       }
-    } catch (e) {}
+    } catch (e) { }
 
     return res.json({ success: true, evaluation: resultJson });
   } catch (err: any) {
@@ -6913,7 +6891,7 @@ app.get("/api/ebooks/:id/chapters/:chapterId/exercises", async (req, res) => {
             if (rendered && rendered.length > 0) {
               const tagged = rendered.map(p => ({ ...p, pageType: 'exercise' }));
               manualRenderedPages = persistPageImagesToDisk(book.id, chapter.id, tagged);
-              
+
               // Merge into chapter.pages
               const existing = (chapter.pages || []).filter((p: any) => !manualRenderedPages.some(np => np.pageNumber === p.pageNumber));
               chapter.pages = [...existing, ...manualRenderedPages].sort((a: any, b: any) => a.pageNumber - b.pageNumber);
@@ -6930,14 +6908,14 @@ app.get("/api/ebooks/:id/chapters/:chapterId/exercises", async (req, res) => {
     if (!chapter.pages || chapter.pages.length === 0) {
       let startPage = Number(chapter.start_page) || 0;
       let endPage = Number(chapter.end_page) || 0;
-      
-      const lessonsList = Array.isArray(book.blueprint) 
-        ? book.blueprint 
+
+      const lessonsList = Array.isArray(book.blueprint)
+        ? book.blueprint
         : (book.blueprint && Array.isArray((book.blueprint as any).lessons) ? (book.blueprint as any).lessons : []);
 
-      const bpMatch = lessonsList.find((bp: any) => 
-        bp.lesson_title === chapter.title || 
-        bp.title === chapter.title || 
+      const bpMatch = lessonsList.find((bp: any) =>
+        bp.lesson_title === chapter.title ||
+        bp.title === chapter.title ||
         bp.id === chapter.id ||
         (bp.lesson_title && chapter.title && (bp.lesson_title.includes(chapter.title) || chapter.title.includes(bp.lesson_title)))
       );
@@ -6945,7 +6923,7 @@ app.get("/api/ebooks/:id/chapters/:chapterId/exercises", async (req, res) => {
         startPage = Number(bpMatch.start_page);
         endPage = Number(bpMatch.end_page);
       }
-      
+
       if (!startPage || !endPage) {
         const idx = (book.chapters || []).findIndex((c: any) => c.id === chapterId);
         startPage = Math.max(0, idx) * 8 + 11;
@@ -7029,10 +7007,10 @@ app.get("/api/ebooks/:id/chapters/:chapterId/exercises", async (req, res) => {
 
     // If exercises already cached and not forced and no manual page was requested, return cached
     if (chapter.exercises && Array.isArray(chapter.exercises) && chapter.exercises.length > 0 && force !== 'true' && !manualPage) {
-      return res.json({ 
-        success: true, 
+      return res.json({
+        success: true,
         hasExercisePages,
-        exercises: chapter.exercises, 
+        exercises: chapter.exercises,
         exercisePage: primaryExercisePage,
         exercisePages,
         allPages
@@ -7193,10 +7171,10 @@ ${(chapter.content || "").substring(0, 5000)}
       saveEbooks(ebooks);
     }
 
-    res.json({ 
-      success: exercises.length > 0, 
+    res.json({
+      success: exercises.length > 0,
       hasExercisePages: true,
-      exercises, 
+      exercises,
       exercisePage: primaryExercisePage,
       exercisePages,
       allPages,
@@ -7224,7 +7202,7 @@ app.post("/api/v2/generate-curriculum-mindmap", async (req, res) => {
       try {
         const { data: dbBook } = await supabase.from("books").select("*").eq("id", bookId).maybeSingle();
         if (dbBook) book = dbBook;
-      } catch (e) {}
+      } catch (e) { }
     }
 
     if (!book) {
@@ -7347,7 +7325,7 @@ app.post("/api/ebooks/:id/toggle-publish", async (req, res) => {
  */
 const getFallbackIllustration = (prompt: string): string => {
   const normalized = prompt.toLowerCase();
-  
+
   const library = {
     assessment: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=1200&q=80", // exam, writing, paper
     classroom: "https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?auto=format&fit=crop&w=1200&q=80", // students, school
@@ -7453,10 +7431,10 @@ app.post("/api/ebooks/:id/generate-image", async (req, res) => {
     res.json({ success: true, imageUrl: base64Image });
   } catch (error: any) {
     console.log("[Gemini API] Dynamic fallback applied for chapter illustration.");
-    
+
     // Select premium high-resolution illustration seamlessly
     const fallbackImage = getFallbackIllustration(prompt);
-    
+
     // Save fallback image in memory for persistence in current session
     const ebook = ebooks.find((e) => e.id === req.params.id);
     if (ebook) {
@@ -7511,7 +7489,7 @@ app.post("/api/ebooks/:id/generate-questions", async (req, res) => {
 
   try {
     console.log(`Generating AI Quiz Questions for chapter ${chapterId}...`);
-    
+
     const questionsResponseSchema = {
       type: Type.ARRAY,
       description: "A list of exactly 3 highly relevant multiple choice quiz questions based on the provided text.",
@@ -7552,7 +7530,7 @@ app.post("/api/ebooks/:id/generate-questions", async (req, res) => {
     }
 
     const generatedQuestions = JSON.parse(resultText);
-    
+
     // Assign unique IDs to the generated questions
     const formattedQuestions = generatedQuestions.map((q: any, index: number) => ({
       ...q,
@@ -7569,7 +7547,7 @@ app.post("/api/ebooks/:id/generate-questions", async (req, res) => {
         saveEbooks(ebooks);
         try {
           await supabase.from('books').update({ chapters: ebook.chapters }).eq('id', req.params.id);
-        } catch (e) {}
+        } catch (e) { }
       }
     }
 
@@ -7593,9 +7571,9 @@ app.post("/api/ebooks/:id/chapters/:chapterId/mindmap/ai-edit", async (req, res)
     console.log(`[MindMap AI Simulator] Processing prompt: "${prompt}"`);
     const lowerPrompt = prompt.toLowerCase();
     const updatedNodes = [...(nodes || [])];
-    
+
     const isArabic = /[\u0600-\u06FF]/.test(prompt);
-    
+
     if (lowerPrompt.includes("delete") || lowerPrompt.includes("حذف") || lowerPrompt.includes("remove")) {
       if (updatedNodes.length > 0) {
         updatedNodes.pop();
@@ -7618,7 +7596,7 @@ app.post("/api/ebooks/:id/chapters/:chapterId/mindmap/ai-edit", async (req, res)
         });
       }
     }
-    
+
     // Save to server
     const ebook = ebooks.find((e) => e.id === req.params.id);
     if (ebook) {
@@ -7628,13 +7606,13 @@ app.post("/api/ebooks/:id/chapters/:chapterId/mindmap/ai-edit", async (req, res)
         saveEbooks(ebooks);
       }
     }
-    
+
     return res.json({ success: true, nodes: updatedNodes });
   }
 
   try {
     console.log(`[Gemini API] Editing Mind Map with prompt: "${prompt}"`);
-    
+
     const mindMapResponseSchema = {
       type: Type.ARRAY,
       description: "The complete list of updated mindmap nodes after performing the requested action.",
@@ -7735,18 +7713,18 @@ function saveVouchers(vouchers: any[]) {
 // 1. Generate batch of voucher codes with Platform Commission & Wallet Balance Pre-payment
 app.post("/api/vouchers/generate", async (req, res) => {
   try {
-    const { 
-      count = 8, 
-      bookId, 
-      voucherType = 'book_access', 
+    const {
+      count = 8,
+      bookId,
+      voucherType = 'book_access',
       creditAmount = 150,
       pricePrinted = 150,
-      createdBy, 
+      createdBy,
       createdByUserId,
       authorName,
-      userRole 
+      userRole
     } = req.body;
-    
+
     // Commission Rate: 15% standard (or check platform_settings)
     let commissionRate = 15;
     try {
@@ -7756,7 +7734,7 @@ app.post("/api/vouchers/generate", async (req, res) => {
       } else if (st?.features?.platformFeePercentage !== undefined) {
         commissionRate = Number(st.features.platformFeePercentage);
       }
-    } catch (e) {}
+    } catch (e) { }
 
     const pricePerCard = voucherType === 'wallet_credit' ? Number(creditAmount) : Number(pricePrinted);
     const totalCardsValue = Number(count) * pricePerCard;
@@ -7849,16 +7827,16 @@ app.post("/api/vouchers/generate", async (req, res) => {
       console.warn("Supabase vouchers sync notice:", dbErr);
     }
 
-    res.json({ 
-      success: true, 
-      count: newCodes.length, 
+    res.json({
+      success: true,
+      count: newCodes.length,
       commissionRate,
       commissionPerCard,
       totalCommission,
       newWalletBalance,
       cancellationDeadline: deadline,
       vouchers: newCodes,
-      message: newWalletBalance !== null 
+      message: newWalletBalance !== null
         ? `تم إصدار ${newCodes.length} كارت بنجاح وخصم عمولة المنصة (${totalCommission} ج.م) من محفظتك!`
         : `تم إصدار ${newCodes.length} كارت بنجاح!`
     });
@@ -7895,9 +7873,9 @@ app.post("/api/vouchers/cancel", async (req, res) => {
     const deadline = voucher.cancellation_deadline ? new Date(voucher.cancellation_deadline) : new Date(new Date(voucher.created_at).getTime() + 24 * 60 * 60 * 1000);
 
     if (now > deadline) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "عفواً، انتهت مهلة الـ 24 ساعة المسموحة لإلغاء واسترجاع الكارت." 
+      return res.status(400).json({
+        success: false,
+        message: "عفواً، انتهت مهلة الـ 24 ساعة المسموحة لإلغاء واسترجاع الكارت."
       });
     }
 
@@ -7921,7 +7899,7 @@ app.post("/api/vouchers/cancel", async (req, res) => {
           description: `استرداد عمولة كارت ملغي (${voucher.code})`,
           reference_id: voucher.code
         });
-      } catch (e) {}
+      } catch (e) { }
     }
 
     res.json({
@@ -7998,9 +7976,9 @@ app.post("/api/wallet/withdraw", async (req, res) => {
     const currentBal = Number(prof?.wallet_balance) || 0;
 
     if (currentBal < withdrawAmount) {
-      return res.status(400).json({ 
-        success: false, 
-        message: `عفواً، رصيدك الحالي (${currentBal} ج.م) لا يكفي لسحب (${withdrawAmount} ج.م).` 
+      return res.status(400).json({
+        success: false,
+        message: `عفواً، رصيدك الحالي (${currentBal} ج.م) لا يكفي لسحب (${withdrawAmount} ج.م).`
       });
     }
 
@@ -8028,7 +8006,7 @@ app.post("/api/wallet/withdraw", async (req, res) => {
         payout_details: payoutDetails,
         status: "processing"
       });
-    } catch (e) {}
+    } catch (e) { }
 
     res.json({
       success: true,
@@ -8074,7 +8052,7 @@ app.post("/api/books/:id/submit-approval", async (req, res) => {
     }
     try {
       await supabase.from("books").update({ approval_status: "pending_approval" }).eq("id", id);
-    } catch (e) {}
+    } catch (e) { }
 
     res.json({ success: true, message: "تم إرسال المقرر لإدارة المنصة للمراجعة والاعتماد ✓" });
   } catch (e: any) {
@@ -8093,12 +8071,12 @@ app.post("/api/books/:id/approve", async (req, res) => {
       saveEbooks(ebooks);
     }
     try {
-      await supabase.from("books").update({ 
-        approval_status: "approved", 
+      await supabase.from("books").update({
+        approval_status: "approved",
         is_published: true,
         approved_at: new Date().toISOString()
       }).eq("id", id);
-    } catch (e) {}
+    } catch (e) { }
 
     res.json({ success: true, message: "تم اعتماد ونشر المقرر بنجاح للطلاب! 🎉" });
   } catch (e: any) {
@@ -8118,11 +8096,11 @@ app.post("/api/books/:id/reject", async (req, res) => {
       saveEbooks(ebooks);
     }
     try {
-      await supabase.from("books").update({ 
-        approval_status: "rejected", 
-        admin_rejection_reason: reason 
+      await supabase.from("books").update({
+        approval_status: "rejected",
+        admin_rejection_reason: reason
       }).eq("id", id);
-    } catch (e) {}
+    } catch (e) { }
 
     res.json({ success: true, message: "تم رفض المقرر مع إرسال الملاحظات للمعلم." });
   } catch (e: any) {
@@ -8142,11 +8120,11 @@ app.post("/api/books/:id/request-edit", async (req, res) => {
       saveEbooks(ebooks);
     }
     try {
-      await supabase.from("books").update({ 
-        approval_status: "edit_requested", 
-        edit_request_notes: notes 
+      await supabase.from("books").update({
+        approval_status: "edit_requested",
+        edit_request_notes: notes
       }).eq("id", id);
-    } catch (e) {}
+    } catch (e) { }
 
     res.json({ success: true, message: "تم إرسال طلب التعديل للأدمن بنجاح." });
   } catch (e: any) {
@@ -8233,7 +8211,7 @@ app.post("/api/ai/stem-tutor", async (req, res) => {
             if (ch) chapterContent = ch.content || "";
           }
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     if (!bookTitle || !chapterContent) {
@@ -8848,7 +8826,7 @@ app.get("/api/vouchers", async (req, res) => {
       if (data && data.length > 0) {
         vouchers = data;
       }
-    } catch (e) {}
+    } catch (e) { }
 
     if (createdBy && createdBy !== "admin") {
       vouchers = vouchers.filter((v: any) => v.created_by === createdBy || v.author_name === createdBy);
@@ -8892,7 +8870,7 @@ app.post("/api/vouchers/redeem", async (req, res) => {
       try {
         const { data } = await supabase.from("vouchers").select("*").eq("code", cleanCode).single();
         if (data) voucher = data;
-      } catch (e) {}
+      } catch (e) { }
     }
 
     if (!voucher) {
@@ -8925,9 +8903,9 @@ app.post("/api/vouchers/redeem", async (req, res) => {
 
     // Check if voucher is locked to a different course
     if (voucher.voucher_type === 'book_access' && voucher.book_id && bookId && voucher.book_id !== bookId) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "هذا الكارت مخصص لمقرر دراسي آخر في السنتر وليس لهذا المقرر." 
+      return res.status(400).json({
+        success: false,
+        message: "هذا الكارت مخصص لمقرر دراسي آخر في السنتر وليس لهذا المقرر."
       });
     }
 
@@ -8943,7 +8921,7 @@ app.post("/api/vouchers/redeem", async (req, res) => {
         used_by: userEmail || userId,
         used_at: new Date().toISOString()
       }).eq("code", cleanCode);
-    } catch (e) {}
+    } catch (e) { }
 
     // If wallet credit voucher
     if (voucher.voucher_type === 'wallet_credit') {
@@ -8971,13 +8949,13 @@ app.post("/api/vouchers/redeem", async (req, res) => {
 // 4. Custom Scalable Exam Generator with AI completion (10 to 100 questions on specific chapters)
 app.post("/api/exams/generate-custom", async (req, res) => {
   try {
-    const { 
-      bookId, 
-      chapterIds = [], 
-      mcqCount = 20, 
-      essayCount = 4, 
+    const {
+      bookId,
+      chapterIds = [],
+      mcqCount = 20,
+      essayCount = 4,
       examTitle = "امتحان المراجعة الشاملة",
-      teacherName = "د. كريم كامل" 
+      teacherName = "د. كريم كامل"
     } = req.body;
 
     const ebooks = loadEbooks();
@@ -8988,15 +8966,15 @@ app.post("/api/exams/generate-custom", async (req, res) => {
     }
 
     // Extract selected chapters text
-    const selectedChapters = (targetBook.chapters || []).filter((ch: any) => 
+    const selectedChapters = (targetBook.chapters || []).filter((ch: any) =>
       chapterIds.length === 0 || chapterIds.includes(ch.id)
     );
 
-    const existingMCQs = (targetBook.question_bank || []).filter((q: any) => 
+    const existingMCQs = (targetBook.question_bank || []).filter((q: any) =>
       q.type === 'multiple_choice' || (q.options && q.options.length > 0)
     );
 
-    const existingEssays = (targetBook.question_bank || []).filter((q: any) => 
+    const existingEssays = (targetBook.question_bank || []).filter((q: any) =>
       q.type === 'essay' || q.type === 'true_false'
     );
 
@@ -9253,7 +9231,7 @@ app.post("/api/gamification/progress", async (req, res) => {
         const { data: profile } = await supabase.from("profiles").select("xp_points, study_streak").eq("id", userId).single();
         const currentXp = (profile?.xp_points || 0) + xpGained;
         await supabase.from("profiles").update({ xp_points: currentXp }).eq("id", userId);
-      } catch (e) {}
+      } catch (e) { }
     }
     res.json({ success: true });
   } catch (error: any) {
@@ -9299,7 +9277,7 @@ app.post("/api/reels/generate-for-book", async (req, res) => {
       try {
         const { data: dbBook } = await supabase.from("books").select("*").eq("id", bookId).single();
         if (dbBook) book = dbBook;
-      } catch (e) {}
+      } catch (e) { }
     }
 
     if (!book && (!clientChapters || clientChapters.length === 0)) {
@@ -9329,7 +9307,7 @@ app.post("/api/reels/generate-for-book", async (req, res) => {
     }
 
     const effectiveStyle = customStyle || defaultStyle;
-    
+
     // 🌍 Multilingual Reel Support
     const sampleText = targetChapters.map((c: any) => c.content || "").join(" ").substring(0, 3000);
     const bookLang = (book?.language || req.body?.language || detectContentLanguage(sampleText));
@@ -9582,7 +9560,7 @@ ${chapterContent}
         // Sync with Supabase asynchronously
         try {
           await supabase.from("reels").upsert(reelRecord);
-        } catch (dbE) {}
+        } catch (dbE) { }
       } catch (genErr) {
         console.warn(`Failed to generate reel for chapter ${chapter.title}:`, genErr);
       }
@@ -9611,7 +9589,7 @@ app.post("/api/reels/generate-single-chapter", async (req, res) => {
       try {
         const { data: dbBook } = await supabase.from("books").select("*").eq("id", bookId).single();
         if (dbBook) book = dbBook;
-      } catch (e) {}
+      } catch (e) { }
     }
 
     let chapter = book?.chapters?.find((c: any) => c.id === chapterId);
@@ -9629,7 +9607,7 @@ app.post("/api/reels/generate-single-chapter", async (req, res) => {
 
     const ai = getAiInstance();
     const effectiveStyle = styleType || style || "chalkboard";
-    
+
     // 🌍 Multilingual Reel Support
     const contentText = chapter.content || clientContent || "";
     const bookLang = (book?.language || req.body?.language || detectContentLanguage(contentText));
@@ -9875,7 +9853,7 @@ ${contentText.substring(0, 12000)}
 
     try {
       await supabase.from("reels").upsert(updatedReel);
-    } catch (e) {}
+    } catch (e) { }
 
     res.json({ success: true, reel: updatedReel });
   } catch (error: any) {
@@ -9906,7 +9884,7 @@ app.get("/api/reels/feed", async (req, res) => {
       if (data && data.length > 0) {
         reels = data;
       }
-    } catch (e) {}
+    } catch (e) { }
 
     if (category && category !== "all") {
       reels = reels.filter((r: any) => (r.category || "").toLowerCase() === String(category).toLowerCase());
@@ -9943,7 +9921,7 @@ app.get("/api/reels/book/:bookId", async (req, res) => {
       try {
         const { data } = await supabase.from("reels").select("*").eq("book_id", bookId);
         if (data) reels = data;
-      } catch (e) {}
+      } catch (e) { }
     }
 
     res.json({ success: true, reels });
@@ -9973,7 +9951,7 @@ app.post("/api/reels/:id/interact", async (req, res) => {
         const { data: prof } = await supabase.from("profiles").select("xp_points").eq("id", userId).single();
         const newXp = (prof?.xp_points || 0) + 10;
         await supabase.from("profiles").update({ xp_points: newXp }).eq("id", userId);
-      } catch (e) {}
+      } catch (e) { }
     }
 
     res.json({ success: true });
@@ -9991,7 +9969,7 @@ app.delete("/api/reels/:id", async (req, res) => {
     saveReels(reels);
     try {
       await supabase.from("reels").delete().eq("id", id);
-    } catch (e) {}
+    } catch (e) { }
     res.json({ success: true, message: "تم حذف الريل بنجاح" });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
@@ -10008,7 +9986,7 @@ app.delete("/api/reels/book/:bookId", async (req, res) => {
     saveReels(reels);
     try {
       await supabase.from("reels").delete().eq("book_id", bookId);
-    } catch (e) {}
+    } catch (e) { }
     res.json({ success: true, message: `تم حذف جميع ريلز الكتاب (${prevCount - reels.length} ريل) بنجاح` });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
@@ -10021,7 +9999,7 @@ app.delete("/api/reels/all", async (req, res) => {
     saveReels([]);
     try {
       await supabase.from("reels").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-    } catch (e) {}
+    } catch (e) { }
     res.json({ success: true, message: "تم مسح وتصفير كافة الريلز بالكامل" });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
@@ -10058,7 +10036,7 @@ async function getPayPalAccessToken(): Promise<{ token: string; baseUrl: string 
         if (settingsData.paypal_client_id) clientId = String(settingsData.paypal_client_id).trim();
         if (settingsData.paypal_client_secret) clientSecret = String(settingsData.paypal_client_secret).trim();
       }
-    } catch (dbE) {}
+    } catch (dbE) { }
 
     if (!clientId) {
       clientId = "AXf1VFSjeBvqoZAfo6fLpIMwR5ETusghASlo-u4t8VgkG0iDnD_CT-Fkr_JDP760YDKXrRbJFBdAkY6z";
@@ -10068,7 +10046,7 @@ async function getPayPalAccessToken(): Promise<{ token: string; baseUrl: string 
     }
 
     const auth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
-    
+
     // 1. Try Live Endpoint
     let baseUrl = "https://api-m.paypal.com";
     let res = await fetch(`${baseUrl}/v1/oauth2/token`, {
@@ -10158,7 +10136,7 @@ async function processBookPurchaseFulfillment({
         amount: amountPaid,
         status: "completed"
       });
-    } catch (e) {}
+    } catch (e) { }
 
     try {
       await supabase.from("payments").insert({
@@ -10171,7 +10149,7 @@ async function processBookPurchaseFulfillment({
         status: "completed",
         transaction_ref: ref
       });
-    } catch (e) {}
+    } catch (e) { }
 
     // 3. Find Book & Author
     const ebooks = loadEbooks();
@@ -10180,7 +10158,7 @@ async function processBookPurchaseFulfillment({
       try {
         const { data: dbBook } = await supabase.from("books").select("*").eq("id", bookId).maybeSingle();
         if (dbBook) book = dbBook;
-      } catch (e) {}
+      } catch (e) { }
     }
 
     // 4. Get Platform Settings Commission Rate (default 15%)
@@ -10194,7 +10172,7 @@ async function processBookPurchaseFulfillment({
           commissionRate = Number(settingsData.features.platformCommissionRate);
         }
       }
-    } catch (e) {}
+    } catch (e) { }
 
     // 5. Calculate Commission & Credit Author's Wallet
     if (book && (book.author_id || book.author_name)) {
@@ -10204,12 +10182,12 @@ async function processBookPurchaseFulfillment({
         try {
           const { data: authorProf } = await supabase.from("profiles").select("id").ilike("full_name", `%${book.author_name}%`).maybeSingle();
           if (authorProf) targetAuthorId = authorProf.id;
-        } catch (e) {}
+        } catch (e) { }
       }
 
       if (targetAuthorId) {
         const { data: authorProfile } = await supabase.from("profiles").select("id, role, wallet_balance, full_name").eq("id", targetAuthorId).maybeSingle();
-        
+
         const isAuthorAdmin = authorProfile?.role === "admin";
         // Admin gets 100% of price (0% commission). Instructor gets price - (price * commissionRate / 100)
         const effectiveCommissionRate = isAuthorAdmin ? 0 : commissionRate;
@@ -10463,7 +10441,7 @@ app.post("/api/payment/paypal/create-order", async (req, res) => {
     const { amount, currency = "USD", bookId, userId, userEmail, recharge, origin: clientOrigin } = req.body;
     const authData = await getPayPalAccessToken();
     if (!authData) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: "تعذر التحقق من مصادقة حساب PayPal (Authentication Failed). يرجى التأكد من إضافة Client ID و Secret صالحين من حساب PayPal Developer في لوحة إعدادات المنصة (Admin Settings) أو ملف .env.",
         hint: "Minimum payment is $10 USD. Ensure Live/Sandbox credentials match the environment."
       });
@@ -10509,9 +10487,9 @@ app.post("/api/payment/paypal/create-order", async (req, res) => {
     const orderData = await orderRes.json();
     if (!orderRes.ok || !orderData.id) {
       console.error("PayPal create order API error:", orderData);
-      return res.status(orderRes.status || 500).json({ 
-        error: orderData.message || orderData.details?.[0]?.description || "فشل إنشاء طلب الدفع عبر PayPal", 
-        details: orderData 
+      return res.status(orderRes.status || 500).json({
+        error: orderData.message || orderData.details?.[0]?.description || "فشل إنشاء طلب الدفع عبر PayPal",
+        details: orderData
       });
     }
 
@@ -10682,7 +10660,7 @@ app.post("/api/vouchers/redeem", async (req, res) => {
       try {
         const { data } = await supabase.from("vouchers").select("*").eq("code", cleanCode).single();
         if (data) voucher = data;
-      } catch (e) {}
+      } catch (e) { }
     }
 
     if (!voucher) {
@@ -10728,9 +10706,9 @@ app.post("/api/vouchers/redeem", async (req, res) => {
 
     // Check if voucher is locked to a different course
     if (voucher.voucher_type === 'book_access' && voucher.book_id && bookId && voucher.book_id !== bookId) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "هذا الكارت مخصص لمقرر دراسي آخر في السنتر وليس لهذا المقرر." 
+      return res.status(400).json({
+        success: false,
+        message: "هذا الكارت مخصص لمقرر دراسي آخر في السنتر وليس لهذا المقرر."
       });
     }
 
@@ -10746,7 +10724,7 @@ app.post("/api/vouchers/redeem", async (req, res) => {
         used_by: userEmail || userId,
         used_at: new Date().toISOString()
       }).eq("code", cleanCode);
-    } catch (e) {}
+    } catch (e) { }
 
     // If wallet credit voucher
     if (voucher.voucher_type === 'wallet_credit') {
@@ -10840,7 +10818,7 @@ app.post("/api/withdrawals/request", async (req, res) => {
       const { data: st } = await supabase.from("platform_settings").select("*").eq("id", "default_settings").maybeSingle();
       if (st?.min_withdrawal !== undefined) minWithdrawal = Number(st.min_withdrawal);
       else if (st?.features?.minWithdrawalAmount !== undefined) minWithdrawal = Number(st.features.minWithdrawalAmount);
-    } catch (e) {}
+    } catch (e) { }
 
     if (withdrawAmount < minWithdrawal) {
       return res.status(400).json({
@@ -10853,9 +10831,9 @@ app.post("/api/withdrawals/request", async (req, res) => {
     const currentBal = Number(prof?.wallet_balance) || 0;
 
     if (currentBal < withdrawAmount) {
-      return res.status(400).json({ 
-        success: false, 
-        message: `عفواً، رصيدك المتاح (${currentBal} ج.م) لا يكفي لسحب (${withdrawAmount} ج.م).` 
+      return res.status(400).json({
+        success: false,
+        message: `عفواً، رصيدك المتاح (${currentBal} ج.م) لا يكفي لسحب (${withdrawAmount} ج.م).`
       });
     }
 
@@ -10900,7 +10878,7 @@ app.post("/api/withdrawals/request", async (req, res) => {
         description: `طلب سحب أرباح (${payoutMethod === 'vodafone_cash' ? 'فودافون كاش' : payoutMethod === 'instapay' ? 'إنستاباي' : 'تحويل بنكي'}) - تفاصيل: ${payoutDetails}`,
         reference_id: refId
       });
-    } catch (e) {}
+    } catch (e) { }
 
     // Record in Supabase withdrawals table
     try {
@@ -10915,7 +10893,7 @@ app.post("/api/withdrawals/request", async (req, res) => {
         reference_number: refId,
         created_at: nowIso
       });
-    } catch (e) {}
+    } catch (e) { }
 
     res.json({
       success: true,
@@ -10945,17 +10923,17 @@ app.get("/api/withdrawals/list", async (req, res) => {
       if (!error && data) {
         dbWithdrawals = data;
       }
-    } catch (e) {}
+    } catch (e) { }
 
     // Merge without duplicates, preferring database status if updated
     const mergedMap = new Map<string, any>();
-    
+
     // First insert local entries
     for (const item of localList) {
       const key = item.reference_number || item.id;
       mergedMap.set(key, item);
     }
-    
+
     // Merge DB entries
     for (const item of dbWithdrawals) {
       const key = item.reference_number || item.id;
@@ -10966,7 +10944,7 @@ app.get("/api/withdrawals/list", async (req, res) => {
       }
     }
 
-    let allWithdrawals = Array.from(mergedMap.values()).sort((a, b) => 
+    let allWithdrawals = Array.from(mergedMap.values()).sort((a, b) =>
       new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
     );
 
@@ -11049,11 +11027,11 @@ app.post("/api/withdrawals/approve", async (req, res) => {
       await supabase.from("wallet_transactions").update({
         description: `تم تحويل واعتماد السحب (مرجع: ${finalRef})`
       }).ilike("reference_id", `%${cleanId}%`);
-    } catch (e) {}
+    } catch (e) { }
 
-    res.json({ 
-      success: true, 
-      message: `تم تأكيد واعتماد تحويل المبلغ (${amountApproved || 100} ج.م) بنجاح! ✅` 
+    res.json({
+      success: true,
+      message: `تم تأكيد واعتماد تحويل المبلغ (${amountApproved || 100} ج.م) بنجاح! ✅`
     });
   } catch (e: any) {
     res.status(500).json({ success: false, message: e.message });
@@ -11153,9 +11131,9 @@ app.post("/api/withdrawals/reject", async (req, res) => {
       }
     }
 
-    res.json({ 
-      success: true, 
-      message: `تم رفض الطلب وإعادة الرصيد (${amountToRefund || 100} ج.م) لمحفظة المعلم بنجاح.` 
+    res.json({
+      success: true,
+      message: `تم رفض الطلب وإعادة الرصيد (${amountToRefund || 100} ج.م) لمحفظة المعلم بنجاح.`
     });
   } catch (e: any) {
     res.status(500).json({ success: false, message: e.message });
@@ -11222,14 +11200,14 @@ function loadBlockedUsersFile(): Record<string, { isBlocked: boolean; reason?: s
     if (fs.existsSync(BLOCKED_USERS_FILE)) {
       return JSON.parse(fs.readFileSync(BLOCKED_USERS_FILE, "utf-8"));
     }
-  } catch (e) {}
+  } catch (e) { }
   return {};
 }
 
 function saveBlockedUsersFile(data: any) {
   try {
     fs.writeFileSync(BLOCKED_USERS_FILE, JSON.stringify(data, null, 2), "utf-8");
-  } catch (e) {}
+  } catch (e) { }
 }
 
 function loadBlockedBooksFile(): Record<string, { isBlocked: boolean; reason?: string; blockedAt?: string }> {
@@ -11237,14 +11215,14 @@ function loadBlockedBooksFile(): Record<string, { isBlocked: boolean; reason?: s
     if (fs.existsSync(BLOCKED_BOOKS_FILE)) {
       return JSON.parse(fs.readFileSync(BLOCKED_BOOKS_FILE, "utf-8"));
     }
-  } catch (e) {}
+  } catch (e) { }
   return {};
 }
 
 function saveBlockedBooksFile(data: any) {
   try {
     fs.writeFileSync(BLOCKED_BOOKS_FILE, JSON.stringify(data, null, 2), "utf-8");
-  } catch (e) {}
+  } catch (e) { }
 }
 
 // 1. GET Detailed Users List with purchases, uploads, stats, and activity
@@ -11255,35 +11233,35 @@ app.get("/api/admin/users-detailed", async (req, res) => {
     try {
       const { data } = await supabase.from("profiles").select("*").order("created_at", { ascending: false });
       if (data) profiles = data;
-    } catch (e) {}
+    } catch (e) { }
 
     // 2. Fetch purchases from Supabase
     let purchases: any[] = [];
     try {
       const { data } = await supabase.from("purchases").select("*").order("created_at", { ascending: false });
       if (data) purchases = data;
-    } catch (e) {}
+    } catch (e) { }
 
     // 3. Fetch quiz attempts
     let quizzes: any[] = [];
     try {
       const { data } = await supabase.from("quiz_attempts").select("*").order("created_at", { ascending: false });
       if (data) quizzes = data;
-    } catch (e) {}
+    } catch (e) { }
 
     // 4. Fetch wallet transactions
     let transactions: any[] = [];
     try {
       const { data } = await supabase.from("wallet_transactions").select("*").order("created_at", { ascending: false });
       if (data) transactions = data;
-    } catch (e) {}
+    } catch (e) { }
 
     // 5. Fetch vouchers
     let vouchers: any[] = [];
     try {
       const { data } = await supabase.from("voucher_codes").select("*").order("created_at", { ascending: false });
       if (data) vouchers = data;
-    } catch (e) {}
+    } catch (e) { }
 
     const blockedUsersDb = loadBlockedUsersFile();
     const blockedBooksDb = loadBlockedBooksFile();
@@ -11311,7 +11289,7 @@ app.get("/api/admin/users-detailed", async (req, res) => {
       });
 
       // Teacher-specific data:
-      const userAuthoredBooks = ebooks.filter(b => 
+      const userAuthoredBooks = ebooks.filter(b =>
         (b.author_id && b.author_id === profile.id) ||
         (b.author_email && b.author_email === profile.email) ||
         (profile.full_name && b.author_name && b.author_name.toLowerCase().includes(profile.full_name.toLowerCase()))
@@ -11414,7 +11392,7 @@ app.post("/api/admin/users/:userId/toggle-block", async (req, res) => {
     // 2. Update in Supabase
     try {
       await supabase.from("profiles").update({ is_blocked: !!isBlocked }).eq("id", userId);
-    } catch (e) {}
+    } catch (e) { }
 
     res.json({
       success: true,
@@ -11438,7 +11416,7 @@ app.post("/api/admin/users/:userId/change-role", async (req, res) => {
 
     try {
       await supabase.from("profiles").update({ role }).eq("id", userId);
-    } catch (e) {}
+    } catch (e) { }
 
     res.json({
       success: true,
@@ -11481,7 +11459,7 @@ app.post("/api/admin/books/:bookId/toggle-block", async (req, res) => {
         is_blocked_by_admin: !!isBlocked,
         is_published: isBlocked ? false : true
       }).eq("id", bookId);
-    } catch (e) {}
+    } catch (e) { }
 
     res.json({
       success: true,
@@ -11611,7 +11589,7 @@ async function getUserAiQuotaInfo(userId?: string, userRole?: string) {
     if (prof) {
       walletBalance = Number(prof.wallet_balance) || 0;
     }
-  } catch (e) {}
+  } catch (e) { }
 
   const usageDb = loadTeacherAiUsageFile();
   const userUsage = usageDb[userId] || { usedCount: 0, history: [] };
@@ -11719,10 +11697,10 @@ app.post("/api/platform/settings", async (req, res) => {
       console.warn("Supabase platform_settings exception:", dbErr);
     }
 
-    return res.json({ 
-      success: true, 
+    return res.json({
+      success: true,
       settings: updatedSettings,
-      message: "تم حفظ وتطبيق إعدادات المنصة والهوية بنجاح! ✓" 
+      message: "تم حفظ وتطبيق إعدادات المنصة والهوية بنجاح! ✓"
     });
   } catch (err: any) {
     console.error("Save platform settings error:", err);
@@ -11759,7 +11737,7 @@ app.post("/api/platform/upload-logo", async (req, res) => {
       if (!fs.existsSync(BRANDING_DIR)) {
         fs.mkdirSync(BRANDING_DIR, { recursive: true });
       }
-    } catch (e) {}
+    } catch (e) { }
 
     const cleanFileName = `platform_logo_${Date.now()}.${extension}`;
     const localFilePath = path.join(BRANDING_DIR, cleanFileName);
@@ -11789,7 +11767,7 @@ app.post("/api/platform/upload-logo", async (req, res) => {
           publicUrl = urlData.publicUrl;
         }
       }
-    } catch (e) {}
+    } catch (e) { }
 
     // Fallback: If not written to file and no Supabase, use direct Data URL
     if (!publicUrl) {
@@ -11977,7 +11955,7 @@ app.get("/api/admin/support/tickets", async (req, res) => {
         );
         saveSupportTicketsFile(tickets);
       }
-    } catch (e) {}
+    } catch (e) { }
 
     res.json({ success: true, tickets });
   } catch (err: any) {
@@ -12014,7 +11992,7 @@ app.post("/api/admin/support/tickets/:id/status", async (req, res) => {
         admin_reply: ticket.admin_reply || null,
         resolved_at: ticket.resolved_at || null
       }).eq("id", id);
-    } catch (e) {}
+    } catch (e) { }
 
     res.json({
       success: true,
@@ -12059,7 +12037,7 @@ app.post("/api/admin/support/tickets/:id/reply", async (req, res) => {
         status: ticket.status,
         resolved_at: ticket.resolved_at || null
       }).eq("id", id);
-    } catch (e) {}
+    } catch (e) { }
 
     res.json({
       success: true,
@@ -12189,13 +12167,13 @@ app.get("/sitemap.xml", (req, res) => {
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
 ${allUrls
-  .map((item: any) => `  <url>
+      .map((item: any) => `  <url>
     <loc>${escapeXml(item.loc)}</loc>
     ${item.lastmod ? `<lastmod>${item.lastmod}</lastmod>` : `<lastmod>${nowIso}</lastmod>`}
     <changefreq>${item.changefreq || "weekly"}</changefreq>
     <priority>${item.priority || "0.5"}</priority>
   </url>`)
-  .join("\n")}
+      .join("\n")}
 </urlset>`;
 
   sitemapCache = { xml, generatedAt: now };
@@ -12234,8 +12212,7 @@ app.get("/llms-full.txt", (req, res) => {
     .slice(0, 50)
     .map(
       (b) =>
-        `- [${b.title || "كتاب تفاعلي"}](https://www.ebook.osera-ai.com/book/${b.id}): ${
-          b.description || "منهج تفاعلي متكامل يضم شروحاً واختبارات وبطاقات استذكار."
+        `- [${b.title || "كتاب تفاعلي"}](https://www.ebook.osera-ai.com/book/${b.id}): ${b.description || "منهج تفاعلي متكامل يضم شروحاً واختبارات وبطاقات استذكار."
         } (القسم: ${b.category || b.subject || "عام"})`
     )
     .join("\n");
@@ -12325,7 +12302,7 @@ function renderHtmlWithDynamicMeta(req: express.Request, originalHtml: string): 
     const rawBookId = cleanPath.replace("/book/", "").split("/")[0].trim();
     const book = currentEbooks.find(
       (b) => String(b.id).toLowerCase() === rawBookId.toLowerCase() ||
-             String(b.slug || "").toLowerCase() === rawBookId.toLowerCase()
+        String(b.slug || "").toLowerCase() === rawBookId.toLowerCase()
     );
 
     if (book) {
