@@ -4,7 +4,12 @@ import { createRequire } from 'node:module';
 import { normWord } from './script.js';
 import { japaneseReadings } from './phonemes.js';
 
-const require = createRequire(import.meta.url);
+import { pathToFileURL } from 'node:url';
+
+const safeRequireUrl = (typeof import.meta !== 'undefined' && import.meta?.url) 
+  ? import.meta.url 
+  : (typeof __filename !== 'undefined' ? pathToFileURL(__filename).href : pathToFileURL(process.cwd() + '/package.json').href);
+const require = createRequire(safeRequireUrl);
 
 // Whisper often writes Mandarin in Traditional characters, even when the
 // script is Simplified. Both sides are compared in Simplified.

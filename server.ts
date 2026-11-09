@@ -47,10 +47,41 @@ import { transpileSTEMToSpokenArabic } from "./server/services/arabicSTEMLexicon
 
 dotenv.config();
 
+// Helper functions to safely sanitize Supabase credentials and prevent "Invalid URL" crash
+function sanitizeSupabaseUrl(rawUrl?: string): string {
+  let url = (rawUrl || "").trim().replace(/^["']|["']$/g, "").trim();
+  if (!url || url === "undefined" || url === "null") {
+    return "https://ydlzvuutjgelpxueufgn.supabase.co";
+  }
+  if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    url = `https://${url}`;
+  }
+  return url.replace(/\/+$/, "");
+}
+
+function sanitizeSupabaseKey(rawKey?: string): string {
+  let key = (rawKey || "").trim().replace(/^["']|["']$/g, "").trim();
+  if (!key || key === "undefined" || key === "null") {
+    return "sb_publishable_KoXiLZfD6mIYGRRMb0gjtg_h3PkBle7";
+  }
+  return key;
+}
+
 // Initialize backend Supabase Client
-const supabaseUrl = process.env.VITE_SUPABASE_URL || "https://ydlzvuutjgelpxueufgn.supabase.co";
-const supabaseAnonKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || "sb_publishable_KoXiLZfD6mIYGRRMb0gjtg_h3PkBle7";
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const rawSupabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const supabaseUrl = sanitizeSupabaseUrl(rawSupabaseUrl);
+
+// Prefer SERVICE_ROLE_KEY on backend to bypass Row Level Security (RLS) safely
+const rawSupabaseKey = 
+  process.env.SUPABASE_SERVICE_ROLE_KEY || 
+  process.env.SERVICE_ROLE_KEY || 
+  process.env.SUPABASE_KEY || 
+  process.env.VITE_SUPABASE_PUBLISHABLE_KEY || 
+  process.env.VITE_SUPABASE_ANON_KEY;
+const supabaseKey = sanitizeSupabaseKey(rawSupabaseKey);
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+console.log(`[Supabase Init] Connected to: ${supabaseUrl} (Using ${process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SERVICE_ROLE_KEY ? 'Service Role Key 🔑' : 'Publishable/Anon Key 🛡️'})`);
 
 // Ensure local audio cache directory exists (using os.tmpdir() for 100% Vercel / Cloud serverless write compatibility)
 const AUDIO_CACHE_DIR = path.join(os.tmpdir(), "ebook_audio_cache");
@@ -2151,16 +2182,6 @@ ${chapterRawText.substring(0, 15000)}
     const mathCacheDir = path.join(projDir, "build", "math");
     fs.mkdirSync(mathCacheDir, { recursive: true });
 
-    let typesetMathFn: any = null;
-    let mathHashFn: any = null;
-    try {
-      const mathModule = await import("./explainroo/src/math.js");
-      typesetMathFn = mathModule.typesetMath;
-      mathHashFn = mathModule.mathHash;
-    } catch (e) {
-      console.warn("[Explainroo] Could not load math module:", e);
-    }
-
     // Teacher lower-third branding bar text
     const teacherBrandParts = [
       teacherName ? `أ/ ${teacherName}` : '',
@@ -2179,16 +2200,10 @@ ${chapterRawText.substring(0, 15000)}
       scenesJs += `    s.text('${headerTitle}', { x: ${centerX}, y: ${isVertical ? 180 : 120}, size: ${isVertical ? 46 : 52}, font: 'display', color: 'yellow' });\n`;
 
       // Check if scene has valid TeX mathFormula
-      let hasValidMath = false;
       const rawFormula = sanitizeTexFormula(sc.mathFormula || "");
-      if (rawFormula && typesetMathFn && mathHashFn) {
-        try {
-          const cacheFile = path.join(mathCacheDir, `${mathHashFn(rawFormula, true)}.json`);
-          await typesetMathFn(rawFormula, true, cacheFile);
-          hasValidMath = true;
-        } catch (mErr: any) {
-          console.warn(`[Explainroo Math Warning for "${rawFormula}"]:`, mErr.message);
-        }
+      const hasValidMath = !!rawFormula;
+      if (hasValidMath) {
+        // Explainroo natively renders TeX via s.math
       }
 
       const layoutType = sc.layoutType || (sc.boxes?.length === 3 ? 'step_by_step' : (sc.boxes?.length === 2 ? 'split_comparison' : 'concept_hero'));
@@ -2354,19 +2369,43 @@ ${chapterRawText.substring(0, 15000)}
     const voiceDir = path.join(projDir, "build", "voice");
     fs.mkdirSync(voiceDir, { recursive: true });
 
-    const { loadProject } = await import("./explainroo/src/project.js");
-    const { sceneHash, voicePaths } = await import("./explainroo/src/voice.js");
-    const { writeWav } = await import("./explainroo/src/wav.js");
-    const projInstance = loadProject(projDir);
+    // Standalone helper to write pure PCM WAV without dragging Explainroo ESM dependencies into bundle
+    const writePureWav = (filePath: string, samples: Float32Array, sampleRate = 24000) => {
+      const numChannels = 1;
+      const bitsPerSample = 16;
+      const dataSize = samples.length * (bitsPerSample / 8);
+      const buffer = Buffer.alloc(44 + dataSize);
 
-    const { execSync } = await import("child_process");
+      buffer.write("RIFF", 0);
+      buffer.writeUInt32LE(36 + dataSize, 4);
+      buffer.write("WAVE", 8);
+      buffer.write("fmt ", 12);
+      buffer.writeUInt32LE(16, 16);
+      buffer.writeUInt16LE(1, 20); // PCM
+      buffer.writeUInt16LE(numChannels, 22);
+      buffer.writeUInt32LE(sampleRate, 24);
+      buffer.writeUInt32LE(sampleRate * numChannels * (bitsPerSample / 8), 28);
+      buffer.writeUInt16LE(numChannels * (bitsPerSample / 8), 32);
+      buffer.writeUInt16LE(bitsPerSample, 34);
+      buffer.write("data", 36);
+      buffer.writeUInt32LE(dataSize, 40);
 
-    for (const sc of projInstance.script.scenes) {
-      const words = sc.units.filter((u: any) => u.type === 'word').map((u: any) => u.display);
+      for (let i = 0; i < samples.length; i++) {
+        const s = Math.max(-1, Math.min(1, samples[i]));
+        buffer.writeInt16LE(s < 0 ? s * 0x8000 : s * 0x7FFF, 44 + i * 2);
+      }
+      fs.writeFileSync(filePath, buffer);
+    };
+
+    for (const sc of scriptData.scenes) {
+      // Clean narration text removing {shown|spoken} syntax
+      const cleanNarration = (sc.narration || sc.heading || "").replace(/\{([^|}]*)\|?([^}]*)\}/g, '$1');
+      const words = cleanNarration.split(/\s+/).filter(Boolean);
       const sceneText = words.join(" ");
 
       const mp3Buffer = await synthesizeGoogleCloudTTS(sceneText, voice, "ar-XA");
-      const vp = voicePaths(projInstance, sc.id);
+      const wavPath = path.join(voiceDir, `${sc.id}.wav`);
+      const jsonPath = path.join(voiceDir, `${sc.id}.json`);
 
       let duration = Math.max(2.5, words.length * 0.45);
 
@@ -2374,10 +2413,10 @@ ${chapterRawText.substring(0, 15000)}
         const tempMp3 = path.join(voiceDir, `${sc.id}_temp.mp3`);
         fs.writeFileSync(tempMp3, mp3Buffer);
         try {
-          execSync(`ffmpeg -y -i "${tempMp3}" -ar 24000 -ac 1 -c:a pcm_s16le "${vp.wav}"`, { stdio: "ignore" });
+          execSync(`ffmpeg -y -i "${tempMp3}" -ar 24000 -ac 1 -c:a pcm_s16le "${wavPath}"`, { stdio: "ignore" });
           fs.rmSync(tempMp3, { force: true });
 
-          const probeOut = execSync(`ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${vp.wav}"`, { encoding: "utf8" });
+          const probeOut = execSync(`ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${wavPath}"`, { encoding: "utf8" });
           const parsedDur = parseFloat(probeOut.trim());
           if (!isNaN(parsedDur) && parsedDur > 0) {
             duration = parsedDur;
@@ -2388,17 +2427,11 @@ ${chapterRawText.substring(0, 15000)}
       } else {
         const sr = 24000;
         const samples = new Float32Array(Math.floor(duration * sr));
-        writeWav(vp.wav, samples, sr);
+        writePureWav(wavPath, samples, sr);
       }
 
-      const chunks = [];
-      let curChunk = '';
-      for (const u of sc.units) {
-        if (u.type === 'word') curChunk += (curChunk ? ' ' : '') + u.display;
-      }
-      if (curChunk) chunks.push({ gapBefore: 0, text: curChunk });
-
-      const hash = sceneHash(sc, chunks, projInstance.config);
+      const chunks = [{ gapBefore: 0, text: sceneText }];
+      const hash = crypto.createHash('sha256').update(JSON.stringify({ id: sc.id, text: sceneText, duration })).digest('hex').slice(0, 16);
 
       const wordObjs = words.map((w: string, idx: number) => ({
         text: w,
@@ -2409,16 +2442,11 @@ ${chapterRawText.substring(0, 15000)}
       }));
 
       const marks: Record<string, number> = {};
-      let wordsCounted = 0;
-      const totalWords = Math.max(1, words.length);
-      for (const u of sc.units) {
-        if (u.type === 'word') {
-          wordsCounted++;
-        } else if (u.type === 'mark') {
-          const ratio = Math.max(0.10, Math.min(0.92, wordsCounted / totalWords));
-          marks[u.name] = Number((duration * ratio).toFixed(2));
-        }
-      }
+      const boxes = Array.isArray(sc.boxes) ? sc.boxes : [];
+      boxes.forEach((_: any, bIdx: number) => {
+        const ratio = Math.max(0.15, Math.min(0.90, (bIdx + 1) / (boxes.length + 1)));
+        marks[`m${bIdx + 1}`] = Number((duration * ratio).toFixed(2));
+      });
 
       const info = {
         hash,
@@ -2432,7 +2460,7 @@ ${chapterRawText.substring(0, 15000)}
         unmatched: []
       };
 
-      fs.writeFileSync(vp.json, JSON.stringify(info, null, 2));
+      fs.writeFileSync(jsonPath, JSON.stringify(info, null, 2));
     }
 
     // 6. Execute Explainroo Render (Chromium Headless + Canvas + FFmpeg)

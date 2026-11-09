@@ -76,7 +76,10 @@ function fail(msg) {
 
 const LOOK_KEYS = ['extends', 'name', 'dark', 'bg', 'ink', 'muted', 'surface', 'accent', 'colors', 'fonts', 'background', 'stroke', 'radius', 'transition', 'music', 'code', 'terminal', 'caption'];
 const TEXTURES = ['paper', 'dots', 'chalk', 'grid', 'glow', 'plain'];
-const BUILTIN_FONTS = [...new Set(JSON.parse(fs.readFileSync(new URL('../fonts/fonts.json', import.meta.url), 'utf8')).map((f) => f.family))];
+const fontsFilePath = (typeof import.meta !== 'undefined' && import.meta?.url)
+  ? new URL('../fonts/fonts.json', import.meta.url)
+  : path.join(process.cwd(), 'explainroo', 'fonts', 'fonts.json');
+const BUILTIN_FONTS = [...new Set(JSON.parse(fs.readFileSync(fontsFilePath, 'utf8')).map((f) => f.family))];
 
 function lookPath(theme) {
   return typeof theme === 'string' && theme.endsWith('.json') && !path.isAbsolute(theme) && !path.win32.isAbsolute(theme);

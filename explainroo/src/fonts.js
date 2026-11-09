@@ -63,7 +63,10 @@ let hb;
 // Keeps only the characters in text, so an exported player loads a few
 // kilobytes of font instead of the full 16 MB file.
 export function subsetFont(data, text) {
-  hb ??= new WebAssembly.Instance(new WebAssembly.Module(fs.readFileSync(createRequire(import.meta.url).resolve('harfbuzzjs/dist/harfbuzz-subset.wasm')))).exports;
+  const safeReq = (typeof import.meta !== 'undefined' && import.meta?.url)
+    ? createRequire(import.meta.url)
+    : createRequire(process.cwd() + '/package.json');
+  hb ??= new WebAssembly.Instance(new WebAssembly.Module(fs.readFileSync(safeReq.resolve('harfbuzzjs/dist/harfbuzz-subset.wasm')))).exports;
   const pointer = hb.malloc(data.byteLength);
   new Uint8Array(hb.memory.buffer).set(data, pointer);
   const blob = hb.hb_blob_create(pointer, data.byteLength, 2, 0, 0);
