@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Play, RefreshCw, Sparkles, CheckCircle2, AlertTriangle, 
   Video, BookOpen, Download, Monitor, Smartphone,
-  User, Palette, ChevronDown, ChevronUp, Layers
+  User, Palette, ChevronDown, ChevronUp, Layers, Music
 } from 'lucide-react';
 import { MarketplaceBook, Chapter } from '../../types';
 
@@ -21,6 +21,11 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
   // Theme selection: Defaults to 'paper' (كراسة مسطرة) as the user's top preferred choice!
   const [selectedTheme, setSelectedTheme] = useState<'paper' | 'chalk' | 'midnight' | 'clean'>(() => {
     return (localStorage.getItem('osera_video_theme') as any) || 'paper';
+  });
+
+  // Background Music Style
+  const [musicStyle, setMusicStyle] = useState<string>(() => {
+    return localStorage.getItem('osera_music_style') || 'warm';
   });
 
   // Video topic focus
@@ -42,11 +47,12 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
   useEffect(() => {
     try {
       localStorage.setItem('osera_video_theme', selectedTheme);
+      localStorage.setItem('osera_music_style', musicStyle);
       localStorage.setItem('osera_teacher_name', teacherName);
       localStorage.setItem('osera_teacher_phone', teacherPhone);
       localStorage.setItem('osera_subject_name', subjectName);
     } catch (e) {}
-  }, [selectedTheme, teacherName, teacherPhone, subjectName]);
+  }, [selectedTheme, musicStyle, teacherName, teacherPhone, subjectName]);
 
   // Video Library & Playback State
   const [chapterVideos, setChapterVideos] = useState<any[]>([]);
@@ -162,6 +168,7 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
           videoTopic: computedTopic,
           videoType: computedType,
           theme: selectedTheme,
+          musicStyle,
           teacherName,
           teacherPhone,
           subjectName,
@@ -389,7 +396,43 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
 
         </div>
 
-        {/* C. COLLAPSIBLE TEACHER BRANDING (اسم المعلم اختياري وخلف زر بسيط) */}
+        {/* C. خلفية الموسيقى التصويرية (SOUNDTRACK SELECTION) */}
+        <div className="pt-3 border-t border-slate-100 space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+              <Music className="w-4 h-4 text-amber-600" />
+              <span>الموسيقى التصويرية المصاحبة:</span>
+            </label>
+            <span className="text-[10px] text-slate-500 font-normal">نغمات ذكية تعزز تفاعل الطالب دون التشويش على الشرح</span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            {[
+              { id: 'warm', label: 'كلاسيكي دافئ', desc: 'كمان وبيانو', icon: '🎻' },
+              { id: 'calm', label: 'هادئ تأملي', desc: 'نغمات استرخاء', icon: '🎹' },
+              { id: 'upbeat', label: 'حماسي نشط', desc: 'إيقاع تحفيزي', icon: '⚡' },
+              { id: 'tech', label: 'تقني عصري', desc: 'إلكتروني خفيف', icon: '💻' },
+              { id: 'none', label: 'بدون موسيقى', desc: 'صوت الإلقاء فقط', icon: '🔇' },
+            ].map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => setMusicStyle(m.id)}
+                className={`p-2.5 rounded-2xl border text-center transition cursor-pointer flex flex-col items-center justify-center gap-1 ${
+                  musicStyle === m.id
+                    ? 'bg-amber-500/10 text-amber-900 border-amber-500 ring-2 ring-amber-400 font-black shadow-xs'
+                    : 'bg-white text-slate-700 border-slate-200 font-bold hover:bg-slate-50'
+                }`}
+              >
+                <span className="text-sm">{m.icon}</span>
+                <span className="text-xs font-bold">{m.label}</span>
+                <span className="text-[10px] opacity-75 font-normal">{m.desc}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* D. COLLAPSIBLE TEACHER BRANDING (اسم المعلم اختياري وخلف زر بسيط) */}
         <div className="pt-2 border-t border-slate-100">
           <button
             type="button"

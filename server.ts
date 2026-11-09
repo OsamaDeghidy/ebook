@@ -1800,7 +1800,8 @@ app.post("/api/explainroo/generate-lesson-video", async (req, res) => {
     voice = "ar-XA-Chirp3-HD-Fenrir",
     videoTopic = "",
     videoType = "explainer", // 'explainer' | 'reels' | 'exercise_drill'
-    theme = "chalk", // 'chalk' | 'midnight' | 'paper' | 'clean'
+    theme = "paper", // 'paper' | 'chalk' | 'midnight' | 'clean'
+    musicStyle = "warm", // 'warm' | 'calm' | 'upbeat' | 'tech' | 'playful' | 'none'
     teacherName = "",
     teacherPhone = "",
     subjectName = "",
@@ -1873,7 +1874,7 @@ ${chapterRawText.substring(0, 9500)}
 1. **تجريد الصوت نهائياً من أسماء الأشخاص (تحذير حاسم):**
    - يمنع منعاً باتاً ومطلقاً ذكر اسم أي شخص (سواء المعلم أو الطالب) في الشرح الصوتي إطلاقاً!
    - ممنوع تماماً المقدمات الترحيبية من نوع: (أهلاً بك يا فلان، أهلاً بك أيها الطالب، معكم المستر فلان، إلخ).
-   - ابدأ فوراً ومباشرة في صلب المادة العلمية وشرح المفهوم الرياضي كشرح مباشر، علمي، رصين ووقور يليق بدرس أكاديمي متقن.
+   - ابدأ فوراً ومباشرة في صلب المادة العلمية وشرح المفهوم كشرح مباشر، علمي، رصين ووقور يليق بدرس أكاديمي متقن.
    - لغة الإلقاء: لغة عربية فصحى مشكولة ومضبوطة بدقة بالتشكيل الكامل (خصوصاً أواخر الكلمات والضمائر) لضمان نطق سليم 100% من محرك الصوت البشري.
 
 2. **العمق والشمولية ومنع التلخيص المخل:**
@@ -1891,19 +1892,20 @@ ${chapterRawText.substring(0, 9500)}
      * إذا كان "exercise_drill": 6 إلى 8 مشاهد لحل المسائل خطوة بخطوة بالتفصيل الكامل.
    - لكل مشهد: صِغ تعليقاً صوتياً وافياً ومشكولاً (من 45 إلى 75 كلمة، 3 إلى 5 جمل تعليمية قوية ومترابطة).
 
-3. **تنوع التخطيط البصري للمشاهد (Visual Diversity Archetypes):**
-   - ممنوع تكرار نفس شكل الصناديق في كل المشاهد! اختر لكل مشهد نمط تخطيط محدد في حقل "layoutType":
-     * "concept_hero": عنوان كبير + معادلة TeX في المنتصف + بطاقة شرح عريضة في الأسفل.
-     * "split_comparison": بطاقتان متجاورتان (يمين ويسار) لمقارنة حالتين مع أيقونات متقابلة.
-     * "step_by_step": ثلاث خطوات رأسية متتابعة (الخطوة 1: المعطيات، الخطوة 2: القانون والتعويض، الخطوة 3: الناتج المؤطر) تظهر تباعاً عند العلامات (m1, m2, m3).
-     * "golden_alert": بطاقة تحذيرية مميزة بإطار بارز تركز على فخاخ الامتحانات (Exam Trap) بلون تحذيري ساطع.
-     * "summary_takeaways": بطاقتان أو ثلاث بطاقات لتلخيص زبدة الدرس.
+3. **تنوع التخطيط البصري وقواعد النصوص داخل البطاقات (Card Formatting):**
+   - في حقل "boxes": اكتب نص كل بطاقة بتركيز شديد وإيجاز ذكي (من 6 إلى 12 كلمة كحد أقصى) لتظهر البطاقة بسطر أو سطرين دون أي تكدس أو تداخل مع البطاقات الأخرى.
+   - تنويع "layoutType":
+     * "concept_hero": عنوان + معادلة TeX في المنتصف + بطاقة شرح واضحة في الأسفل.
+     * "split_comparison": بطاقتان متجاورتان للمقارنة الثنائية.
+     * "step_by_step": ثلاث خطوات متتابعة (الخطوة 1، الخطوة 2، الخطوة 3).
+     * "golden_alert": بطاقة تنبيه ذهبية لفخاخ الامتحانات (Exam Trap).
 
-4. **الرموز الرياضية ومنع الأيقونات العشوائية:**
-   - في دروس الرياضيات، ضع المعادلة الرياضية الصحيحة بصيغة TeX في حقل "mathFormula" في كل المشاهد الممكنة.
-   - ممنوع منعاً باتاً ومطلقاً استخدام أيقونات التكنولوجيا أو البيئة (wifi, cpu, database, globe, laptop, leaf, heart-pulse) في دروس الرياضيات!
+4. **الرموز الرياضية وقواعد TeX الصارمة:**
+   - ضع المعادلة الرياضية الصحيحة بصيغة TeX في حقل "mathFormula".
+   - لا تستخدم علامة & مطلقاً في صيغ TeX ما لم تكن داخل بيئة matrix أو aligned.
+   - ممنوع استخدام أيقونات غير مناسبة لمادة الدرس.
 
-المطلوب: أجب حصراً بكائن JSON مطابق للبنية الآتية بدون أي نصوص قبل أو بعد:
+المطلوب: أجب حصراً بكائن JSON صالح مطابق تماماً للبنية الآتية بدون أي نصوص أو كتل خارجها:
 {
   "title": "عنوان شامل ومحدد للدرس مستخرج من النص",
   "scenes": [
@@ -1913,31 +1915,22 @@ ${chapterRawText.substring(0, 9500)}
       "layoutType": "concept_hero",
       "mathFormula": "\\mathbb{R} = \\mathbb{Q} \\cup \\mathbb{Q}'",
       "icon": "calculator",
-      "narration": "نص الشرح الصوتي المفصل للفقرة الأولى بالفصحى المشكولة (شرح تعليمي غني من 45-75 كلمة يبدأ فوراً بتعريف المفهوم العلمي دون أي أسماء).",
-      "marks": [
-        { "name": "m1", "afterWords": 5 },
-        { "name": "m2", "afterWords": 12 }
-      ],
+      "narration": "نص الشرح الصوتي المفصل للفقرة الأولى بالفصحى المشكولة (شرح تعليمي غني من 45-75 كلمة يبدأ فوراً بتعريف المفهوم دون أي أسماء).",
       "boxes": [
-        { "label": "المفهوم الأساسي من النص المرفق", "icon": "check", "color": "teal", "atMark": "m1" }
+        { "label": "المفهوم الأساسي في سطر مكثف وواضح", "icon": "check", "color": "teal" }
       ]
     },
     {
       "id": "scene2",
-      "heading": "مقارنة أنواع الفترات",
+      "heading": "مقارنة الحالات",
       "layoutType": "split_comparison",
       "mathFormula": "[a, b] \\quad \\text{مقابل} \\quad ]a, b[",
       "icon": "scale",
-      "narration": "شرح مقارنة الحالتين بالتفصيل العلمي الدقيق بدون أي أسماء شخصية.",
-      "marks": [
-        { "name": "m1", "afterWords": 5 },
-        { "name": "m2", "afterWords": 12 }
-      ],
+      "narration": "شرح مقارنة الحالتين بالتفصيل العلمي الدقيق بدون أي أسماء شخصية وبكلمات غنية.",
       "boxes": [
-        { "label": "الفترة المغلقة: العناصر وأطرافها تنتمي للمجموعة", "icon": "check", "color": "teal", "atMark": "m1" },
-        { "label": "الفترة المفتوحة: الأطراف لا تنتمي للمجموعة", "icon": "layers", "color": "yellow", "atMark": "m2" }
-      ],
-      "arrow": { "from": 0, "to": 1, "label": "مقارنة" }
+        { "label": "الحالة الأولى: العناصر وأطرافها تنتمي للمجموعة", "icon": "check", "color": "teal" },
+        { "label": "الحالة الثانية: الأطراف لا تنتمي للمجموعة", "icon": "layers", "color": "yellow" }
+      ]
     },
     {
       "id": "scene3",
@@ -1945,16 +1938,11 @@ ${chapterRawText.substring(0, 9500)}
       "layoutType": "step_by_step",
       "mathFormula": "[2, 6] \\cap [4, 8] = [4, 6]",
       "icon": "calculator",
-      "narration": "شرح خطوات الحل الحسابي والتعويض بالتفصيل حتى الوصول للناتج بصوت علمي متقن.",
-      "marks": [
-        { "name": "m1", "afterWords": 4 },
-        { "name": "m2", "afterWords": 10 },
-        { "name": "m3", "afterWords": 18 }
-      ],
+      "narration": "شرح خطوات الحل الحسابي والتعويض بالتفصيل حتى الوصول للناتج بصوت علمي متقن ومفصل.",
       "boxes": [
-        { "label": "الخطوة 1: كتابة المعطيات وتحديد الفترات على خط الأعداد", "icon": "layers", "color": "teal", "atMark": "m1" },
-        { "label": "الخطوة 2: تحديد منطقة التقاطع المشتركة بين الفترتين", "icon": "calculator", "color": "purple", "atMark": "m2" },
-        { "label": "الناتج النهائي: مجموعة الحل هي الفترة [4، 6]", "icon": "check", "color": "green", "atMark": "m3" }
+        { "label": "الخطوة 1: كتابة المعطيات وتحديد الفترات على خط الأعداد", "icon": "layers", "color": "teal" },
+        { "label": "الخطوة 2: تحديد منطقة التقاطع المشتركة بين الفترتين", "icon": "calculator", "color": "purple" },
+        { "label": "الناتج النهائي: مجموعة الحل هي الفترة [4، 6]", "icon": "check", "color": "green" }
       ]
     },
     {
@@ -1963,12 +1951,9 @@ ${chapterRawText.substring(0, 9500)}
       "layoutType": "golden_alert",
       "mathFormula": "\\{3, 5\\} \\neq [3, 5]",
       "icon": "award",
-      "narration": "توضيح الفرق الجوهري لتجنب خطأ الامتحان الشائع بين الطلاب والتركيز على الدقة.",
-      "marks": [
-        { "name": "m1", "afterWords": 4 }
-      ],
+      "narration": "توضيح الفرق الجوهري لتجنب خطأ الامتحان الشائع والتركيز على الدقة العلمية.",
       "boxes": [
-        { "label": "انتبه: المجموعة {3، 5} عنصران فقط، بينما الفترة [3، 5] عدد لا نهائي من الأعداد الحقيقية!", "icon": "award", "color": "yellow", "atMark": "m1" }
+        { "label": "انتبه: المجموعة عنصران فقط بينما الفترة تمثل مجالا متصلا لا نهائيا", "icon": "award", "color": "yellow" }
       ]
     }
   ]
@@ -1983,12 +1968,37 @@ ${chapterRawText.substring(0, 9500)}
       }
     });
 
-    let scriptData: any = null;
-    try {
-      scriptData = JSON.parse(geminiRes?.text || "{}");
-    } catch (e) {
-      console.warn("[Explainroo] Failed to parse Gemini response:", e);
-    }
+    // Robust JSON Parser with TeX and escape sequence healing
+    const sanitizeGeminiJson = (rawText: string): any => {
+      if (!rawText) return null;
+      let cleaned = rawText.trim();
+      cleaned = cleaned.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/i, '').trim();
+
+      // Escape stray backslashes that are invalid in JSON string literals (e.g. \mathbb, \cup, \text)
+      cleaned = cleaned.replace(/\\(?!["\\/bfnrt]|u[0-9a-fA-F]{4})/g, "\\\\");
+
+      try {
+        return JSON.parse(cleaned);
+      } catch (e1) {
+        // Clean trailing commas in objects and arrays
+        const fixedCommas = cleaned.replace(/,\s*([}\]])/g, '$1');
+        try {
+          return JSON.parse(fixedCommas);
+        } catch (e2) {
+          console.warn("[Explainroo JSON Parser] Standard & comma fix failed. Trying regex extractor...", e2);
+          const scenesMatch = cleaned.match(/"scenes"\s*:\s*(\[\s*\{[\s\S]*\}\s*\])/);
+          if (scenesMatch) {
+            try {
+              const scenesArr = JSON.parse(scenesMatch[1].replace(/,\s*([}\]])/g, '$1'));
+              return { title: chapter.title, scenes: scenesArr };
+            } catch (e3) {}
+          }
+          return null;
+        }
+      }
+    };
+
+    let scriptData: any = sanitizeGeminiJson(geminiRes?.text || "");
 
     if (!scriptData || !Array.isArray(scriptData.scenes) || scriptData.scenes.length === 0) {
       // Dynamic fallback constructed directly from chapter title
@@ -1998,30 +2008,39 @@ ${chapterRawText.substring(0, 9500)}
           {
             id: "scene1",
             heading: chapter.title,
+            layoutType: "concept_hero",
             icon: book?.category?.includes("رياض") ? "calculator" : (book?.category?.includes("حاسب") ? "cpu" : "book-open"),
-            narration: `أهلاً بكم في شرح ${chapter.title}. سنتعلم اليوم أهم المفاهيم والقواعد الأساسية في المنهج.`,
-            marks: [{ name: "m1", afterWords: 3 }],
+            narration: `نتناول في هذا الدرس التعليمي موضوع ${chapter.title}. سنستعرض أهم المفاهيم والقواعد والمسائل التطبيقية المقررة في المنهج بعناية وتفصيل.`,
             boxes: [
-              { label: `المفهوم الأساسي في ${chapter.title}`, icon: "check", color: "yellow", atMark: "m1" }
+              { label: `المفهوم الأساسي والمحاور الرئيسية في درس ${chapter.title}`, icon: "check", color: "teal" }
             ]
           },
           {
             id: "scene2",
             heading: "الخلاصة والتطبيق العملي",
+            layoutType: "step_by_step",
             icon: "award",
-            narration: "بهذا نكون قد أتقنا المبادئ الأساسية لهذا الدرس. استمروا في حل التمارين للتفوق.",
-            marks: [{ name: "m1", afterWords: 3 }],
+            narration: "نصل إلى تلخيص القواعد الأساسية وأهم الإرشادات لحل التمارين والتفوق في اختبارات المنهج بثقة واقتدار.",
             boxes: [
-              { label: "إتقان كامل لجميع أفكار ومسائل الدرس", icon: "award", color: "green", atMark: "m1" }
+              { label: "فهم التعريفات وتحديد المعطيات بدقة قبل البدء في الحل", icon: "layers", color: "teal" },
+              { label: "تطبيق القوانين الرياضية والخطوات المنهجية المعتمدة", icon: "calculator", color: "purple" },
+              { label: "مراجعة الناتج النهائي والتأكد من صحة الخطوات", icon: "award", color: "green" }
             ]
           }
         ]
       };
     }
 
-    // 2. Build video.json with selected theme
-    const allowedThemes = ['chalk', 'midnight', 'paper', 'clean'];
-    const activeTheme = allowedThemes.includes(theme) ? theme : 'chalk';
+    // 2. Build video.json with selected theme and music
+    const allowedThemes = ['paper', 'chalk', 'midnight', 'clean'];
+    const activeTheme = allowedThemes.includes(theme) ? theme : 'paper';
+
+    const allowedMusicStyles = ['warm', 'calm', 'upbeat', 'tech', 'playful'];
+    const activeMusicStyle = allowedMusicStyles.includes(musicStyle) 
+      ? musicStyle 
+      : (activeTheme === 'paper' ? 'warm' : (activeTheme === 'clean' ? 'upbeat' : 'calm'));
+
+    const transitionStyle = activeTheme === 'paper' ? 'brush' : (activeTheme === 'midnight' ? 'zoom' : (activeTheme === 'chalk' ? 'wipe' : 'fade'));
 
     const videoConfig = {
       title: scriptData.title || chapter.title,
@@ -2031,23 +2050,41 @@ ${chapterRawText.substring(0, 9500)}
       voice: "af_heart",
       speed: 1.0,
       watermark: false,
-      music: { style: activeTheme === 'clean' ? 'upbeat' : (activeTheme === 'paper' ? 'warm' : 'calm'), volume: 0.10 },
+      music: musicStyle === 'none' ? false : { style: activeMusicStyle, volume: 0.10 },
       sfx: "minimal",
       captions: false,
-      transition: "fade",
+      transition: transitionStyle,
       end: 1.2
     };
     fs.writeFileSync(path.join(projDir, "video.json"), JSON.stringify(videoConfig, null, 2));
 
-    // 3. Build script.md with explicit spoken cues that match sc.marks
+    // 3. Build script.md with dynamically distributed spoken cues matching sc.boxes
     let scriptMd = `# ${scriptData.title || chapter.title}\n\n`;
     for (const sc of scriptData.scenes) {
       scriptMd += `## ${sc.id}\n`;
       const words = (sc.narration || "").split(/\s+/).filter(Boolean);
-      let markedNarration = "";
-      const markPositions = new Map();
-      (sc.marks || []).forEach((m: any) => markPositions.set(m.afterWords, m.name));
+      const boxesCount = Array.isArray(sc.boxes) ? sc.boxes.length : 0;
+      
+      // Calculate evenly spaced marks across the full narration words
+      const markPositions = new Map<number, string>();
+      if (boxesCount === 1) {
+        const p1 = Math.max(1, Math.floor(words.length * 0.15));
+        markPositions.set(p1, "m1");
+      } else if (boxesCount === 2) {
+        const p1 = Math.max(1, Math.floor(words.length * 0.15));
+        const p2 = Math.max(p1 + 2, Math.floor(words.length * 0.55));
+        markPositions.set(p1, "m1");
+        markPositions.set(p2, "m2");
+      } else if (boxesCount >= 3) {
+        const p1 = Math.max(1, Math.floor(words.length * 0.15));
+        const p2 = Math.max(p1 + 2, Math.floor(words.length * 0.50));
+        const p3 = Math.max(p2 + 2, Math.floor(words.length * 0.80));
+        markPositions.set(p1, "m1");
+        markPositions.set(p2, "m2");
+        markPositions.set(p3, "m3");
+      }
 
+      let markedNarration = "";
       for (let i = 0; i < words.length; i++) {
         if (i === 0 && markPositions.has(0)) {
           markedNarration += `[#${markPositions.get(0)}] `;
@@ -2061,8 +2098,28 @@ ${chapterRawText.substring(0, 9500)}
     }
     fs.writeFileSync(path.join(projDir, "script.md"), scriptMd);
 
-    // 4. Pre-typeset math formulas if present and build high-fidelity visual scenes.js
-    const esc = (s: string) => String(s || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+    // 4. Pre-typeset math formulas with TeX sanitization and build non-overlapping scenes.js
+    const esc = (s: string) => {
+      if (!s) return "";
+      return String(s)
+        .replace(/\\/g, "\\\\")
+        .replace(/'/g, "\\'")
+        .replace(/\r?\n/g, " ")
+        .replace(/[\u2028\u2029]/g, " ")
+        .trim();
+    };
+
+    const sanitizeTexFormula = (formula: string): string => {
+      if (!formula) return "";
+      let s = String(formula).trim();
+      s = s.replace(/^\$+/, '').replace(/\$+$/, '').trim();
+      // Replace bare '&' outside tabular/aligned environments to avoid MathJax Misplaced '&'
+      if (s.includes('&') && !s.includes('\\begin{')) {
+        s = s.replace(/&/g, ' \\text{ و } ');
+      }
+      return s;
+    };
+
     const mathCacheDir = path.join(projDir, "build", "math");
     fs.mkdirSync(mathCacheDir, { recursive: true });
 
@@ -2091,11 +2148,11 @@ ${chapterRawText.substring(0, 9500)}
       
       // Scene Title with display font
       const headerTitle = esc(sc.heading || chapter.title);
-      scenesJs += `    s.text('${headerTitle}', { x: ${centerX}, y: ${isVertical ? 180 : 130}, size: ${isVertical ? 46 : 56}, font: 'display', color: 'yellow' });\n`;
+      scenesJs += `    s.text('${headerTitle}', { x: ${centerX}, y: ${isVertical ? 180 : 120}, size: ${isVertical ? 46 : 52}, font: 'display', color: 'yellow' });\n`;
 
       // Check if scene has valid TeX mathFormula
       let hasValidMath = false;
-      const rawFormula = (sc.mathFormula || "").trim();
+      const rawFormula = sanitizeTexFormula(sc.mathFormula || "");
       if (rawFormula && typesetMathFn && mathHashFn) {
         try {
           const cacheFile = path.join(mathCacheDir, `${mathHashFn(rawFormula, true)}.json`);
@@ -2110,65 +2167,101 @@ ${chapterRawText.substring(0, 9500)}
       const boxes = Array.isArray(sc.boxes) ? sc.boxes : [];
 
       if (layoutType === 'step_by_step') {
-        // --- 1. STEP-BY-STEP DERIVATION LAYOUT ---
+        // --- 1. STEP-BY-STEP DERIVATION LAYOUT (Generous vertical spacing to prevent overlap) ---
         if (hasValidMath) {
-          scenesJs += `    s.math('${esc(rawFormula)}', { x: ${centerX}, y: ${isVertical ? 340 : 250}, size: ${isVertical ? 54 : 64}, color: 'yellow', at: 0.1 });\n`;
+          scenesJs += `    s.math('${esc(rawFormula)}', { x: ${centerX}, y: ${isVertical ? 340 : 210}, size: ${isVertical ? 54 : 56}, color: 'yellow', at: 0.1 });\n`;
         }
+
         boxes.forEach((b: any, bIdx: number) => {
           const boxId = `step_${sc.id}_${bIdx}`;
           const boxLabel = esc(b.label || `الخطوة ${bIdx + 1}`);
           const boxIcon = esc(b.icon || (bIdx === 2 ? 'check' : 'calculator'));
           const boxColor = esc(b.color || (bIdx === 0 ? 'teal' : (bIdx === 1 ? 'purple' : 'green')));
-          const atClause = b.atMark ? `, at: '#${esc(b.atMark)}'` : `, at: ${(bIdx + 1) * 0.8}`;
-          const boxY = isVertical ? (520 + bIdx * 340) : (390 + bIdx * 190);
-          const boxW = isVertical ? 920 : 1100;
-          scenesJs += `    s.box('${boxLabel}', { id: '${boxId}', x: ${centerX}, y: ${boxY}, w: ${boxW}, icon: '${boxIcon}', color: '${boxColor}'${atClause} });\n`;
+          const markTag = `m${bIdx + 1}`;
+          
+          if (isVertical) {
+            // Vertical 1080x1920: 400px step delta
+            const boxY = 600 + bIdx * 400;
+            scenesJs += `    s.box('${boxLabel}', { id: '${boxId}', x: ${centerX}, y: ${boxY}, w: 940, size: 34, iconSize: 40, icon: '${boxIcon}', color: '${boxColor}', at: '#${markTag}' });\n`;
+            scenesJs += `    s.focus('${boxId}', { at: '#${markTag}' });\n`;
+          } else {
+            // Landscape 1920x1080: 220px step delta with compact 32px text font
+            const baseY = hasValidMath ? 370 : 330;
+            const stepDelta = hasValidMath ? 220 : 240;
+            const boxY = baseY + bIdx * stepDelta;
+            scenesJs += `    s.box('${boxLabel}', { id: '${boxId}', x: ${centerX}, y: ${boxY}, w: 1120, size: 32, iconSize: 36, icon: '${boxIcon}', color: '${boxColor}', at: '#${markTag}' });\n`;
+            scenesJs += `    s.focus('${boxId}', { at: '#${markTag}' });\n`;
+          }
         });
+
       } else if (layoutType === 'split_comparison' && boxes.length >= 2) {
-        // --- 2. SPLIT COMPARISON LAYOUT (Right vs Left) ---
+        // --- 2. SPLIT COMPARISON LAYOUT (Right vs Left in Landscape, Top vs Bottom in Vertical) ---
         if (hasValidMath) {
-          scenesJs += `    s.math('${esc(rawFormula)}', { x: ${centerX}, y: ${isVertical ? 360 : 270}, size: ${isVertical ? 56 : 66}, color: 'yellow', at: 0.1 });\n`;
+          scenesJs += `    s.math('${esc(rawFormula)}', { x: ${centerX}, y: ${isVertical ? 340 : 220}, size: ${isVertical ? 56 : 58}, color: 'yellow', at: 0.1 });\n`;
         }
         const b0 = boxes[0];
         const b1 = boxes[1];
         const id0 = `split_${sc.id}_0`;
         const id1 = `split_${sc.id}_1`;
         if (isVertical) {
-          scenesJs += `    s.box('${esc(b0.label)}', { id: '${id0}', x: ${centerX}, y: 640, w: 900, icon: '${esc(b0.icon || "check")}', color: '${esc(b0.color || "teal")}'${b0.atMark ? `, at: '#${esc(b0.atMark)}'` : ', at: 0.8'} });\n`;
-          scenesJs += `    s.box('${esc(b1.label)}', { id: '${id1}', x: ${centerX}, y: 1060, w: 900, icon: '${esc(b1.icon || "scale")}', color: '${esc(b1.color || "yellow")}'${b1.atMark ? `, at: '#${esc(b1.atMark)}'` : ', at: 1.5'} });\n`;
-          scenesJs += `    s.arrow('${id0}', '${id1}', { color: 'orange', label: 'مقارنة', at: 1.8 });\n`;
+          scenesJs += `    s.box('${esc(b0.label)}', { id: '${id0}', x: ${centerX}, y: 680, w: 920, size: 34, iconSize: 40, icon: '${esc(b0.icon || "check")}', color: '${esc(b0.color || "teal")}', at: '#m1' });\n`;
+          scenesJs += `    s.focus('${id0}', { at: '#m1' });\n`;
+          scenesJs += `    s.box('${esc(b1.label)}', { id: '${id1}', x: ${centerX}, y: 1180, w: 920, size: 34, iconSize: 40, icon: '${esc(b1.icon || "scale")}', color: '${esc(b1.color || "yellow")}', at: '#m2' });\n`;
+          scenesJs += `    s.focus('${id1}', { at: '#m2' });\n`;
+          scenesJs += `    s.arrow('${id0}', '${id1}', { color: 'orange', label: 'مقارنة', at: '#m2' });\n`;
         } else {
-          scenesJs += `    s.box('${esc(b0.label)}', { id: '${id0}', x: ${centerX - 430}, y: 600, w: 680, icon: '${esc(b0.icon || "check")}', color: '${esc(b0.color || "teal")}'${b0.atMark ? `, at: '#${esc(b0.atMark)}'` : ', at: 0.8'} });\n`;
-          scenesJs += `    s.box('${esc(b1.label)}', { id: '${id1}', x: ${centerX + 430}, y: 600, w: 680, icon: '${esc(b1.icon || "scale")}', color: '${esc(b1.color || "yellow")}'${b1.atMark ? `, at: '#${esc(b1.atMark)}'` : ', at: 1.5'} });\n`;
-          scenesJs += `    s.arrow('${id0}', '${id1}', { color: 'orange', label: 'مقارنة', at: 1.8 });\n`;
+          const compY = hasValidMath ? 580 : 540;
+          scenesJs += `    s.box('${esc(b0.label)}', { id: '${id0}', x: ${centerX - 440}, y: ${compY}, w: 720, size: 34, iconSize: 38, icon: '${esc(b0.icon || "check")}', color: '${esc(b0.color || "teal")}', at: '#m1' });\n`;
+          scenesJs += `    s.focus('${id0}', { at: '#m1' });\n`;
+          scenesJs += `    s.box('${esc(b1.label)}', { id: '${id1}', x: ${centerX + 440}, y: ${compY}, w: 720, size: 34, iconSize: 38, icon: '${esc(b1.icon || "scale")}', color: '${esc(b1.color || "yellow")}', at: '#m2' });\n`;
+          scenesJs += `    s.focus('${id1}', { at: '#m2' });\n`;
+          scenesJs += `    s.arrow('${id0}', '${id1}', { color: 'orange', label: 'مقارنة', at: '#m2' });\n`;
         }
+
       } else if (layoutType === 'golden_alert') {
         // --- 3. GOLDEN ALERT / EXAM TRAP LAYOUT ---
-        scenesJs += `    s.icon('award', { id: 'alert_icon_${sc.id}', x: ${centerX}, y: ${isVertical ? 420 : 310}, size: ${isVertical ? 150 : 160}, color: 'yellow', at: 0.2 });\n`;
+        scenesJs += `    s.icon('award', { id: 'alert_icon_${sc.id}', x: ${centerX}, y: ${isVertical ? 380 : 270}, size: ${isVertical ? 140 : 130}, color: 'yellow', at: 0.1 });\n`;
         if (hasValidMath) {
-          scenesJs += `    s.math('${esc(rawFormula)}', { x: ${centerX}, y: ${isVertical ? 650 : 510}, size: ${isVertical ? 62 : 72}, color: 'red', at: 0.5 });\n`;
+          scenesJs += `    s.math('${esc(rawFormula)}', { x: ${centerX}, y: ${isVertical ? 620 : 460}, size: ${isVertical ? 58 : 64}, color: 'red', at: 0.4 });\n`;
         }
-        const alertLabel = esc(boxes[0]?.label || 'تنبيه هام جداً: تجنب الوقوع في أخطاء الامتحانات الشائعة!');
-        const alertY = isVertical ? (hasValidMath ? 980 : 800) : (hasValidMath ? 750 : 620);
-        scenesJs += `    s.box('${alertLabel}', { id: 'alert_box_${sc.id}', x: ${centerX}, y: ${alertY}, w: ${isVertical ? 920 : 1100}, icon: 'check', color: 'yellow', at: 1.0 });\n`;
+        const alertLabel = esc(boxes[0]?.label || 'تنبيه هام: تجنب الوقوع في أخطاء الامتحانات الشائعة!');
+        const alertY = isVertical ? (hasValidMath ? 980 : 800) : (hasValidMath ? 720 : 580);
+        scenesJs += `    s.box('${alertLabel}', { id: 'alert_box_${sc.id}', x: ${centerX}, y: ${alertY}, w: ${isVertical ? 940 : 1120}, size: 34, iconSize: 40, icon: 'check', color: 'yellow', at: '#m1' });\n`;
+        scenesJs += `    s.focus('alert_box_${sc.id}', { at: '#m1' });\n`;
+
       } else {
         // --- 4. CONCEPT HERO & DEFAULT SUMMARY LAYOUT ---
         if (hasValidMath) {
-          scenesJs += `    s.math('${esc(rawFormula)}', { x: ${centerX}, y: ${isVertical ? 460 : 340}, size: ${isVertical ? 64 : 76}, color: 'yellow', at: 0.1 });\n`;
+          scenesJs += `    s.math('${esc(rawFormula)}', { x: ${centerX}, y: ${isVertical ? 420 : 280}, size: ${isVertical ? 60 : 70}, color: 'yellow', at: 0.1 });\n`;
         } else {
           const sceneIcon = esc(sc.icon || "calculator");
-          scenesJs += `    s.icon('${sceneIcon}', { id: 'hero_icon_${sc.id}', x: ${centerX}, y: ${isVertical ? 460 : 340}, size: ${isVertical ? 140 : 160}, color: 'teal', at: 0.1 });\n`;
+          scenesJs += `    s.icon('${sceneIcon}', { id: 'hero_icon_${sc.id}', x: ${centerX}, y: ${isVertical ? 420 : 280}, size: ${isVertical ? 140 : 150}, color: 'teal', at: 0.1 });\n`;
         }
-        boxes.forEach((b: any, bIdx: number) => {
-          const boxId = `hero_box_${sc.id}_${bIdx}`;
-          const boxLabel = esc(b.label || `الفكرة الأساسية`);
-          const boxIcon = esc(b.icon || "check");
-          const boxColor = esc(b.color || (bIdx === 0 ? "teal" : "purple"));
-          const atClause = b.atMark ? `, at: '#${esc(b.atMark)}'` : `, at: ${(bIdx + 1) * 0.8}`;
-          const boxY = isVertical ? (780 + bIdx * 280) : (620 + bIdx * 180);
-          const boxW = isVertical ? 900 : 960;
-          scenesJs += `    s.box('${boxLabel}', { id: '${boxId}', x: ${centerX}, y: ${boxY}, w: ${boxW}, icon: '${boxIcon}', color: '${boxColor}'${atClause} });\n`;
-        });
+
+        if (boxes.length === 1) {
+          const boxY = isVertical ? 900 : (hasValidMath ? 680 : 620);
+          scenesJs += `    s.box('${esc(boxes[0].label)}', { id: 'hero_box_${sc.id}_0', x: ${centerX}, y: ${boxY}, w: ${isVertical ? 940 : 1100}, size: 34, iconSize: 40, icon: '${esc(boxes[0].icon || "check")}', color: '${esc(boxes[0].color || "teal")}', at: '#m1' });\n`;
+          scenesJs += `    s.focus('hero_box_${sc.id}_0', { at: '#m1' });\n`;
+        } else {
+          boxes.forEach((b: any, bIdx: number) => {
+            const boxId = `hero_box_${sc.id}_${bIdx}`;
+            const boxLabel = esc(b.label || `الفكرة الأساسية`);
+            const boxIcon = esc(b.icon || "check");
+            const boxColor = esc(b.color || (bIdx === 0 ? "teal" : "purple"));
+            const markTag = `m${bIdx + 1}`;
+            
+            if (isVertical) {
+              const boxY = 780 + bIdx * 420;
+              scenesJs += `    s.box('${boxLabel}', { id: '${boxId}', x: ${centerX}, y: ${boxY}, w: 940, size: 34, iconSize: 40, icon: '${boxIcon}', color: '${boxColor}', at: '#${markTag}' });\n`;
+              scenesJs += `    s.focus('${boxId}', { at: '#${markTag}' });\n`;
+            } else {
+              const baseY = hasValidMath ? 560 : 520;
+              const boxY = baseY + bIdx * 230;
+              scenesJs += `    s.box('${boxLabel}', { id: '${boxId}', x: ${centerX}, y: ${boxY}, w: 1040, size: 32, iconSize: 36, icon: '${boxIcon}', color: '${boxColor}', at: '#${markTag}' });\n`;
+              scenesJs += `    s.focus('${boxId}', { at: '#${markTag}' });\n`;
+            }
+          });
+        }
       }
 
       // Teacher lower-third branding bar watermark at bottom (Visual Only, Never Spoken)

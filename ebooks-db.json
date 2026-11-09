@@ -2730,36 +2730,6 @@
         "title": "مقدمة",
         "videos": [
           {
-            "id": "vid_1794230306341_jt2m",
-            "title": "مقدمة المنهج التعليمي الشامل لتخصص الحاسب الآلي والمفاهيم الأساسية",
-            "topic": "شرح مفاهيم الدرس الأساسية والمصطلحات العلمية",
-            "aspectRatio": "16:9",
-            "videoType": "explainer",
-            "theme": "midnight",
-            "teacherName": "فارس ",
-            "teacherPhone": "01066906132",
-            "subjectName": "حاسب ",
-            "videoUrl": "/api/explainroo-projects/ch-47d10d6f-de2a-4d97-8ddf-04b8fab0329a-1_vid_1794230306341_jt2m/video.mp4",
-            "sizeMb": 12.7,
-            "duration": "200 ثانية",
-            "createdAt": "2026-11-09T13:20:07.062Z"
-          },
-          {
-            "id": "vid_1794230244877_9tjr",
-            "title": "مقدمة",
-            "topic": "شرح مفاهيم الدرس الأساسية والمصطلحات العلمية",
-            "aspectRatio": "16:9",
-            "videoType": "explainer",
-            "theme": "chalk",
-            "teacherName": "فارس ",
-            "teacherPhone": "01066906132",
-            "subjectName": "حاسب ",
-            "videoUrl": "/api/explainroo-projects/ch-47d10d6f-de2a-4d97-8ddf-04b8fab0329a-1_vid_1794230244877_9tjr/video.mp4",
-            "sizeMb": 1,
-            "duration": "50 ثانية",
-            "createdAt": "2026-11-09T13:17:41.479Z"
-          },
-          {
             "id": "v-ch-47d10d6f-de2a-4d97-8ddf-04b8fab0329a-1-1",
             "url": "https://www.youtube.com/results?search_query=الرخصة+المهنية+لحاسب+آلي",
             "title": "أهمية الرخصة المهنية لمعلمي الحاسب الآلي",
@@ -3532,19 +3502,19 @@
         "title": "معرفة عمارة الحاسبات ومعمارية فون نيومان ودورة الجلب والتنفيذ",
         "videos": [
           {
-            "id": "vid_1794230502493_tprf",
+            "id": "vid_1794233149402_b41q",
             "title": "معرفة عمارة الحاسبات ومعمارية فون نيومان ودورة الجلب والتنفيذ",
             "topic": "شرح مفاهيم الدرس الأساسية والمصطلحات العلمية",
             "aspectRatio": "16:9",
             "videoType": "explainer",
-            "theme": "midnight",
+            "theme": "paper",
             "teacherName": "فارس ",
             "teacherPhone": "01066906132",
             "subjectName": "حاسب ",
-            "videoUrl": "/api/explainroo-projects/ch-47d10d6f-de2a-4d97-8ddf-04b8fab0329a-6_vid_1794230502493_tprf/video.mp4",
-            "sizeMb": 11.1,
-            "duration": "175 ثانية",
-            "createdAt": "2026-11-09T13:23:15.096Z"
+            "videoUrl": "/api/explainroo-projects/ch-47d10d6f-de2a-4d97-8ddf-04b8fab0329a-6_vid_1794233149402_b41q/video.mp4",
+            "sizeMb": 1.4,
+            "duration": "50 ثانية",
+            "createdAt": "2026-11-09T14:06:27.200Z"
           },
           {
             "id": "v-ch-47d10d6f-de2a-4d97-8ddf-04b8fab0329a-6-1",
