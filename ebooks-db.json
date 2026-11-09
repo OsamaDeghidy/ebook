@@ -2730,6 +2730,21 @@
         "title": "مقدمة",
         "videos": [
           {
+            "id": "vid_1794230306341_jt2m",
+            "title": "مقدمة المنهج التعليمي الشامل لتخصص الحاسب الآلي والمفاهيم الأساسية",
+            "topic": "شرح مفاهيم الدرس الأساسية والمصطلحات العلمية",
+            "aspectRatio": "16:9",
+            "videoType": "explainer",
+            "theme": "midnight",
+            "teacherName": "فارس ",
+            "teacherPhone": "01066906132",
+            "subjectName": "حاسب ",
+            "videoUrl": "/api/explainroo-projects/ch-47d10d6f-de2a-4d97-8ddf-04b8fab0329a-1_vid_1794230306341_jt2m/video.mp4",
+            "sizeMb": 12.7,
+            "duration": "200 ثانية",
+            "createdAt": "2026-11-09T13:20:07.062Z"
+          },
+          {
             "id": "vid_1794230244877_9tjr",
             "title": "مقدمة",
             "topic": "شرح مفاهيم الدرس الأساسية والمصطلحات العلمية",
@@ -3516,6 +3531,21 @@
         ],
         "title": "معرفة عمارة الحاسبات ومعمارية فون نيومان ودورة الجلب والتنفيذ",
         "videos": [
+          {
+            "id": "vid_1794230502493_tprf",
+            "title": "معرفة عمارة الحاسبات ومعمارية فون نيومان ودورة الجلب والتنفيذ",
+            "topic": "شرح مفاهيم الدرس الأساسية والمصطلحات العلمية",
+            "aspectRatio": "16:9",
+            "videoType": "explainer",
+            "theme": "midnight",
+            "teacherName": "فارس ",
+            "teacherPhone": "01066906132",
+            "subjectName": "حاسب ",
+            "videoUrl": "/api/explainroo-projects/ch-47d10d6f-de2a-4d97-8ddf-04b8fab0329a-6_vid_1794230502493_tprf/video.mp4",
+            "sizeMb": 11.1,
+            "duration": "175 ثانية",
+            "createdAt": "2026-11-09T13:23:15.096Z"
+          },
           {
             "id": "v-ch-47d10d6f-de2a-4d97-8ddf-04b8fab0329a-6-1",
             "url": "https://www.youtube.com/results?search_query=%D9%85%D8%B9%D8%B1%D9%81%D8%A9%20%D8%B9%D9%85%D8%A7%D8%B1%D8%A9%20%D8%A7%D9%84%D8%AD%D8%A7%D8%B3%D8%A8%D8%A7%D8%AA%20%D9%88%D9%85%D8%B9%D9%85%D8%A7%D8%B1%D9%8A%D8%A9%20%D9%81%D9%88%D9%86%20%D9%86%D9%8A%D9%88%D9%85%D8%A7%D9%86%20%D9%88%D8%AF%D9%88%D8%B1%D8%A9%20%D8%A7%D9%84%D8%AC%D9%84%D8%A8%20%D9%88%D8%A7%D9%84%D8%AA%D9%86%D9%81%D9%8A%D8%B0%20%D8%A7%D9%84%D8%B5%D9%81%20%D8%A7%D9%84%D8%AB%D8%A7%D9%84%D8%AB%20%D8%A7%D9%84%D8%AB%D8%A7%D9%86%D9%88%D9%8A",
