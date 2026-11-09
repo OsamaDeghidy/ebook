@@ -23,6 +23,7 @@ import path from "path";
 import fs from "fs";
 import os from "os";
 import crypto from "crypto";
+import { execSync, exec, spawn } from "child_process";
 import multer from "multer";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
@@ -2504,11 +2505,46 @@ ${chapterRawText.substring(0, 15000)}
       fs.copyFileSync(targetOutMp4, path.join(canonicalDir, "out", "video.mp4"));
     }
 
-    const videoUrl = `/api/explainroo-projects/${cleanChapterId}_${videoInstanceId}/video.mp4`;
+    let videoUrl = `/api/explainroo-projects/${cleanChapterId}_${videoInstanceId}/video.mp4`;
     let sizeMb = 0;
     try {
       if (fs.existsSync(targetOutMp4)) {
         sizeMb = Number((fs.statSync(targetOutMp4).size / (1024 * 1024)).toFixed(1));
+
+        // ☁️ Direct Google Cloud Storage Upload for Stateless Container Durability (Google Cloud Run SSOT)
+        if (process.env.GCS_ACCESS_KEY && process.env.GCS_SECRET_KEY) {
+          try {
+            const s3 = new S3Client({
+              endpoint: "https://storage.googleapis.com",
+              region: "auto",
+              credentials: {
+                accessKeyId: process.env.GCS_ACCESS_KEY!,
+                secretAccessKey: process.env.GCS_SECRET_KEY!
+              },
+              forcePathStyle: true
+            });
+
+            const gcsVideoKey = `videos/${cleanChapterId}_${videoInstanceId}.mp4`;
+            const fileStream = fs.createReadStream(targetOutMp4);
+            const uploadTask = new Upload({
+              client: s3,
+              params: {
+                Bucket: process.env.GCS_BUCKET_NAME || "ebookstoreg",
+                Key: gcsVideoKey,
+                Body: fileStream,
+                ContentType: "video/mp4"
+              },
+              queueSize: 2,
+              partSize: 5 * 1024 * 1024
+            });
+
+            await uploadTask.done();
+            videoUrl = `https://storage.googleapis.com/${process.env.GCS_BUCKET_NAME || "ebookstoreg"}/${gcsVideoKey}`;
+            console.log(`[Google Cloud Storage] Rendered video backed up to GCS permanently: ${videoUrl}`);
+          } catch (gcsVideoErr) {
+            console.warn("[GCS Video Backup Warning, falling back to container stream]:", gcsVideoErr);
+          }
+        }
       }
     } catch (e) { }
 
