@@ -388,7 +388,7 @@ function cleanScientificTextForSpeech(input: string): string {
 
 
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 // 🛡️ Global Security Headers (HSTS, Anti-Clickjacking, MIME-Sniffing & XSS Protection)
 app.use((req, res, next) => {
