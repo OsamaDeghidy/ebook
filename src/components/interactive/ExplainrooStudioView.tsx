@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   Play, RefreshCw, Sparkles, CheckCircle2, AlertTriangle, 
   Video, Cpu, Zap, BookOpen, 
-  Sliders, Award, FileCode2, Download, Check, Volume2, Monitor, Smartphone
+  Sliders, Award, FileCode2, Download, Check, Volume2, Monitor, Smartphone,
+  User, Phone, Palette, Clock
 } from 'lucide-react';
 import { MarketplaceBook, Chapter } from '../../types';
 
@@ -19,6 +20,30 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16'>('16:9');
   const [selectedVoice, setSelectedVoice] = useState<'ar-XA-Chirp3-HD-Fenrir' | 'ar-XA-Chirp3-HD-Aoede'>('ar-XA-Chirp3-HD-Fenrir');
   const [isDraftQuality, setIsDraftQuality] = useState<boolean>(true);
+  
+  // Visual Theme & Teacher Personalization State
+  const [selectedTheme, setSelectedTheme] = useState<'chalk' | 'midnight' | 'paper' | 'clean'>(() => {
+    return (localStorage.getItem('osera_video_theme') as any) || 'chalk';
+  });
+  const [teacherName, setTeacherName] = useState<string>(() => {
+    return localStorage.getItem('osera_teacher_name') || '';
+  });
+  const [teacherPhone, setTeacherPhone] = useState<string>(() => {
+    return localStorage.getItem('osera_teacher_phone') || '';
+  });
+  const [subjectName, setSubjectName] = useState<string>(() => {
+    return localStorage.getItem('osera_subject_name') || (book.title || '');
+  });
+
+  // Persist teacher branding in localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('osera_video_theme', selectedTheme);
+      localStorage.setItem('osera_teacher_name', teacherName);
+      localStorage.setItem('osera_teacher_phone', teacherPhone);
+      localStorage.setItem('osera_subject_name', subjectName);
+    } catch (e) {}
+  }, [selectedTheme, teacherName, teacherPhone, subjectName]);
   
   // Lesson Video Library State
   const [chapterVideos, setChapterVideos] = useState<any[]>([]);
@@ -101,7 +126,10 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
     setIsGeneratingLesson(true);
     setGenerationError(null);
     setLessonProgress(15);
-    setGenerationStep('بدء العملية: استدعاء الذكاء الاصطناعي لصياغة سكريبت ومشاهد الدرس...');
+    setGenerationStep('بدء العملية: استدعاء الذكاء الاصطناعي لصياغة سكريبت ومشاهد الدرس المتنوعة...');
+    
+    // Unique generation run ID to strictly isolate from any past cache
+    const clientRunId = `run_${Date.now()}`;
 
     const computedTopic = videoTopicOption === 'custom' 
       ? customTopicText 
@@ -113,18 +141,18 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
 
     const computedType = videoTopicOption === 'reels' ? 'reels' : videoTopicOption === 'exercises' ? 'exercise_drill' : 'explainer';
 
-    // Polling status interval while rendering
+    // Polling status interval isolated strictly to this runId
     const pollInterval = setInterval(async () => {
       try {
-        const statusRes = await fetch(`/api/explainroo/chapter-status/${cleanChapterId}`);
+        const statusRes = await fetch(`/api/explainroo/chapter-status/${cleanChapterId}?runId=${clientRunId}`);
         if (statusRes.ok) {
           const statusData = await statusRes.json();
           if (statusData.step) setGenerationStep(statusData.step);
           if (typeof statusData.progress === 'number' && statusData.progress > 0) {
             setLessonProgress(statusData.progress);
           }
-          if (statusData.isReady && statusData.videoUrl) {
-            setLessonVideoUrl(statusData.videoUrl);
+          if (statusData.status === 'ready' && statusData.progress === 100 && statusData.videoUrl) {
+            setLessonVideoUrl(statusData.videoUrl + '?t=' + Date.now());
             setLessonVideoSizeMb(statusData.sizeMb || 0);
             setIsGeneratingLesson(false);
             clearInterval(pollInterval);
@@ -147,8 +175,13 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
           voice: selectedVoice,
           videoTopic: computedTopic,
           videoType: computedType,
+          theme: selectedTheme,
+          teacherName,
+          teacherPhone,
+          subjectName,
           isDraft: isDraftQuality,
-          force: forceRegen
+          force: forceRegen,
+          runId: clientRunId
         })
       });
 
@@ -318,6 +351,128 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
                   </>
                 )}
               </button>
+            </div>
+
+            {/* TEACHER PERSONALIZATION & BRANDING */}
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                  <User className="w-4 h-4 text-indigo-600" />
+                  هوية المعلم والشريط التعريفي المخصص (Lower-Third Branding)
+                </span>
+                <span className="text-[10px] bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full font-bold">
+                  تظهر تلقائياً كشريط رسمي بأسفل الفيديو
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">اسم المعلم / المحاضر</label>
+                  <input
+                    type="text"
+                    value={teacherName}
+                    onChange={(e) => setTeacherName(e.target.value)}
+                    placeholder="مثال: أ/ أسامة مصطفى"
+                    className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">المادة أو المقرر الدراسي</label>
+                  <input
+                    type="text"
+                    value={subjectName}
+                    onChange={(e) => setSubjectName(e.target.value)}
+                    placeholder={book.title || "الرياضيات العامة"}
+                    className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">رقم التواصل / حجز السنتر</label>
+                  <input
+                    type="text"
+                    value={teacherPhone}
+                    onChange={(e) => setTeacherPhone(e.target.value)}
+                    placeholder="010XXXXXXXX"
+                    className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 font-bold text-left ltr font-mono"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* BOARD THEME SELECTOR */}
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 space-y-2">
+              <span className="text-xs font-black text-slate-700 flex items-center gap-1.5">
+                <Palette className="w-4 h-4 text-purple-600" />
+                ثيم وأسلوب عرض السبورة (Board Visual Theme)
+              </span>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setSelectedTheme('chalk')}
+                  className={`p-2.5 rounded-xl border text-center transition cursor-pointer flex flex-col items-center gap-1 ${
+                    selectedTheme === 'chalk'
+                      ? 'bg-emerald-900 text-emerald-100 border-emerald-600 ring-2 ring-emerald-500 font-black shadow-xs'
+                      : 'bg-white text-slate-700 border-slate-200 font-bold hover:bg-slate-100'
+                  }`}
+                >
+                  <div className="w-6 h-6 rounded-md bg-[#233d31] border border-emerald-400 flex items-center justify-center text-[10px] text-yellow-300 font-bold">
+                    ✎
+                  </div>
+                  <div className="text-xs">السبورة الخضراء</div>
+                  <div className="text-[9px] opacity-80">Chalk كلاسيك</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedTheme('midnight')}
+                  className={`p-2.5 rounded-xl border text-center transition cursor-pointer flex flex-col items-center gap-1 ${
+                    selectedTheme === 'midnight'
+                      ? 'bg-slate-900 text-cyan-200 border-cyan-500 ring-2 ring-cyan-400 font-black shadow-xs'
+                      : 'bg-white text-slate-700 border-slate-200 font-bold hover:bg-slate-100'
+                  }`}
+                >
+                  <div className="w-6 h-6 rounded-md bg-[#0b1020] border border-cyan-500 flex items-center justify-center text-[10px] text-cyan-300 font-bold">
+                    ⚡
+                  </div>
+                  <div className="text-xs">شاشة آيباد داكنة</div>
+                  <div className="text-[9px] opacity-80">Midnight Glow</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedTheme('paper')}
+                  className={`p-2.5 rounded-xl border text-center transition cursor-pointer flex flex-col items-center gap-1 ${
+                    selectedTheme === 'paper'
+                      ? 'bg-amber-100 text-amber-950 border-amber-500 ring-2 ring-amber-400 font-black shadow-xs'
+                      : 'bg-white text-slate-700 border-slate-200 font-bold hover:bg-slate-100'
+                  }`}
+                >
+                  <div className="w-6 h-6 rounded-md bg-[#f7f3ea] border border-amber-300 flex items-center justify-center text-[10px] text-amber-800 font-bold">
+                    📄
+                  </div>
+                  <div className="text-xs">كراسة مسطرة</div>
+                  <div className="text-[9px] opacity-80">Paper دافئة</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedTheme('clean')}
+                  className={`p-2.5 rounded-xl border text-center transition cursor-pointer flex flex-col items-center gap-1 ${
+                    selectedTheme === 'clean'
+                      ? 'bg-blue-50 text-blue-900 border-blue-500 ring-2 ring-blue-400 font-black shadow-xs'
+                      : 'bg-white text-slate-700 border-slate-200 font-bold hover:bg-slate-100'
+                  }`}
+                >
+                  <div className="w-6 h-6 rounded-md bg-[#ffffff] border border-blue-400 flex items-center justify-center text-[10px] text-blue-600 font-bold">
+                    💎
+                  </div>
+                  <div className="text-xs">رقمي ناصع</div>
+                  <div className="text-[9px] opacity-80">Clean White نقي</div>
+                </button>
+              </div>
             </div>
 
             {/* THREE CONFIGURATION SELECTORS */}
@@ -707,14 +862,22 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
                     >
                       <div className="space-y-3">
                         <div className="flex items-start justify-between gap-2">
-                          <span className={`px-2.5 py-1 rounded-md text-[10px] font-black flex items-center gap-1 ${
-                            isVertical 
-                              ? 'bg-purple-100 text-purple-700' 
-                              : 'bg-indigo-100 text-indigo-700'
-                          }`}>
-                            {isVertical ? <Smartphone className="w-3 h-3" /> : <Monitor className="w-3 h-3" />}
-                            <span>{isVertical ? '9:16 ريلز' : '16:9 عرض كامل'}</span>
-                          </span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className={`px-2.5 py-1 rounded-md text-[10px] font-black flex items-center gap-1 ${
+                              isVertical 
+                                ? 'bg-purple-100 text-purple-700' 
+                                : 'bg-indigo-100 text-indigo-700'
+                            }`}>
+                              {isVertical ? <Smartphone className="w-3 h-3" /> : <Monitor className="w-3 h-3" />}
+                              <span>{isVertical ? '9:16 ريلز' : '16:9 عرض كامل'}</span>
+                            </span>
+
+                            {vid.theme && (
+                              <span className="px-2 py-0.5 rounded-md text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                {vid.theme === 'midnight' ? '🌌 آيباد داكن' : vid.theme === 'paper' ? '📄 كراسة' : vid.theme === 'clean' ? '💎 رقمي ناصع' : '🟢 سبورة خضراء'}
+                              </span>
+                            )}
+                          </div>
 
                           <span className="text-[10px] text-slate-400 font-mono">
                             {vid.duration || '45 ثانية'}
@@ -725,6 +888,11 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
                           <h4 className="text-xs font-black text-slate-900 group-hover:text-indigo-600 transition line-clamp-2">
                             {vid.title || `فيديو الشرح رقم ${idx + 1}`}
                           </h4>
+                          {vid.teacherName && (
+                            <p className="text-[10px] text-indigo-700 font-bold mt-0.5">
+                              أ/ {vid.teacherName} {vid.subjectName ? `• ${vid.subjectName}` : ''}
+                            </p>
+                          )}
                           {vid.topicFocus && (
                             <p className="text-[11px] text-slate-500 mt-1 line-clamp-1">
                               {vid.topicFocus}

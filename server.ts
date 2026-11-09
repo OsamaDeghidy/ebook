@@ -1640,8 +1640,37 @@ const explainrooProgressMap = new Map<string, { status: string; step: string; pr
 // 🎬 Chapter Status API for Explainroo
 app.get("/api/explainroo/chapter-status/:chapterId", (req, res) => {
   const { chapterId } = req.params;
+  const runId = typeof req.query.runId === "string" ? req.query.runId : undefined;
   const cleanId = String(chapterId).replace(/[^a-zA-Z0-9_-]/g, "_");
   const liveProgress = explainrooProgressMap.get(cleanId);
+
+  // If a specific generation run was requested, isolate strictly to that run!
+  if (runId) {
+    if (!liveProgress || (liveProgress as any).runId !== runId || liveProgress.status !== "ready") {
+      return res.json({
+        chapterId: cleanId,
+        isReady: false,
+        status: liveProgress?.status || "generating",
+        step: liveProgress?.step || "جاري تهيئة ومعالجة الفيديو الجديد...",
+        progress: liveProgress?.progress || 15,
+        videoUrl: null,
+        sizeMb: 0
+      });
+    }
+  }
+
+  // If currently generating a video, NEVER report ready with a stale past video!
+  if (liveProgress && liveProgress.status === "generating") {
+    return res.json({
+      chapterId: cleanId,
+      isReady: false,
+      status: "generating",
+      step: liveProgress.step || "جاري توليد الفيديو...",
+      progress: liveProgress.progress || 20,
+      videoUrl: null,
+      sizeMb: 0
+    });
+  }
 
   let videoUrl = liveProgress?.videoUrl || null;
   let isReady = liveProgress?.status === "ready" && !!videoUrl;
@@ -1771,8 +1800,13 @@ app.post("/api/explainroo/generate-lesson-video", async (req, res) => {
     voice = "ar-XA-Chirp3-HD-Fenrir",
     videoTopic = "",
     videoType = "explainer", // 'explainer' | 'reels' | 'exercise_drill'
+    theme = "chalk", // 'chalk' | 'midnight' | 'paper' | 'clean'
+    teacherName = "",
+    teacherPhone = "",
+    subjectName = "",
     isDraft = false,
-    force = false 
+    force = false,
+    runId = `run_${Date.now()}`
   } = req.body;
 
   if (!chapterId) {
@@ -1804,9 +1838,10 @@ app.post("/api/explainroo/generate-lesson-video", async (req, res) => {
 
   explainrooProgressMap.set(cleanChapterId, { 
     status: "generating", 
-    step: `تحليل محتوى درس "${chapter.title}" وصياغة المشاهد التخصصية...`, 
+    runId,
+    step: `تحليل محتوى درس "${chapter.title}" وتوليد الهيكل البيداغوجي الأكاديمي المتنوع...`, 
     progress: 15 
-  });
+  } as any);
 
   try {
     // 1. Call Gemini to create curriculum scenes 100% derived from the current chapter content
@@ -1814,14 +1849,16 @@ app.post("/api/explainroo/generate-lesson-video", async (req, res) => {
     const specificTopicPrompt = videoTopic ? `التركيز الخاص في هذا الفيديو التكميلي: "${videoTopic}"` : "";
     const chapterRawText = (chapter.content || chapter.originalContent || "").trim();
     const targetSceneCount = videoType === "reels" 
-      ? "2 إلى 3 مشاهد كبسولة سريعة ومكثفة (60-90 ثانية) تناسب الشورتس" 
-      : "5 إلى 7 مشاهد أكاديمية متسلسلة ووافية (تغطي كافة أقسام وقوانين وأمثلة الدرس بالتفصيل الممل في 3 إلى 5 دقائق كدرس متكامل)";
+      ? "2 إلى 3 مشاهد كبسولة سريعة ومكثفة (60-90 ثانية) تناسب الشورتس والهاتف (9:16)" 
+      : videoType === "exercise_drill"
+        ? "6 إلى 8 مشاهد لحل التمارين والمسائل النموذجية خطوة بخطوة بالتفصيل الكامل مع توضيح القوانين والخطوات والناتج (مدة 4 إلى 6 دقائق)"
+        : "6 إلى 8 مشاهد أكاديمية متسلسلة ووافية تغطي كافة مفاهيم وقوانين الدرس وأمثلته بالتفصيل في 4 إلى 6 دقائق كدرس يوتيوب كامل ومفصل";
 
     const prompt = `
-أنت المخرج البيداغوجي ومصمم المحتوى التعليمي البرمجي لمنصة Osera AI.
-المهمة الصارمة: تحويل نص الشرح المكتوب أدناه إلى سكريبت فيديو تعليمي احترافي 100% مستمد من هذا النص تحديداً.
+أنت المخرج البيداغوجي والسيناريست التعليمي المتخصص لمنصة Osera AI.
+المهمة الصارمة: تحويل نص الشرح المكتوب أدناه إلى سكريبت فيديو تعليمي تفصيلي، غني ومتنوع المشاهد 100% مستمد من هذا النص تحديداً بدون أي هلوسة بصرية (Zero Hallucination).
 المقرر المعتمد: "${book?.title || 'مقرر دراسي'}"
-المادة والمرحلة: "${book?.category || 'عام'}"
+المادة والمرحلة: "${subjectName || book?.category || 'عام'}"
 الفصل / الدرس المطلوب: "${chapter.title}"
 ${specificTopicPrompt}
 أبعاد الفيديو المطلوبة: ${aspectRatio} (${isVertical ? 'Vertical Reels 1080x1920' : 'Landscape 1920x1080'})
@@ -1832,88 +1869,106 @@ ${specificTopicPrompt}
 ${chapterRawText.substring(0, 9500)}
 """
 
-قواعد التحويل الحرفي الصارمة (STRICT PEDAGOGICAL RULES):
-1. **الارتباط التام والمطلق بنص الشرح المرفق أعلاه (Zero Hallucination):**
-   - اقرأ النص المرفق بعناية تامة. استخرج منه المفاهيم الأساسية، القوانين، والمسائل المذكورة فيه فقط.
-   - يمنع منعاً باتاً ذكر أي موضوع خارجي لا يوجد في هذا النص المرفق إطلاقاً.
-   - إذا كان الدرس رياضيات (مثل الفترات والعمليات عليها والأعداد الحقيقية): كل المشاهد والشرح يجب أن تكون عن الفترات، خط الأعداد، الأقواس المغلقة والمفتوحة [أ، ب]، التقاطع والاتحاد، مستخدماً الأيقونات: (calculator, scale, maximize, hash, layers, check). ممنوع نهائياً ذكر إنترنت الأشياء أو المناخ!
-   - إذا كان الدرس حاسب آلي: تحدث عن التقنيات المذكورة في النص واستخدم أيقونات: (cpu, wifi, globe, database, laptop).
-   - إذا كان الدرس علوم: تحدث عن المفاهيم والتجارب العلمية المذكورة واستخدم أيقونات: (atom, flask-conical, thermometer, heart-pulse).
-   - إذا كان دراسات أو لغة عربية: تحدث عن القواعد والتاريخ المذكور واستخدم أيقونات: (book-open, feather, landmark, compass).
+قواعد الصوت والإلقاء الحتمية (STRICT AUDIO NARRATION RULES):
+1. **تجريد الصوت نهائياً من أسماء الأشخاص (تحذير حاسم):**
+   - يمنع منعاً باتاً ومطلقاً ذكر اسم أي شخص (سواء المعلم أو الطالب) في الشرح الصوتي إطلاقاً!
+   - ممنوع تماماً المقدمات الترحيبية من نوع: (أهلاً بك يا فلان، أهلاً بك أيها الطالب، معكم المستر فلان، إلخ).
+   - ابدأ فوراً ومباشرة في صلب المادة العلمية وشرح المفهوم الرياضي كشرح مباشر، علمي، رصين ووقور يليق بدرس أكاديمي متقن.
+   - لغة الإلقاء: لغة عربية فصحى مشكولة ومضبوطة بدقة بالتشكيل الكامل (خصوصاً أواخر الكلمات والضمائر) لضمان نطق سليم 100% من محرك الصوت البشري.
 
 2. **العمق والشمولية ومنع التلخيص المخل:**
-   - قسّم نص الشرح إلى 5 إلى 7 مشاهد موضوعية تغطي الدرس خطوة بخطوة بالتفصيل الكامل:
-     * مشهد 1: المقدمة والتعريف الأساسي للمفهوم
-     * مشهد 2: القوانين والتصنيفات الدقيقة (مثل أنواع الفترات)
-     * مشهد 3: التمثيل الهندسي/البياني (مثل خط الأعداد والأقواس)
-     * مشهد 4: المسألة التطبيقية الأولى وخطوات حلها
-     * مشهد 5: العمليات المتقدمة (مثل التقاطع والاتحاد والفرق)
-     * مشهد 6: التريكات الشائعة وأهم نقاط الامتحان
-   - لكل مشهد: صِغ تعليقاً صوتياً وافياً ومشكولاً (من 40 إلى 70 كلمة، 3 إلى 5 جمل تعليمية قوية ومترابطة كشرح المعلم المتمكن على السبورة).
+   - قسّم نص الشرح وفق النمط المطلوب:
+     * إذا كان "explainer": من 6 إلى 8 مشاهد متسلسلة أكاديمياً (مدة الدرس 3 إلى 5 دقائق كاملة):
+       1. المشهد 1: المقدمة والتعريف الأساسي للمفهوم والربط التأسيسي
+       2. المشهد 2: القانون الرئيسي أو التصنيف الرياضي/العلمي (مع صيغة TeX)
+       3. المشهد 3: مقارنة ثنائية بين نوعين أو حالتين (مثل: الفترات المحدودة vs غير المحدودة، أو القوس المغلق vs المفتوح)
+       4. المشهد 4: المسألة النموذجية الأولى وتفكيك معطياتها
+       5. المشهد 5: خطوات الحل الحسابي الدقيقة والتعويض وصولاً للناتج
+       6. المشهد 6: التمثيل البياني أو الهندسي أو خط الأعداد
+       7. المشهد 7: تريكات الامتحان وفخاخ الأسئلة الشائعة وتنبيهات الأخطاء
+       8. المشهد 8: الخلاصة الذهبية والقاعدة الجامعة
+     * إذا كان "reels": 3 مشاهد سريعة ومكثفة (كبسولة ملخصة 60-90 ثانية).
+     * إذا كان "exercise_drill": 6 إلى 8 مشاهد لحل المسائل خطوة بخطوة بالتفصيل الكامل.
+   - لكل مشهد: صِغ تعليقاً صوتياً وافياً ومشكولاً (من 45 إلى 75 كلمة، 3 إلى 5 جمل تعليمية قوية ومترابطة).
 
-3. **الصناديق والرموز البصرية (Visual Elements):**
-   - استخرج من كل فقرة أهم مصطلحين أو قاعدتين وضعهما في الصناديق (نصوص عربية واضحة ودقيقة).
-   - ضع علامات زمنية (marks: m1, m2) بعد عدد مناسب من الكلمات لتظهر الصناديق بالتزامن الدقيق مع نطق المعلق.
+3. **تنوع التخطيط البصري للمشاهد (Visual Diversity Archetypes):**
+   - ممنوع تكرار نفس شكل الصناديق في كل المشاهد! اختر لكل مشهد نمط تخطيط محدد في حقل "layoutType":
+     * "concept_hero": عنوان كبير + معادلة TeX في المنتصف + بطاقة شرح عريضة في الأسفل.
+     * "split_comparison": بطاقتان متجاورتان (يمين ويسار) لمقارنة حالتين مع أيقونات متقابلة.
+     * "step_by_step": ثلاث خطوات رأسية متتابعة (الخطوة 1: المعطيات، الخطوة 2: القانون والتعويض، الخطوة 3: الناتج المؤطر) تظهر تباعاً عند العلامات (m1, m2, m3).
+     * "golden_alert": بطاقة تحذيرية مميزة بإطار بارز تركز على فخاخ الامتحانات (Exam Trap) بلون تحذيري ساطع.
+     * "summary_takeaways": بطاقتان أو ثلاث بطاقات لتلخيص زبدة الدرس.
 
-المطلوب: أجب حصراً بكائن JSON مطابق للبنية الآتية بدون أي مقدمات:
+4. **الرموز الرياضية ومنع الأيقونات العشوائية:**
+   - في دروس الرياضيات، ضع المعادلة الرياضية الصحيحة بصيغة TeX في حقل "mathFormula" في كل المشاهد الممكنة.
+   - ممنوع منعاً باتاً ومطلقاً استخدام أيقونات التكنولوجيا أو البيئة (wifi, cpu, database, globe, laptop, leaf, heart-pulse) في دروس الرياضيات!
+
+المطلوب: أجب حصراً بكائن JSON مطابق للبنية الآتية بدون أي نصوص قبل أو بعد:
 {
   "title": "عنوان شامل ومحدد للدرس مستخرج من النص",
   "scenes": [
     {
       "id": "scene1",
       "heading": "عنوان المفهوم الأول بالدرس",
-      "icon": "أيقونة مناسبة من القائمة أعلاه",
-      "narration": "نص الشرح الصوتي المفصل للفقرة الأولى بالفصحى المشكولة (شرح تعليمي غني من 40-70 كلمة).",
+      "layoutType": "concept_hero",
+      "mathFormula": "\\mathbb{R} = \\mathbb{Q} \\cup \\mathbb{Q}'",
+      "icon": "calculator",
+      "narration": "نص الشرح الصوتي المفصل للفقرة الأولى بالفصحى المشكولة (شرح تعليمي غني من 45-75 كلمة يبدأ فوراً بتعريف المفهوم العلمي دون أي أسماء).",
       "marks": [
-        { "name": "m1", "afterWords": 4 },
-        { "name": "m2", "afterWords": 10 }
+        { "name": "m1", "afterWords": 5 },
+        { "name": "m2", "afterWords": 12 }
       ],
       "boxes": [
-        { "label": "المفهوم الأول من النص المرفق", "icon": "أيقونة فرعية", "color": "teal", "atMark": "m1" },
-        { "label": "القاعدة أو المثال التطبيقي", "icon": "أيقونة ثانية", "color": "yellow", "atMark": "m2" }
-      ],
-      "arrow": { "from": 0, "to": 1, "label": "علاقة توضيحية أو سهم انتقال" }
+        { "label": "المفهوم الأساسي من النص المرفق", "icon": "check", "color": "teal", "atMark": "m1" }
+      ]
     },
     {
       "id": "scene2",
-      "heading": "عنوان المفهوم الثاني أو القوانين",
-      "icon": "أيقونة علمية",
-      "narration": "شرح الخطوات أو تفكيك المسألة/الفكرة الثانية بصوت واضح ومتقن مستمد من صلب المذكرة.",
+      "heading": "مقارنة أنواع الفترات",
+      "layoutType": "split_comparison",
+      "mathFormula": "[a, b] \\quad \\text{مقابل} \\quad ]a, b[",
+      "icon": "scale",
+      "narration": "شرح مقارنة الحالتين بالتفصيل العلمي الدقيق بدون أي أسماء شخصية.",
       "marks": [
-        { "name": "m1", "afterWords": 4 },
-        { "name": "m2", "afterWords": 10 }
+        { "name": "m1", "afterWords": 5 },
+        { "name": "m2", "afterWords": 12 }
       ],
       "boxes": [
-        { "label": "العنصر الأول في الفكرة", "icon": "أيقونة", "color": "purple", "atMark": "m1" },
-        { "label": "العنصر الثاني أو القاعدة", "icon": "أيقونة", "color": "green", "atMark": "m2" }
+        { "label": "الفترة المغلقة: العناصر وأطرافها تنتمي للمجموعة", "icon": "check", "color": "teal", "atMark": "m1" },
+        { "label": "الفترة المفتوحة: الأطراف لا تنتمي للمجموعة", "icon": "layers", "color": "yellow", "atMark": "m2" }
       ],
-      "arrow": { "from": 0, "to": 1, "label": "يؤدي إلى" }
+      "arrow": { "from": 0, "to": 1, "label": "مقارنة" }
     },
     {
       "id": "scene3",
-      "heading": "المسألة التطبيقية وخطوات الحل",
+      "heading": "خطوات حل المسألة التطبيقية",
+      "layoutType": "step_by_step",
+      "mathFormula": "[2, 6] \\cap [4, 8] = [4, 6]",
       "icon": "calculator",
-      "narration": "شرح مسألة نموذجية من الدرس خطوة بخطوة بصوت واضح.",
+      "narration": "شرح خطوات الحل الحسابي والتعويض بالتفصيل حتى الوصول للناتج بصوت علمي متقن.",
       "marks": [
         { "name": "m1", "afterWords": 4 },
-        { "name": "m2", "afterWords": 10 }
+        { "name": "m2", "afterWords": 10 },
+        { "name": "m3", "afterWords": 18 }
       ],
       "boxes": [
-        { "label": "المعطيات والخطوة الأولى", "icon": "layers", "color": "teal", "atMark": "m1" },
-        { "label": "الناتج النهائي وتفسيره", "icon": "check", "color": "yellow", "atMark": "m2" }
-      ],
-      "arrow": { "from": 0, "to": 1, "label": "تطبيق القانون" }
+        { "label": "الخطوة 1: كتابة المعطيات وتحديد الفترات على خط الأعداد", "icon": "layers", "color": "teal", "atMark": "m1" },
+        { "label": "الخطوة 2: تحديد منطقة التقاطع المشتركة بين الفترتين", "icon": "calculator", "color": "purple", "atMark": "m2" },
+        { "label": "الناتج النهائي: مجموعة الحل هي الفترة [4، 6]", "icon": "check", "color": "green", "atMark": "m3" }
+      ]
     },
     {
       "id": "scene4",
-      "heading": "الخلاصة العملية والتفوق الأكاديمي",
+      "heading": "فخاخ الامتحان والتريكات الهامة",
+      "layoutType": "golden_alert",
+      "mathFormula": "\\{3, 5\\} \\neq [3, 5]",
       "icon": "award",
-      "narration": "الخلاصة الذهبية وكلمة سر الامتحان لهذا الدرس بالتحديد بناءً على المذكرة.",
+      "narration": "توضيح الفرق الجوهري لتجنب خطأ الامتحان الشائع بين الطلاب والتركيز على الدقة.",
       "marks": [
         { "name": "m1", "afterWords": 4 }
       ],
       "boxes": [
-        { "label": "خلاصة الدرس والقاعدة الذهبية للامتحان", "icon": "check", "color": "yellow", "atMark": "m1" }
+        { "label": "انتبه: المجموعة {3، 5} عنصران فقط، بينما الفترة [3، 5] عدد لا نهائي من الأعداد الحقيقية!", "icon": "award", "color": "yellow", "atMark": "m1" }
       ]
     }
   ]
@@ -1964,16 +2019,19 @@ ${chapterRawText.substring(0, 9500)}
       };
     }
 
-    // 2. Build video.json with watermark completely disabled
+    // 2. Build video.json with selected theme
+    const allowedThemes = ['chalk', 'midnight', 'paper', 'clean'];
+    const activeTheme = allowedThemes.includes(theme) ? theme : 'chalk';
+
     const videoConfig = {
       title: scriptData.title || chapter.title,
-      theme: "chalk",
+      theme: activeTheme,
       size: sizeName,
       fps: 30,
       voice: "af_heart",
       speed: 1.0,
       watermark: false,
-      music: { style: "calm", volume: 0.10 },
+      music: { style: activeTheme === 'clean' ? 'upbeat' : (activeTheme === 'paper' ? 'warm' : 'calm'), volume: 0.10 },
       sfx: "minimal",
       captions: false,
       transition: "fade",
@@ -2003,9 +2061,28 @@ ${chapterRawText.substring(0, 9500)}
     }
     fs.writeFileSync(path.join(projDir, "script.md"), scriptMd);
 
-    // 4. Build high-fidelity visual scenes.js using Explainroo native icons, arrows, and styled boxes
-    // Helper to escape single quotes safely
-    const esc = (s: string) => String(s || "").replace(/'/g, "\\'");
+    // 4. Pre-typeset math formulas if present and build high-fidelity visual scenes.js
+    const esc = (s: string) => String(s || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+    const mathCacheDir = path.join(projDir, "build", "math");
+    fs.mkdirSync(mathCacheDir, { recursive: true });
+
+    let typesetMathFn: any = null;
+    let mathHashFn: any = null;
+    try {
+      const mathModule = await import("./explainroo/src/math.js");
+      typesetMathFn = mathModule.typesetMath;
+      mathHashFn = mathModule.mathHash;
+    } catch (e) {
+      console.warn("[Explainroo] Could not load math module:", e);
+    }
+
+    // Teacher lower-third branding bar text
+    const teacherBrandParts = [
+      teacherName ? `أ/ ${teacherName}` : '',
+      subjectName ? subjectName : (book?.title || ''),
+      teacherPhone ? `📞 ${teacherPhone}` : ''
+    ].filter(Boolean);
+    const teacherBrandText = teacherBrandParts.join(' • ');
 
     let scenesJs = `// Auto-generated High-Fidelity Pedagogical Scenes for ${chapter.title}\n`;
     scenesJs += `export default {\n`;
@@ -2014,49 +2091,89 @@ ${chapterRawText.substring(0, 9500)}
       
       // Scene Title with display font
       const headerTitle = esc(sc.heading || chapter.title);
-      scenesJs += `    s.text('${headerTitle}', { x: ${centerX}, y: ${isVertical ? 220 : 160}, size: ${isVertical ? 48 : 62}, font: 'display', color: 'yellow' });\n`;
+      scenesJs += `    s.text('${headerTitle}', { x: ${centerX}, y: ${isVertical ? 180 : 130}, size: ${isVertical ? 46 : 56}, font: 'display', color: 'yellow' });\n`;
 
-      // Main Scene Icon
-      const sceneIcon = esc(sc.icon || "star");
-      const iconId = `icon_${sc.id}`;
-      scenesJs += `    s.icon('${sceneIcon}', { id: '${iconId}', x: ${centerX}, y: ${isVertical ? 460 : 340}, size: ${isVertical ? 140 : 160}, color: 'teal', at: 0.1 });\n`;
-
-      // Render Boxes
-      const boxes = Array.isArray(sc.boxes) ? sc.boxes : [];
-      boxes.forEach((b: any, bIdx: number) => {
-        const boxId = `box_${sc.id}_${bIdx}`;
-        const boxLabel = esc(b.label || `فكرة ${bIdx + 1}`);
-        const boxIcon = esc(b.icon || "check");
-        const boxColor = esc(b.color || (bIdx % 2 === 0 ? "teal" : "purple"));
-        const atMarkClause = b.atMark ? `, at: '#${esc(b.atMark)}'` : `, at: ${(bIdx + 1) * 0.8}`;
-
-        let boxX = centerX;
-        let boxY = isVertical ? (720 + bIdx * 240) : (560 + bIdx * 160);
-        let boxW = isVertical ? 860 : (boxes.length > 2 ? 680 : 820);
-
-        if (!isVertical && boxes.length === 2) {
-          boxX = bIdx === 0 ? (centerX - 440) : (centerX + 440);
-          boxY = 640;
-          boxW = 680;
-        } else if (boxes.length === 1) {
-          boxY = isVertical ? 760 : 580;
-          boxW = isVertical ? 860 : 820;
+      // Check if scene has valid TeX mathFormula
+      let hasValidMath = false;
+      const rawFormula = (sc.mathFormula || "").trim();
+      if (rawFormula && typesetMathFn && mathHashFn) {
+        try {
+          const cacheFile = path.join(mathCacheDir, `${mathHashFn(rawFormula, true)}.json`);
+          await typesetMathFn(rawFormula, true, cacheFile);
+          hasValidMath = true;
+        } catch (mErr: any) {
+          console.warn(`[Explainroo Math Warning for "${rawFormula}"]:`, mErr.message);
         }
+      }
 
-        scenesJs += `    s.box('${boxLabel}', { id: '${boxId}', x: ${boxX}, y: ${boxY}, w: ${boxW}, icon: '${boxIcon}', color: '${boxColor}'${atMarkClause} });\n`;
-      });
+      const layoutType = sc.layoutType || (sc.boxes?.length === 3 ? 'step_by_step' : (sc.boxes?.length === 2 ? 'split_comparison' : 'concept_hero'));
+      const boxes = Array.isArray(sc.boxes) ? sc.boxes : [];
 
-      // Render Arrow if relationship exists
-      if (sc.arrow && boxes.length >= 2) {
-        const fromBoxId = `box_${sc.id}_${sc.arrow.from ?? 0}`;
-        const toBoxId = `box_${sc.id}_${sc.arrow.to ?? 1}`;
-        const arrowLabel = sc.arrow.label ? `, label: '${esc(sc.arrow.label)}'` : "";
-        const arrowAt = boxes[1]?.atMark ? `, at: '#${esc(boxes[1].atMark)}'` : ", at: 1.5";
-        scenesJs += `    s.arrow('${fromBoxId}', '${toBoxId}', { color: 'yellow'${arrowLabel}${arrowAt} });\n`;
-      } else if (boxes.length >= 1) {
-        const targetBox = `box_${sc.id}_0`;
-        const arrowAt = boxes[0]?.atMark ? `, at: '#${esc(boxes[0].atMark)}'` : ", at: 0.8";
-        scenesJs += `    s.arrow('${iconId}', '${targetBox}', { color: 'green', dashed: true${arrowAt} });\n`;
+      if (layoutType === 'step_by_step') {
+        // --- 1. STEP-BY-STEP DERIVATION LAYOUT ---
+        if (hasValidMath) {
+          scenesJs += `    s.math('${esc(rawFormula)}', { x: ${centerX}, y: ${isVertical ? 340 : 250}, size: ${isVertical ? 54 : 64}, color: 'yellow', at: 0.1 });\n`;
+        }
+        boxes.forEach((b: any, bIdx: number) => {
+          const boxId = `step_${sc.id}_${bIdx}`;
+          const boxLabel = esc(b.label || `الخطوة ${bIdx + 1}`);
+          const boxIcon = esc(b.icon || (bIdx === 2 ? 'check' : 'calculator'));
+          const boxColor = esc(b.color || (bIdx === 0 ? 'teal' : (bIdx === 1 ? 'purple' : 'green')));
+          const atClause = b.atMark ? `, at: '#${esc(b.atMark)}'` : `, at: ${(bIdx + 1) * 0.8}`;
+          const boxY = isVertical ? (520 + bIdx * 340) : (390 + bIdx * 190);
+          const boxW = isVertical ? 920 : 1100;
+          scenesJs += `    s.box('${boxLabel}', { id: '${boxId}', x: ${centerX}, y: ${boxY}, w: ${boxW}, icon: '${boxIcon}', color: '${boxColor}'${atClause} });\n`;
+        });
+      } else if (layoutType === 'split_comparison' && boxes.length >= 2) {
+        // --- 2. SPLIT COMPARISON LAYOUT (Right vs Left) ---
+        if (hasValidMath) {
+          scenesJs += `    s.math('${esc(rawFormula)}', { x: ${centerX}, y: ${isVertical ? 360 : 270}, size: ${isVertical ? 56 : 66}, color: 'yellow', at: 0.1 });\n`;
+        }
+        const b0 = boxes[0];
+        const b1 = boxes[1];
+        const id0 = `split_${sc.id}_0`;
+        const id1 = `split_${sc.id}_1`;
+        if (isVertical) {
+          scenesJs += `    s.box('${esc(b0.label)}', { id: '${id0}', x: ${centerX}, y: 640, w: 900, icon: '${esc(b0.icon || "check")}', color: '${esc(b0.color || "teal")}'${b0.atMark ? `, at: '#${esc(b0.atMark)}'` : ', at: 0.8'} });\n`;
+          scenesJs += `    s.box('${esc(b1.label)}', { id: '${id1}', x: ${centerX}, y: 1060, w: 900, icon: '${esc(b1.icon || "scale")}', color: '${esc(b1.color || "yellow")}'${b1.atMark ? `, at: '#${esc(b1.atMark)}'` : ', at: 1.5'} });\n`;
+          scenesJs += `    s.arrow('${id0}', '${id1}', { color: 'orange', label: 'مقارنة', at: 1.8 });\n`;
+        } else {
+          scenesJs += `    s.box('${esc(b0.label)}', { id: '${id0}', x: ${centerX - 430}, y: 600, w: 680, icon: '${esc(b0.icon || "check")}', color: '${esc(b0.color || "teal")}'${b0.atMark ? `, at: '#${esc(b0.atMark)}'` : ', at: 0.8'} });\n`;
+          scenesJs += `    s.box('${esc(b1.label)}', { id: '${id1}', x: ${centerX + 430}, y: 600, w: 680, icon: '${esc(b1.icon || "scale")}', color: '${esc(b1.color || "yellow")}'${b1.atMark ? `, at: '#${esc(b1.atMark)}'` : ', at: 1.5'} });\n`;
+          scenesJs += `    s.arrow('${id0}', '${id1}', { color: 'orange', label: 'مقارنة', at: 1.8 });\n`;
+        }
+      } else if (layoutType === 'golden_alert') {
+        // --- 3. GOLDEN ALERT / EXAM TRAP LAYOUT ---
+        scenesJs += `    s.icon('award', { id: 'alert_icon_${sc.id}', x: ${centerX}, y: ${isVertical ? 420 : 310}, size: ${isVertical ? 150 : 160}, color: 'yellow', at: 0.2 });\n`;
+        if (hasValidMath) {
+          scenesJs += `    s.math('${esc(rawFormula)}', { x: ${centerX}, y: ${isVertical ? 650 : 510}, size: ${isVertical ? 62 : 72}, color: 'red', at: 0.5 });\n`;
+        }
+        const alertLabel = esc(boxes[0]?.label || 'تنبيه هام جداً: تجنب الوقوع في أخطاء الامتحانات الشائعة!');
+        const alertY = isVertical ? (hasValidMath ? 980 : 800) : (hasValidMath ? 750 : 620);
+        scenesJs += `    s.box('${alertLabel}', { id: 'alert_box_${sc.id}', x: ${centerX}, y: ${alertY}, w: ${isVertical ? 920 : 1100}, icon: 'check', color: 'yellow', at: 1.0 });\n`;
+      } else {
+        // --- 4. CONCEPT HERO & DEFAULT SUMMARY LAYOUT ---
+        if (hasValidMath) {
+          scenesJs += `    s.math('${esc(rawFormula)}', { x: ${centerX}, y: ${isVertical ? 460 : 340}, size: ${isVertical ? 64 : 76}, color: 'yellow', at: 0.1 });\n`;
+        } else {
+          const sceneIcon = esc(sc.icon || "calculator");
+          scenesJs += `    s.icon('${sceneIcon}', { id: 'hero_icon_${sc.id}', x: ${centerX}, y: ${isVertical ? 460 : 340}, size: ${isVertical ? 140 : 160}, color: 'teal', at: 0.1 });\n`;
+        }
+        boxes.forEach((b: any, bIdx: number) => {
+          const boxId = `hero_box_${sc.id}_${bIdx}`;
+          const boxLabel = esc(b.label || `الفكرة الأساسية`);
+          const boxIcon = esc(b.icon || "check");
+          const boxColor = esc(b.color || (bIdx === 0 ? "teal" : "purple"));
+          const atClause = b.atMark ? `, at: '#${esc(b.atMark)}'` : `, at: ${(bIdx + 1) * 0.8}`;
+          const boxY = isVertical ? (780 + bIdx * 280) : (620 + bIdx * 180);
+          const boxW = isVertical ? 900 : 960;
+          scenesJs += `    s.box('${boxLabel}', { id: '${boxId}', x: ${centerX}, y: ${boxY}, w: ${boxW}, icon: '${boxIcon}', color: '${boxColor}'${atClause} });\n`;
+        });
+      }
+
+      // Teacher lower-third branding bar watermark at bottom (Visual Only, Never Spoken)
+      if (teacherBrandText) {
+        scenesJs += `    s.text('${esc(teacherBrandText)}', { x: ${centerX}, y: ${isVertical ? 1830 : 1025}, size: ${isVertical ? 26 : 24}, font: 'body', color: 'muted' });\n`;
       }
 
       scenesJs += `  },\n`;
@@ -2160,21 +2277,28 @@ ${chapterRawText.substring(0, 9500)}
     const explainrooPath = path.join(process.cwd(), "explainroo");
     const renderFlags = isDraft ? "--draft" : "";
     const renderFolder = `projects/${cleanChapterId}_${videoInstanceId}`;
-    const renderCmd = `node bin/explainroo.js render "${renderFolder}" ${renderFlags} --workers 4`;
+    const targetOutMp4 = path.join(projDir, "out", "video.mp4");
+    fs.mkdirSync(path.join(projDir, "out"), { recursive: true });
+
+    const sizeFlag = isVertical ? "--size 9:16" : "--size 16:9";
+    const renderCmd = `node bin/explainroo.js render "${renderFolder}" ${renderFlags} ${sizeFlag} --out "${targetOutMp4}" --workers 4`;
 
     console.log(`[Explainroo] Executing render command: ${renderCmd}...`);
     execSync(renderCmd, { cwd: explainrooPath, stdio: "inherit" });
 
     // Also copy to canonical chapter video path so player always loads latest
-    const producedFile = path.join(projDir, "out", isDraft ? "draft.mp4" : "video.mp4");
     const canonicalDir = path.join(EXPLAINROO_PROJECTS_DIR, cleanChapterId);
     fs.mkdirSync(path.join(canonicalDir, "out"), { recursive: true });
-    fs.copyFileSync(producedFile, path.join(canonicalDir, "out", "video.mp4"));
+    if (fs.existsSync(targetOutMp4)) {
+      fs.copyFileSync(targetOutMp4, path.join(canonicalDir, "out", "video.mp4"));
+    }
 
     const videoUrl = `/api/explainroo-projects/${cleanChapterId}_${videoInstanceId}/video.mp4`;
     let sizeMb = 0;
     try {
-      sizeMb = Number((fs.statSync(producedFile).size / (1024 * 1024)).toFixed(1));
+      if (fs.existsSync(targetOutMp4)) {
+        sizeMb = Number((fs.statSync(targetOutMp4).size / (1024 * 1024)).toFixed(1));
+      }
     } catch (e) {}
 
     // Register video in chapter.videos library to ensure persistence
@@ -2184,9 +2308,13 @@ ${chapterRawText.substring(0, 9500)}
       topic: videoTopic || (scriptData.scenes[0]?.heading || chapter.title),
       aspectRatio,
       videoType,
+      theme: activeTheme,
+      teacherName: teacherName || "",
+      teacherPhone: teacherPhone || "",
+      subjectName: subjectName || "",
       videoUrl,
       sizeMb,
-      duration: `${Math.round(scriptData.scenes.length * 15)} ثانية`,
+      duration: `${Math.round(scriptData.scenes.length * 25)} ثانية`,
       createdAt: new Date().toISOString()
     };
 
