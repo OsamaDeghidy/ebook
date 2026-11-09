@@ -30,6 +30,33 @@ html, body, #root {
   line-height: 1.6;
 }
 
+/* Dual Language Typography: Latin & Arabic Auto-Switch */
+[dir="ltr"], [dir="ltr"] body, [dir="ltr"] input, [dir="ltr"] textarea, [dir="ltr"] select, [dir="ltr"] button {
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  letter-spacing: -0.01em;
+}
+
+[dir="rtl"], [dir="rtl"] body, [dir="rtl"] input, [dir="rtl"] textarea, [dir="rtl"] select, [dir="rtl"] button {
+  font-family: 'Cairo', 'Readex Pro', 'IBM Plex Sans Arabic', 'Noto Sans Arabic', system-ui, sans-serif !important;
+}
+
+/* Mobile Safe Area Utilities for modern notch & bottom bar */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 16px);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 16px);
+}
+
+/* Smooth Horizontal Scroll without scrollbars on mobile */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 /* Enforce reliable Arabic typography fallback on all text elements */
 body, input, textarea, select, button {
   font-family: 'Cairo', 'Readex Pro', 'IBM Plex Sans Arabic', 'Noto Sans Arabic', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Tahoma, Arial, sans-serif;

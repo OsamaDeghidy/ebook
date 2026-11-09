@@ -50,6 +50,13 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
       if (saved && ['ar', 'en', 'it', 'fr', 'de'].includes(saved)) {
         return saved;
       }
+      // Auto-detect browser language on first visit if non-Arabic
+      if (typeof navigator !== 'undefined' && navigator.language) {
+        const browserCode = navigator.language.slice(0, 2).toLowerCase();
+        if (['ar', 'en', 'it', 'fr', 'de'].includes(browserCode)) {
+          return browserCode as AppLanguage;
+        }
+      }
     } catch {}
     return 'ar';
   });
@@ -75,25 +82,47 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const t = (path: string, fallback?: string): string => {
     const keys = path.split('.');
+    
+    // 1. Try active language dictionary
     let current = dictionaries[language];
+    let found = true;
     for (const k of keys) {
       if (current && typeof current === 'object' && k in current) {
         current = current[k];
       } else {
-        // Fallback to English dictionary
-        let fallbackVal = dictionaries.en;
-        for (const fk of keys) {
-          if (fallbackVal && typeof fallbackVal === 'object' && fk in fallbackVal) {
-            fallbackVal = fallbackVal[fk];
-          } else {
-            fallbackVal = undefined;
-            break;
-          }
-        }
-        return (typeof fallbackVal === 'string' ? fallbackVal : fallback) || path;
+        found = false;
+        break;
       }
     }
-    return typeof current === 'string' ? current : (fallback || path);
+    if (found && typeof current === 'string') return current;
+
+    // 2. Multi-tier Fallback: Try English
+    let enCurrent = dictionaries.en;
+    let enFound = true;
+    for (const k of keys) {
+      if (enCurrent && typeof enCurrent === 'object' && k in enCurrent) {
+        enCurrent = enCurrent[k];
+      } else {
+        enFound = false;
+        break;
+      }
+    }
+    if (enFound && typeof enCurrent === 'string') return enCurrent;
+
+    // 3. Multi-tier Fallback: Try Arabic
+    let arCurrent = dictionaries.ar;
+    let arFound = true;
+    for (const k of keys) {
+      if (arCurrent && typeof arCurrent === 'object' && k in arCurrent) {
+        arCurrent = arCurrent[k];
+      } else {
+        arFound = false;
+        break;
+      }
+    }
+    if (arFound && typeof arCurrent === 'string') return arCurrent;
+
+    return fallback || path;
   };
 
   return (

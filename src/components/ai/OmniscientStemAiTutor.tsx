@@ -4,6 +4,7 @@ import {
   Code, Calculator, FlaskConical, HelpCircle, ChevronLeft, Mic, Volume2
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 interface OmniscientStemAiTutorProps {
   bookId?: string;
@@ -20,6 +21,7 @@ export const OmniscientStemAiTutor: React.FC<OmniscientStemAiTutorProps> = ({
   chapterContent,
   bookCategory
 }) => {
+  const { t, dir } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [question, setQuestion] = useState('');
 
@@ -163,7 +165,7 @@ export const OmniscientStemAiTutor: React.FC<OmniscientStemAiTutorProps> = ({
 
       {/* 🌟 SLIDE-OVER OMNISCIENT CHAT DRAWER */}
       {isOpen && (
-        <div className="fixed inset-y-0 left-0 z-50 w-full sm:w-[450px] bg-white shadow-2xl border-r border-gray-200 flex flex-col animate-slide-in-left text-right" dir="rtl">
+        <div className="fixed inset-y-0 left-0 z-50 w-full sm:w-[450px] bg-white shadow-2xl border-r border-gray-200 flex flex-col animate-slide-in-left text-start" dir={dir}>
           {/* HEADER */}
           <div className="p-4 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
             <div className="flex items-center gap-2.5">

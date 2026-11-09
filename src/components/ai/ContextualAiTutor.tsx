@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, Brain, X, Lightbulb, HelpCircle, Check, BookOpen, Send, RefreshCw } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 interface ContextualAiTutorProps {
   chapterTitle: string;
 }
 
 export const ContextualAiTutor: React.FC<ContextualAiTutorProps> = ({ chapterTitle }) => {
+  const { t, dir } = useLanguage();
   const [selectedText, setSelectedText] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [floatingPos, setFloatingPos] = useState<{ x: number; y: number } | null>(null);
@@ -112,7 +114,7 @@ export const ContextualAiTutor: React.FC<ContextualAiTutorProps> = ({ chapterTit
 
       {/* 2. SLIDE-OVER AI TUTOR DRAWER */}
       {isOpen && (
-        <div className="fixed bottom-4 left-4 sm:left-6 z-50 max-w-md w-[calc(100vw-2rem)] bg-white border border-teal-200 shadow-2xl rounded-3xl overflow-hidden animate-scale-up text-right" dir="rtl">
+        <div className="fixed bottom-4 left-4 sm:left-6 z-50 max-w-md w-[calc(100vw-2rem)] bg-white border border-teal-200 shadow-2xl rounded-3xl overflow-hidden animate-scale-up text-start" dir={dir}>
           {/* Header */}
           <div className="bg-gradient-to-r from-slate-950 via-teal-950 to-slate-900 text-white p-4 flex items-center justify-between">
             <div className="flex items-center gap-2">

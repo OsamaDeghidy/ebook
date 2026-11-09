@@ -12,6 +12,7 @@ import { fireConfetti } from '../../utils/confetti';
 import { EduAvatarHost } from './avatar/EduAvatarHost';
 import { exportReelToVideo, downloadReelBlob } from '../../utils/reelVideoExporter';
 import ReactMarkdown from 'react-markdown';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 interface EduReelPlayerProps {
   reel: EduReel;
@@ -32,6 +33,7 @@ export const EduReelPlayer: React.FC<EduReelPlayerProps> = ({
   onPrevReel,
   onUpdateReelStyle
 }) => {
+  const { t, dir } = useLanguage();
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
@@ -556,7 +558,7 @@ export const EduReelPlayer: React.FC<EduReelPlayerProps> = ({
           ? 'bg-[#0c0a09] border border-amber-500/50 shadow-[0_0_70px_rgba(245,158,11,0.35)]'
           : 'bg-[#0f0c29] border-3 border-fuchsia-500/70 shadow-[0_0_60px_rgba(217,70,239,0.35)]'
       }`}
-      dir="rtl"
+      dir={dir}
     >
       {/* 🌟 AUDIO ELEMENT (PRIMARY NARRATOR VOICE) */}
       {(reel.audio_url || reel.narration_script) && (
@@ -700,7 +702,7 @@ export const EduReelPlayer: React.FC<EduReelPlayerProps> = ({
                 <div 
                   onClick={(e) => e.stopPropagation()}
                   className="absolute top-8 left-0 z-50 w-56 p-3 bg-slate-950/95 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl space-y-2.5 text-right text-white animate-scale-up" 
-                  dir="rtl"
+                  dir={dir}
                 >
                   <div className="flex items-center justify-between text-[11px] font-black border-b border-white/10 pb-1.5">
                     <span className="flex items-center gap-1 text-teal-300">
@@ -830,7 +832,7 @@ export const EduReelPlayer: React.FC<EduReelPlayerProps> = ({
 
         {/* ACT 2: DEEP CONCEPT & FORMULA / CODE */}
         {currentScene.act === 'concept' && (
-          <div className="w-full max-w-xs p-2.5 rounded-2xl bg-black/55 backdrop-blur-md border border-white/15 shadow-2xl space-y-1.5 animate-fade-in text-right pointer-events-none" dir="rtl">
+          <div className="w-full max-w-xs p-2.5 rounded-2xl bg-black/55 backdrop-blur-md border border-white/15 shadow-2xl space-y-1.5 animate-fade-in text-right pointer-events-none" dir={dir}>
             <div className="flex items-center justify-between border-b border-white/10 pb-1">
               <span className="text-[11px] font-black text-teal-300 flex items-center gap-1">
                 <Brain className="w-3.5 h-3.5" />
@@ -889,7 +891,7 @@ export const EduReelPlayer: React.FC<EduReelPlayerProps> = ({
         <div 
           onClick={(e) => e.stopPropagation()}
           className="absolute inset-x-3 bottom-20 z-50 p-4 rounded-3xl bg-slate-950/98 backdrop-blur-2xl border-2 border-amber-400 shadow-[0_0_50px_rgba(245,158,11,0.4)] space-y-2.5 animate-scale-up text-right" 
-          dir="rtl"
+          dir={dir}
         >
           <div className="flex items-center justify-between border-b border-white/10 pb-1.5">
             <span className="text-xs font-black text-amber-300 flex items-center gap-1.5">
@@ -1147,7 +1149,7 @@ export const EduReelPlayer: React.FC<EduReelPlayerProps> = ({
 
       {/* 🔴 LIVE RECORDING STATUS BAR (ACTIVE RECORDING) */}
       {isLiveRecording && (
-        <div className="absolute top-4 inset-x-4 z-50 p-3 bg-slate-950/95 border-2 border-rose-500 rounded-2xl shadow-2xl backdrop-blur-md flex items-center justify-between text-white animate-fade-in" dir="rtl">
+        <div className="absolute top-4 inset-x-4 z-50 p-3 bg-slate-950/95 border-2 border-rose-500 rounded-2xl shadow-2xl backdrop-blur-md flex items-center justify-between text-white animate-fade-in" dir={dir}>
           <div className="flex items-center gap-2.5 truncate">
             <span className="w-3 h-3 rounded-full bg-rose-500 animate-ping shrink-0" />
             <div className="truncate">
@@ -1174,7 +1176,7 @@ export const EduReelPlayer: React.FC<EduReelPlayerProps> = ({
 
       {/* 🎬 BACKGROUND VIDEO EXPORT PROGRESS OVERLAY */}
       {isExportingVideo && exportProgress && (
-        <div className="absolute inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-white text-center animate-fade-in" dir="rtl">
+        <div className="absolute inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-white text-center animate-fade-in" dir={dir}>
           <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-purple-600 via-cyan-500 to-indigo-600 flex items-center justify-center p-1 shadow-2xl shadow-cyan-500/30 mb-4 animate-pulse">
             <div className="w-full h-full rounded-full bg-slate-950 flex flex-col items-center justify-center">
               <span className="text-sm font-black text-cyan-300">{exportProgress.percent}%</span>
@@ -1206,7 +1208,7 @@ export const EduReelPlayer: React.FC<EduReelPlayerProps> = ({
             setIsDownloadModalOpen(false);
           }}
           className="absolute inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in text-white" 
-          dir="rtl"
+          dir={dir}
         >
           <div 
             onClick={(e) => e.stopPropagation()} 

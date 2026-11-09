@@ -8,6 +8,7 @@ import {
 import { MarketplaceBook, Chapter } from '../types';
 import { fireConfetti } from '../utils/confetti';
 import AuthenticExerciseBank from './AuthenticExerciseBank';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface DynamicDomainSandboxProps {
   book: MarketplaceBook;
@@ -15,6 +16,7 @@ interface DynamicDomainSandboxProps {
 }
 
 export default function DynamicDomainSandbox({ book, chapter }: DynamicDomainSandboxProps) {
+  const { dir, t } = useLanguage();
   const combinedContext = `${book?.title || ''} ${chapter?.title || ''} ${chapter?.content || ''}`.toLowerCase();
   const isTechDomain = /حاسب|كمبيوتر|برمج|كود|logic|شبك|معالج|computer|python|html|javascript|scratch/.test(combinedContext);
 
@@ -264,7 +266,7 @@ export default function DynamicDomainSandbox({ book, chapter }: DynamicDomainSan
   const archetypeInfo = getArchetypeMeta(activity?.archetype || '');
 
   return (
-    <div className="w-full bg-white border border-slate-200/90 rounded-3xl p-4 sm:p-7 shadow-xs space-y-6 text-right" dir="rtl">
+    <div className="w-full bg-white border border-slate-200/90 rounded-3xl p-4 sm:p-7 shadow-xs space-y-6 text-start" dir={dir}>
       {/* 1. TOP HEADER & ACTIVITY CONTROL BAR */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-slate-100">
         <div className="space-y-1.5">
@@ -724,7 +726,7 @@ export default function DynamicDomainSandbox({ book, chapter }: DynamicDomainSan
                           if (evaluationResult) return;
                           setSelectedSimOptionId(opt.id);
                         }}
-                        className={`p-3 rounded-2xl border text-xs font-bold transition text-right cursor-pointer flex items-center justify-between ${
+                        className={`p-3 rounded-2xl border text-xs font-bold transition text-start cursor-pointer flex items-center justify-between ${
                           isSelected
                             ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
                             : 'bg-white text-slate-800 border-slate-200 hover:border-indigo-300'

@@ -3,6 +3,7 @@ import {
   ShieldCheck, AlertTriangle, Scale, FileText, 
   X, CheckCircle2, Lock, ExternalLink, Mail, Ban
 } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 interface TermsOfUseModalProps {
   isOpen: boolean;
@@ -17,14 +18,15 @@ export const TermsOfUseModal: React.FC<TermsOfUseModalProps> = ({
   onAccept,
   showAcceptButton = false
 }) => {
+  const { t, dir } = useLanguage();
   const [activeTab, setActiveTab] = useState<'copyright' | 'terms' | 'privacy' | 'takedown'>('copyright');
   const [hasAgreed, setHasAgreed] = useState(false);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-fade-in" dir="rtl">
-      <div className="relative w-full max-w-2xl bg-slate-900 border border-white/15 rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden text-right">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-fade-in" dir={dir}>
+      <div className="relative w-full max-w-2xl bg-slate-900 border border-white/15 rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden text-start">
         
         {/* HEADER */}
         <div className="p-4 sm:p-5 border-b border-white/10 bg-slate-950/60 flex items-center justify-between">

@@ -31,7 +31,7 @@ export const LanguageSelector: React.FC = () => {
 
       {isOpen && (
         <div 
-          className="absolute top-full mt-1.5 right-0 sm:right-auto sm:left-0 z-50 w-44 bg-white border border-slate-200 rounded-2xl p-1.5 shadow-xl animate-in fade-in zoom-in-95 duration-150"
+          className="absolute top-full mt-1.5 end-0 z-50 w-48 bg-white border border-slate-200 rounded-2xl p-1.5 shadow-2xl animate-in fade-in zoom-in-95 duration-150"
           dir="ltr"
         >
           <div className="px-2.5 py-1.5 text-[10px] font-extrabold text-slate-400 border-b border-slate-100 uppercase tracking-wider">
@@ -47,20 +47,20 @@ export const LanguageSelector: React.FC = () => {
                     setLanguage(lang.code);
                     setIsOpen(false);
                   }}
-                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition text-left cursor-pointer ${
+                  className={`w-full flex items-center justify-between px-3 py-2.5 min-h-[44px] rounded-xl text-xs font-bold transition text-left cursor-pointer active:scale-98 ${
                     isSelected
-                      ? 'bg-sky-50 text-sky-700 font-black'
+                      ? 'bg-teal-50 text-teal-800 font-black'
                       : 'text-slate-700 hover:bg-slate-50'
                   }`}
                 >
-                  <div className="flex items-center gap-2">
-                    <span className="text-base leading-none">{lang.flag}</span>
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-lg leading-none">{lang.flag}</span>
                     <div className="flex flex-col">
-                      <span className="text-xs">{lang.nativeName}</span>
-                      <span className="text-[10px] text-slate-400">{lang.name}</span>
+                      <span className="text-xs font-extrabold">{lang.nativeName}</span>
+                      <span className="text-[10px] text-slate-400 font-medium">{lang.name}</span>
                     </div>
                   </div>
-                  {isSelected && <Check className="w-3.5 h-3.5 text-sky-600" />}
+                  {isSelected && <Check className="w-4 h-4 text-teal-600" />}
                 </button>
               );
             })}

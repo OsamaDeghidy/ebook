@@ -17,6 +17,7 @@ import {
   getGradesForSystem 
 } from '../constants/taxonomy';
 import { supabase } from '../lib/supabase';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface ContentUploaderProps {
   currentUser?: any;
@@ -74,6 +75,7 @@ export default function ContentUploader({
   progressPercent,
   progressStep,
 }: ContentUploaderProps) {
+  const { t, dir } = useLanguage();
   const [promptText, setPromptText] = useState('');
   const [customTitle, setCustomTitle] = useState('');
   const [price, setPrice] = useState<number>(0);
@@ -390,7 +392,7 @@ export default function ContentUploader({
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto space-y-5 text-right font-sans" dir="rtl">
+    <div className="w-full max-w-2xl mx-auto space-y-5 text-start font-sans" dir={dir}>
       
       {/* 🌟 STREAMLINED HEADER */}
       <div className="text-center space-y-1.5 pt-1">

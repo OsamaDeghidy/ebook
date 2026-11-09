@@ -4,12 +4,14 @@ import {
   Users, CheckCircle2, ArrowLeft, Phone, Mail, Globe, Brain, BookOpen, GraduationCap 
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useLanguage } from '../i18n/LanguageContext';
 
 export function AboutPageView() {
   const navigate = useNavigate();
+  const { dir, t } = useLanguage();
 
   return (
-    <div className="min-h-screen bg-slate-50 py-10 px-4 sm:px-6 max-w-5xl mx-auto space-y-10" dir="rtl">
+    <div className="min-h-screen bg-slate-50 py-10 px-4 sm:px-6 max-w-5xl mx-auto space-y-10" dir={dir}>
       
       {/* HERO SECTION */}
       <div className="bg-gradient-to-r from-slate-950 via-teal-950 to-indigo-950 text-white rounded-3xl p-8 sm:p-12 shadow-xl border border-teal-800/40 relative overflow-hidden">

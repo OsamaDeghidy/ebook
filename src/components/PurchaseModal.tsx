@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { MarketplaceBook } from '../types';
 import { validateVoucherCode } from '../utils/voucherSystem';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface PurchaseModalProps {
   book: MarketplaceBook;
@@ -26,6 +27,7 @@ export const PurchaseModal: React.FC<PurchaseModalProps> = ({
   onOpenAuth,
   onConfirmPurchase
 }) => {
+  const { t, dir } = useLanguage();
   const [activeTab, setActiveTab] = useState<PaymentTab>('paymob_wallet');
   const [voucherCode, setVoucherCode] = useState('');
   const [voucherError, setVoucherError] = useState<string | null>(null);
@@ -195,7 +197,7 @@ export const PurchaseModal: React.FC<PurchaseModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 animate-fade-in" dir="rtl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 animate-fade-in" dir={dir}>
       <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 relative">
         
         {/* CLOSE BUTTON */}

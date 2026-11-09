@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { fireConfetti } from '../utils/confetti';
 import MathRenderer from './MathRenderer';
+import { useLanguage } from '../i18n/LanguageContext';
 
 export interface ExerciseItem {
   id: string;
@@ -45,6 +46,7 @@ export default function AuthenticExerciseBank({
   gradeLevel = 'الصف الثاني الإعدادي',
   subject = 'اللغة العربية'
 }: AuthenticExerciseBankProps) {
+  const { t, dir } = useLanguage();
   const [exercises, setExercises] = useState<ExerciseItem[]>([]);
   const [exercisePage, setExercisePage] = useState<any>(null);
   const [exercisePages, setExercisePages] = useState<any[]>([]);
@@ -259,7 +261,7 @@ export default function AuthenticExerciseBank({
   const displayedPages = pageViewFilter === 'exercises' && exercisePages.length > 0 ? exercisePages : (allPages.length > 0 ? allPages : exercisePages);
 
   return (
-    <div className="space-y-6 animate-fade-in" dir="rtl">
+    <div className="space-y-6 animate-fade-in" dir={dir}>
       
       {/* 🧭 HEADER BANNER & SCORE TELEMETRY */}
       <div className="bg-gradient-to-r from-indigo-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-indigo-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-5">

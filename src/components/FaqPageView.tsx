@@ -4,6 +4,7 @@ import {
   Video, Mic, ShieldCheck, GraduationCap, Laptop, Award, ArrowLeft 
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface FaqItem {
   question: string;
@@ -66,6 +67,7 @@ export const FAQ_DATA: FaqItem[] = [
 
 export function FaqPageView() {
   const navigate = useNavigate();
+  const { dir, t } = useLanguage();
   const [activeCategory, setActiveCategory] = useState<'all' | 'general' | 'students' | 'instructors' | 'ai_features'>('all');
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
@@ -74,7 +76,7 @@ export function FaqPageView() {
     : FAQ_DATA.filter(item => item.category === activeCategory);
 
   return (
-    <div className="min-h-screen bg-slate-50 py-10 px-4 sm:px-6 max-w-5xl mx-auto space-y-8" dir="rtl">
+    <div className="min-h-screen bg-slate-50 py-10 px-4 sm:px-6 max-w-5xl mx-auto space-y-8" dir={dir}>
       
       {/* HEADER HERO */}
       <div className="bg-gradient-to-r from-teal-900 via-slate-900 to-indigo-950 text-white rounded-3xl p-8 sm:p-10 shadow-xl border border-teal-800/40 relative overflow-hidden">

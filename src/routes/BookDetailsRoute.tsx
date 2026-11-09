@@ -60,6 +60,7 @@ function ExternalBookViewer({
   onPurchaseBook,
   books
 }: ExternalBookViewerProps) {
+  const { dir, t } = useLanguage();
   const embedUrl = book.preview_video_url ? (
     book.preview_video_url.includes('youtube.com/watch?v=')
       ? book.preview_video_url.replace('watch?v=', 'embed/')
@@ -124,7 +125,7 @@ function ExternalBookViewer({
   }, [book.external_url]);
 
   return (
-    <div className="space-y-8 animate-fade-in pb-24 text-right max-w-6xl mx-auto" dir="rtl">
+    <div className="space-y-8 animate-fade-in pb-24 text-start max-w-6xl mx-auto" dir={dir}>
       <SeoStructuredData type="book" book={book} />
       {/* TOP NAV BAR */}
       <div className="flex items-center justify-between pb-4 border-b border-gray-200">
@@ -377,7 +378,7 @@ export default function BookDetailsRoute({
 }: BookDetailsRouteProps) {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { dir, t } = useLanguage();
   const searchParams = new URLSearchParams(window.location.search);
   const initialTab = (searchParams.get('tab') as any) || 'read';
 
@@ -905,7 +906,7 @@ export default function BookDetailsRoute({
 
   if (isFocusMode && activeChapter) {
     return (
-      <div className="min-h-screen bg-white text-gray-900 animate-fade-in p-4 sm:p-8 max-w-4xl mx-auto text-right" dir="rtl">
+      <div className="min-h-screen bg-white text-gray-900 animate-fade-in p-4 sm:p-8 max-w-4xl mx-auto text-start" dir={dir}>
         <div className="sticky top-4 z-40 bg-white/95 backdrop-blur-md border border-slate-200 rounded-2xl p-3 shadow-md flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <span className="font-black text-sm text-slate-900 truncate">{book.title} - {activeChapter.title}</span>
@@ -930,7 +931,7 @@ export default function BookDetailsRoute({
   }
 
   return (
-    <div className="space-y-6 animate-fade-in pb-24 text-right" dir="rtl">
+    <div className="space-y-6 animate-fade-in pb-24 text-start" dir={dir}>
       <SeoStructuredData type="chapter" book={book} chapter={activeChapter} />
       
       {/* 🌟 1. UNIFIED TOP BAR (Return + Book Title + Chapter Counter + QR + Focus Mode + Teacher Edit Mode Toggle) */}
@@ -1064,7 +1065,7 @@ export default function BookDetailsRoute({
 
       {/* 🛠️ INSTRUCTOR & ADMIN QUICK CONTROL BAR (Only visible when Edit Mode is active) */}
       {isInstructorOrAdmin && isTeacherEditMode && (
-        <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-indigo-900/60 rounded-2xl p-3 text-white shadow-md flex flex-wrap items-center justify-between gap-3 animate-fade-in" dir="rtl">
+        <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-indigo-900/60 rounded-2xl p-3 text-white shadow-md flex flex-wrap items-center justify-between gap-3 animate-fade-in" dir={dir}>
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-teal-500/20 text-teal-300 flex items-center justify-center font-bold text-sm border border-teal-500/30 shrink-0">
               ⚡
@@ -1117,7 +1118,7 @@ export default function BookDetailsRoute({
 
       {/* 🧭 STREAMLINED SOVEREIGN 4-CORE TABS BAR */}
       <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-2xl p-2 shadow-xs">
-        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none pb-0.5">
+        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar scrollbar-none pb-0.5 touch-pan-x">
           {/* TAB 1: READ */}
           <button
             onClick={() => setActiveTab('read')}
@@ -1126,7 +1127,7 @@ export default function BookDetailsRoute({
             }`}
           >
             <BookOpen className="w-3.5 h-3.5" />
-            <span>قراءة الدرس 📖</span>
+            <span>{t('book.read', 'قراءة الدرس 📖')}</span>
           </button>
 
           {/* TAB 2: INTERACTIVE LABS & ACTIVITIES */}
@@ -1137,7 +1138,7 @@ export default function BookDetailsRoute({
             }`}
           >
             <FlaskConical className="w-3.5 h-3.5" />
-            <span>النشاط والمعمل التفاعلي 🧪</span>
+            <span>{t('book.sandbox', 'النشاط والمعمل التفاعلي 🧪')}</span>
           </button>
 
           {/* TAB 3: EXPLAINROO STUDIO LAB / شرح الدرس */}
@@ -1148,7 +1149,7 @@ export default function BookDetailsRoute({
             }`}
           >
             <Sparkles className="w-3.5 h-3.5" />
-            <span>شرح الدرس 🎬</span>
+            <span>{t('book.interactive_lesson', 'شرح الدرس 🎬')}</span>
           </button>
 
           {/* TAB 4: FULL CURRICULUM EXPLANATION & MINDMAP */}
@@ -1159,7 +1160,7 @@ export default function BookDetailsRoute({
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
-            <span>شرح وخريطة المنهج 🗺️</span>
+            <span>{t('book.interactive_curriculum', 'شرح وخريطة المنهج 🗺️')}</span>
           </button>
 
           {/* TAB 5: VIDEOS */}
@@ -1170,7 +1171,7 @@ export default function BookDetailsRoute({
             }`}
           >
             <Film className="w-3.5 h-3.5" />
-            <span>مكتبة الفيديوهات 🎥</span>
+            <span>{t('book.videos', 'مكتبة الفيديوهات 🎥')}</span>
           </button>
 
           {/* TAB 6: PRACTICE & ASSESSMENT */}
@@ -1181,21 +1182,10 @@ export default function BookDetailsRoute({
             }`}
           >
             <HelpCircle className="w-3.5 h-3.5" />
-            <span>التقييم والمذاكرة 📝</span>
+            <span>{t('book.quiz', 'التقييم والمذاكرة 📝')}</span>
           </button>
 
-          {/* TAB 7: TEACHER DIRECT SOS HELPDESK */}
-          <button
-            onClick={() => setActiveTab('teacher_sos')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
-              activeTab === 'teacher_sos' ? 'bg-rose-600 text-white font-black shadow-xs' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <HelpCircle className="w-3.5 h-3.5" />
-            <span>استفسار المعلم (SOS) 🙋‍♂️</span>
-          </button>
-
-          {/* TAB 6: TEACHER CONTENT EDITOR (Only visible in Teacher Edit Mode) */}
+          {/* TAB 7: TEACHER CONTENT EDITOR (Only visible in Teacher Edit Mode) */}
           {isInstructorOrAdmin && isTeacherEditMode && (
             <>
               <div className="h-5 w-px bg-slate-200 shrink-0 mx-1" />
@@ -1208,7 +1198,7 @@ export default function BookDetailsRoute({
                 }`}
               >
                 <Edit className="w-3.5 h-3.5" />
-                <span>تعديل المحتوى ✏️</span>
+                <span>{t('book.editor', 'تعديل المحتوى ✏️')}</span>
               </button>
             </>
           )}
@@ -1371,7 +1361,7 @@ export default function BookDetailsRoute({
 
         {/* MOBILE SLIDE-OVER CHAPTERS DRAWER */}
         {isMobileChaptersOpen && (
-          <div className="lg:hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-gray-900/60 backdrop-blur-xs p-0 sm:p-4" dir="rtl">
+          <div className="lg:hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-gray-900/60 backdrop-blur-xs p-0 sm:p-4" dir={dir}>
             <div className="bg-white rounded-t-3xl sm:rounded-3xl p-5 w-full sm:max-w-md max-h-[85vh] overflow-y-auto shadow-2xl space-y-4 animate-in slide-in-from-bottom duration-200">
               <div className="flex items-center justify-between border-b border-gray-100 pb-3 sticky top-0 bg-white z-10">
                 <h3 className="font-black text-gray-900 text-sm flex items-center gap-2">
@@ -1576,7 +1566,7 @@ export default function BookDetailsRoute({
 
         {/* 📝 UNIFIED PRACTICE & ASSESSMENT (Quiz + Flashcards + Sandbox) */}
         {activeTab === 'practice' && activeChapter && (
-          <div className="space-y-6 animate-in fade-in duration-200" dir="rtl">
+          <div className="space-y-6 animate-in fade-in duration-200" dir={dir}>
             {/* SUB-TABS PILLS */}
             <div className="bg-white border border-gray-200 rounded-2xl p-2 shadow-xs flex items-center gap-2 overflow-x-auto">
               <button
@@ -1661,7 +1651,7 @@ export default function BookDetailsRoute({
 
         {/* 🎬 UNIFIED VIDEOS TAB (Reels + Curated Video Explanations) */}
         {activeTab === 'videos' && activeChapter && (
-          <div className="space-y-6 animate-in fade-in duration-200" dir="rtl">
+          <div className="space-y-6 animate-in fade-in duration-200" dir={dir}>
             {/* SUB-TABS PILLS */}
             <div className="bg-white border border-gray-200 rounded-2xl p-2 shadow-xs flex items-center gap-2 overflow-x-auto">
               <button
@@ -1696,7 +1686,7 @@ export default function BookDetailsRoute({
               const generatedReelsCount = bookReels.length;
 
               return (
-                <div className="space-y-6 animate-in fade-in duration-300" dir="rtl">
+                <div className="space-y-6 animate-in fade-in duration-300" dir={dir}>
                   {/* STATUS NOTIFICATION BANNER */}
                   {reelStatusMsg && (
                     <div className="p-4 bg-gradient-to-r from-teal-500/10 via-indigo-500/10 to-purple-500/10 border border-teal-500/30 rounded-2xl flex items-center justify-between shadow-sm">
@@ -2065,7 +2055,7 @@ export default function BookDetailsRoute({
       {/* 📱 MOBILE STICKY BOTTOM QUICK BAR (Easy Thumb Navigation - 5 Core Study Modes) */}
       <div 
         className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 px-3 py-2 flex items-center justify-around shadow-lg print:hidden"
-        dir="rtl"
+        dir={dir}
       >
         <button
           onClick={() => setActiveTab('read')}

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { EduReel, EduReelStyle } from '../../types';
 import { EduReelPlayer } from './EduReelPlayer';
+import { useLanguage } from '../../i18n/LanguageContext';
 import { 
   getGamificationState, 
   getSavedNotes, 
@@ -28,6 +29,7 @@ export const EduReelsFeedView: React.FC<EduReelsFeedViewProps> = ({
   onBack,
   onOpenBook
 }) => {
+  const { t, dir } = useLanguage();
   const [searchParams] = useSearchParams();
   const params = useParams();
   const activeBookId = initialBookId || params.bookId || searchParams.get('bookId') || undefined;
@@ -133,8 +135,8 @@ export const EduReelsFeedView: React.FC<EduReelsFeedViewProps> = ({
 
   return (
     <div 
-      className="min-h-[92vh] flex flex-col justify-between py-2 text-right relative select-none"
-      dir="rtl"
+      className="min-h-[92vh] flex flex-col justify-between py-2 text-start relative select-none"
+      dir={dir}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
@@ -268,7 +270,7 @@ export const EduReelsFeedView: React.FC<EduReelsFeedViewProps> = ({
 
       {/* 🌟 SAVED NOTES DRAWER MODAL */}
       {isSavedNotesOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4" dir="rtl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4" dir={dir}>
           <div className="bg-white border border-gray-200 rounded-3xl p-5 max-w-md w-full max-h-[85vh] overflow-y-auto shadow-2xl relative space-y-4">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2">

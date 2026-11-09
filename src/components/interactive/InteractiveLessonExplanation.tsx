@@ -8,6 +8,7 @@ import {
 import { Chapter, MarketplaceBook } from '../../types';
 import { InteractiveCanvas } from './InteractiveCanvas';
 import { fireConfetti } from '../../utils/confetti';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 interface InteractiveLessonExplanationProps {
   book: MarketplaceBook;
@@ -20,6 +21,7 @@ export const InteractiveLessonExplanation: React.FC<InteractiveLessonExplanation
   chapter,
   currentUser
 }) => {
+  const { dir, t } = useLanguage();
   const [explanation, setExplanation] = useState<any>(chapter.interactive_explanation || null);
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingSaved, setIsCheckingSaved] = useState(true);
@@ -219,7 +221,7 @@ export const InteractiveLessonExplanation: React.FC<InteractiveLessonExplanation
   // ========================================================
   if (!explanation) {
     return (
-      <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 border border-indigo-500/20 rounded-3xl p-6 sm:p-8 shadow-xl text-center space-y-5 animate-fade-in text-white max-w-xl mx-auto" dir="rtl">
+      <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 border border-indigo-500/20 rounded-3xl p-6 sm:p-8 shadow-xl text-center space-y-5 animate-fade-in text-white max-w-xl mx-auto" dir={dir}>
         <div className="space-y-3">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-teal-500 to-indigo-600 flex items-center justify-center mx-auto text-white shadow-lg shadow-teal-500/20">
             <Mic className="w-7 h-7" />
@@ -236,7 +238,7 @@ export const InteractiveLessonExplanation: React.FC<InteractiveLessonExplanation
         </div>
 
         {/* VOICE SELECTOR BUTTONS (SIMPLE & HUMAN-FRIENDLY) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-right">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-start">
           <div className="p-3 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-1.5">
             <span className="text-[11px] font-bold text-cyan-300 flex items-center gap-1">
               <span>👦</span>
@@ -296,7 +298,7 @@ export const InteractiveLessonExplanation: React.FC<InteractiveLessonExplanation
   // 🌟 ACTIVE INTERACTIVE EXPLANATION STUDIO
   // ========================================================
   return (
-    <div className="space-y-4 sm:space-y-6 text-right animate-fade-in max-w-full overflow-hidden" dir="rtl">
+    <div className="space-y-4 sm:space-y-6 text-start animate-fade-in max-w-full overflow-hidden" dir={dir}>
       {/* Hidden Audio Player */}
       <audio
         ref={audioRef}
@@ -495,7 +497,7 @@ export const InteractiveLessonExplanation: React.FC<InteractiveLessonExplanation
                 <div
                   key={idx}
                   onClick={() => jumpToStep(idx)}
-                  className={`p-3.5 rounded-2xl border transition-all cursor-pointer select-none text-right break-words ${
+                  className={`p-3.5 rounded-2xl border transition-all cursor-pointer select-none text-start break-words ${
                     isCurrent
                       ? isKarim 
                         ? 'bg-cyan-950/95 border-cyan-400 text-white shadow-lg ring-2 ring-cyan-500/30' 

@@ -1768,7 +1768,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
       </section>
 
       {/* 📱 MOBILE STICKY BOTTOM QUICK CTA */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-md border-t border-slate-800 p-2.5 flex items-center justify-between shadow-2xl print:hidden" dir="rtl">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-md border-t border-slate-800 p-2.5 flex items-center justify-between shadow-2xl print:hidden" dir={dir}>
         <div className="pr-1">
           <span className="text-xs font-black text-white block leading-tight">جاهز تبدأ المذاكرة؟</span>
           <span className="text-[10px] text-teal-400 font-bold">جرّب المقررات والامتحانات مجاناً</span>
@@ -1783,7 +1783,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
 
       {/* 🎬 1-MINUTE VIDEO WALKTHROUGH MODAL */}
       {isVideoModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4" dir="rtl">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4" dir={dir}>
           <div className="bg-slate-900 border border-indigo-500/40 rounded-3xl max-w-2xl w-full p-6 space-y-4 shadow-2xl text-white animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2 text-teal-400">
@@ -1821,7 +1821,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
 
       {/* 📱 60s REELS INTERACTIVE VIEWER MODAL */}
       {isReelModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4" dir="rtl">
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4" dir={dir}>
           <div className="bg-slate-950 border-2 border-purple-500/50 rounded-3xl max-w-sm w-full p-4 space-y-4 shadow-2xl text-white animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
               <span className="text-xs font-black text-purple-300 flex items-center gap-1.5">

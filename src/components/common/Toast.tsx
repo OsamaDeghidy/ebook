@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -22,6 +23,7 @@ export const showToast = (message: string, type: ToastType = 'info', duration: n
 
 export const ToastContainer: React.FC = () => {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const { dir } = useLanguage();
 
   useEffect(() => {
     const handleToast = (e: any) => {
@@ -41,8 +43,8 @@ export const ToastContainer: React.FC = () => {
 
   return (
     <div 
-      className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-50 flex flex-col gap-2.5 max-w-sm w-full pointer-events-none"
-      dir="rtl"
+      className="fixed bottom-20 sm:bottom-6 end-4 sm:end-6 z-50 flex flex-col gap-2.5 max-w-sm w-[calc(100%-2rem)] sm:w-full pointer-events-none pb-safe"
+      dir={dir}
     >
       {toasts.map((toast) => {
         const isSuccess = toast.type === 'success';

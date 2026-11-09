@@ -4,6 +4,7 @@ import {
   Minimize2, RefreshCw, BookOpen, FileText, CheckCircle2,
   Volume2, Download, AlertCircle, Layers
 } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface BookletPage {
   pageNumber: number;
@@ -32,6 +33,7 @@ export default function AuthenticBookletViewer({
   onPlayAudio,
   isAudioPlaying
 }: AuthenticBookletViewerProps) {
+  const { dir, t } = useLanguage();
   const [pages, setPages] = useState<BookletPage[]>([]);
   const [activePageIndex, setActivePageIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -127,7 +129,7 @@ export default function AuthenticBookletViewer({
   };
 
   return (
-    <div className={`space-y-4 animate-fade-in ${isFullscreen ? 'fixed inset-0 z-50 bg-slate-950 p-4 sm:p-6 overflow-y-auto flex flex-col justify-between' : ''}`}>
+    <div className={`space-y-4 animate-fade-in ${isFullscreen ? 'fixed inset-0 z-50 bg-slate-950 p-4 sm:p-6 overflow-y-auto flex flex-col justify-between' : ''}`} dir={dir}>
       
       {/* 🧭 TOP CONTROLS & BREADCRUMB BAR */}
       <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">

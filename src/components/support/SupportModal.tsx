@@ -4,6 +4,7 @@ import {
   Phone, Mail, User, ShieldAlert, Sparkles, Clock, FileText, 
   Paperclip, ExternalLink, Lightbulb, CreditCard, Bug, AlertTriangle
 } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 interface SupportModalProps {
   isOpen: boolean;
@@ -59,6 +60,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({
   currentUser,
   userRole = 'student'
 }) => {
+  const { t, dir } = useLanguage();
   const [fullName, setFullName] = useState(
     currentUser?.user_metadata?.full_name || currentUser?.email?.split('@')[0] || ''
   );
@@ -129,7 +131,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-md p-4 overflow-y-auto animate-fade-in" dir="rtl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-md p-4 overflow-y-auto animate-fade-in" dir={dir}>
       <div className="bg-white border border-slate-200 rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden my-6">
         
         {/* HEADER */}

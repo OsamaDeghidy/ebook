@@ -21,6 +21,7 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { MindMapNode } from '../types';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface MindMapProps {
   nodes: MindMapNode[];
@@ -31,6 +32,7 @@ interface MindMapProps {
 }
 
 export default function MindMap({ nodes = [], onUpdateNodes, ebookId, chapterId, chapterContent }: MindMapProps) {
+  const { t, dir } = useLanguage();
   // Local synchronized nodes state
   const [internalNodes, setInternalNodes] = useState<MindMapNode[]>(nodes);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -331,7 +333,7 @@ export default function MindMap({ nodes = [], onUpdateNodes, ebookId, chapterId,
   };
 
   return (
-    <div id="mindmap-container" className={`grid grid-cols-1 lg:grid-cols-3 gap-6 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm ${isFullscreen ? 'fixed inset-4 z-50 overflow-auto bg-white' : ''}`} dir="rtl">
+    <div id="mindmap-container" className={`grid grid-cols-1 lg:grid-cols-3 gap-6 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm ${isFullscreen ? 'fixed inset-4 z-50 overflow-auto bg-white' : ''}`} dir={dir}>
       
       {/* Interactive Canvas */}
       <div className="lg:col-span-2 relative overflow-auto border border-gray-200 rounded-2xl bg-gradient-to-b from-gray-50/80 to-white p-4 min-h-[500px] max-h-[620px] flex flex-col items-center justify-between">

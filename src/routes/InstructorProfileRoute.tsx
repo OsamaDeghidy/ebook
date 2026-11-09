@@ -25,7 +25,7 @@ export default function InstructorProfileRoute({
 }: InstructorProfileRouteProps) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { dir, t } = useLanguage();
 
   const decodedId = decodeURIComponent(id || '');
 
@@ -52,7 +52,7 @@ export default function InstructorProfileRoute({
   const estimatedStudents = Math.max(120, instructorBooks.length * 280);
 
   return (
-    <div className="min-h-screen bg-slate-50/50 py-8 px-4 sm:px-6 lg:px-8" dir="rtl">
+    <div className="min-h-screen bg-slate-50/50 py-8 px-4 sm:px-6 lg:px-8" dir={dir}>
       <div className="max-w-6xl mx-auto space-y-8">
         
         {/* Navigation Breadcrumb & Action Toolbar */}
@@ -112,7 +112,7 @@ export default function InstructorProfileRoute({
         <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 sm:p-10 shadow-xl border border-slate-800 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-80 h-80 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
 
-          <div className="flex flex-col md:flex-row items-center md:items-start gap-6 z-10 relative text-center md:text-right">
+          <div className="flex flex-col md:flex-row items-center md:items-start gap-6 z-10 relative text-center md:text-start">
             {/* Avatar Initial Circle */}
             <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl bg-gradient-to-tr from-teal-500 to-indigo-600 p-1 shadow-2xl shrink-0">
               <div className="w-full h-full bg-slate-950 rounded-[22px] flex items-center justify-center text-3xl sm:text-4xl font-black text-teal-300">
@@ -230,7 +230,7 @@ export default function InstructorProfileRoute({
 
         {/* ✏️ EDIT INSTRUCTOR PROFILE MODAL */}
         {isEditModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4" dir="rtl">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4" dir={dir}>
             <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-slate-200 space-y-4 animate-in zoom-in-95 duration-150">
               <div className="flex items-center justify-between pb-3 border-b border-gray-100">
                 <div className="flex items-center gap-2">

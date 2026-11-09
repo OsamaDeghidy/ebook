@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { MarketplaceBook, CurriculumMindMapPayload, CurriculumMindMapNode } from '../../types';
 import { fireConfetti } from '../../utils/confetti';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 interface CurriculumMindMapProps {
   book: MarketplaceBook;
@@ -19,6 +20,7 @@ export const CurriculumMindMap: React.FC<CurriculumMindMapProps> = ({
   onNavigateToChapter,
   onMindMapUpdated
 }) => {
+  const { t, dir } = useLanguage();
   const [mindmapData, setMindmapData] = useState<CurriculumMindMapPayload | null>(
     book.curriculum_mindmap || null
   );
@@ -265,7 +267,7 @@ export const CurriculumMindMap: React.FC<CurriculumMindMapProps> = ({
       className={`w-full min-w-0 max-w-full bg-slate-900/95 border border-purple-500/20 rounded-3xl p-4 sm:p-7 shadow-2xl transition-all ${
         isFullScreen ? 'fixed inset-0 z-50 rounded-none overflow-y-auto bg-slate-950 p-6' : ''
       }`}
-      dir="rtl"
+      dir={dir}
     >
       {/* 1. HEADER & CONTROLS */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-slate-800">
@@ -763,7 +765,7 @@ export const CurriculumMindMap: React.FC<CurriculumMindMapProps> = ({
       {/* 4. DETAIL MODAL FOR SELECTED NODE */}
       {selectedNode && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-purple-500/30 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4 animate-in fade-in zoom-in duration-150 text-right" dir="rtl">
+          <div className="bg-slate-900 border border-purple-500/30 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4 animate-in fade-in zoom-in duration-150 text-right" dir={dir}>
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
                 <GitBranch className="w-4 h-4 text-purple-400" />

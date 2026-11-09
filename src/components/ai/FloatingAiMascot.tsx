@@ -4,6 +4,7 @@ import {
   X, ChevronUp, ChevronDown, Lightbulb, Play, ArrowLeft, Volume2
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 interface FloatingAiMascotProps {
   onOpenSupport?: () => void;
@@ -14,6 +15,7 @@ export const FloatingAiMascot: React.FC<FloatingAiMascotProps> = ({
   onOpenSupport,
   onOpenAiTutor
 }) => {
+  const { t, dir } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -99,7 +101,7 @@ export const FloatingAiMascot: React.FC<FloatingAiMascotProps> = ({
         onClick={() => setIsMinimized(false)}
         className="fixed bottom-5 left-5 z-40 p-3 bg-gradient-to-tr from-teal-600 to-indigo-600 hover:from-teal-500 hover:to-indigo-500 text-white rounded-full shadow-2xl shadow-teal-500/30 transition transform hover:scale-110 active:scale-95 cursor-pointer flex items-center gap-1.5 font-bold text-xs"
         title="إظهار المساعد الذكي"
-        dir="rtl"
+        dir={dir}
       >
         <span className="text-base animate-bounce">🦉</span>
         <span className="hidden sm:inline">المساعد الذكي</span>
@@ -110,7 +112,7 @@ export const FloatingAiMascot: React.FC<FloatingAiMascotProps> = ({
   return (
     <div 
       className="fixed bottom-6 left-6 z-40 flex flex-col items-start select-none font-sans print:hidden"
-      dir="rtl"
+      dir={dir}
       style={{
         transform: `translateY(${scrollYOffset}px)`,
         transition: 'transform 0.3s ease-out'

@@ -102,7 +102,7 @@ export default function ChapterEditor({
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-3xl shadow-sm p-6 space-y-6" dir="rtl">
+    <div className="bg-white border border-gray-200 rounded-3xl shadow-sm p-6 space-y-6" dir={dir}>
       
       {/* Title Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">

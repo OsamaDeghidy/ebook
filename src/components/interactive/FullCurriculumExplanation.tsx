@@ -9,6 +9,7 @@ import { MarketplaceBook, Chapter } from '../../types';
 import { InteractiveCanvas } from './InteractiveCanvas';
 import { CurriculumMindMap } from './CurriculumMindMap';
 import { fireConfetti } from '../../utils/confetti';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 interface FullCurriculumExplanationProps {
   book: MarketplaceBook;
@@ -19,6 +20,7 @@ export const FullCurriculumExplanation: React.FC<FullCurriculumExplanationProps>
   book,
   currentUser
 }) => {
+  const { dir, t } = useLanguage();
   const chapters = useMemo(() => book.chapters || [], [book.chapters]);
   const [activeChapterIndex, setActiveChapterIndex] = useState(0);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -199,7 +201,7 @@ export const FullCurriculumExplanation: React.FC<FullCurriculumExplanationProps>
   }, [chapters]);
 
   return (
-    <div className="space-y-4 sm:space-y-6 text-right animate-fade-in max-w-full overflow-hidden" dir="rtl">
+    <div className="space-y-4 sm:space-y-6 text-start animate-fade-in max-w-full overflow-hidden" dir={dir}>
       {/* Audio Element */}
       <audio
         ref={audioRef}
@@ -423,7 +425,7 @@ export const FullCurriculumExplanation: React.FC<FullCurriculumExplanationProps>
                       setCurrentStepIndex(idx);
                       setIsPlaying(true);
                     }}
-                    className={`p-3 rounded-2xl border transition-all cursor-pointer select-none text-right break-words ${
+                    className={`p-3 rounded-2xl border transition-all cursor-pointer select-none text-start break-words ${
                       isCurrent
                         ? isKarim 
                           ? 'bg-cyan-950/90 border-cyan-400 text-white shadow-md' 

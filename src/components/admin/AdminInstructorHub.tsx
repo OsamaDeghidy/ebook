@@ -15,6 +15,7 @@ import { PlatformSettingsTab } from './PlatformSettingsTab';
 import { UsersManagementTab } from './UsersManagementTab';
 import { SupportTicketsTab } from './SupportTicketsTab';
 import { exportReelToVideo, downloadReelBlob } from '../../utils/reelVideoExporter';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 interface AdminInstructorHubProps {
   books: MarketplaceBook[];
@@ -41,6 +42,7 @@ export const AdminInstructorHub: React.FC<AdminInstructorHubProps> = ({
   onOpenCreateModal,
   onOpenExternalModal
 }) => {
+  const { t, dir } = useLanguage();
   const [activeTab, setActiveTab] = useState<'analytics' | 'learning_radar' | 'teacher_sos' | 'users' | 'support' | 'exams' | 'vouchers' | 'approvals' | 'wallet' | 'reels' | 'settings'>('analytics');
   const [booksList, setBooksList] = useState<MarketplaceBook[]>(initialBooks);
 
@@ -996,7 +998,7 @@ export const AdminInstructorHub: React.FC<AdminInstructorHubProps> = ({
 
   if (userRole === 'student' && !isAdminMode) {
     return (
-      <div className="p-12 text-center bg-white border border-rose-100 rounded-3xl shadow-sm space-y-4 max-w-lg mx-auto my-12" dir="rtl">
+      <div className="p-12 text-center bg-white border border-rose-100 rounded-3xl shadow-sm space-y-4 max-w-lg mx-auto my-12" dir={dir}>
         <Shield className="w-12 h-12 text-rose-500 mx-auto" />
         <h3 className="text-xl font-black text-slate-900">غير مصرح بالدخول (مخصص للمعلمين والإدارة فقط)</h3>
         <p className="text-xs text-slate-500">حسابك مسجل كطالب. هذه اللوحة مخصصة للمعلمين لإصدار الكتب وإدارة السناتر والكروت المالية.</p>
@@ -1011,7 +1013,7 @@ export const AdminInstructorHub: React.FC<AdminInstructorHubProps> = ({
   }
 
   return (
-    <div className="space-y-8 animate-fade-in pb-20 text-right max-w-7xl mx-auto" dir="rtl">
+    <div className="space-y-8 animate-fade-in pb-20 text-start max-w-7xl mx-auto" dir={dir}>
       
       {/* 🌟 TOP HEADER */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-gray-200 print:hidden">
@@ -1959,7 +1961,7 @@ export const AdminInstructorHub: React.FC<AdminInstructorHubProps> = ({
 
       {/* REJECTION REASON MODAL */}
       {rejectionModalBookId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 animate-fade-in" dir="rtl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 animate-fade-in" dir={dir}>
           <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
             <h3 className="font-black text-slate-900 text-base">رفض المقرر وإرسال ملاحظات للمعلم</h3>
             <p className="text-xs text-slate-500">اكتب سبب الرفض بوضوح ليقوم المعلم بتصحيحه وإعادة الإرسال:</p>
@@ -1995,7 +1997,7 @@ export const AdminInstructorHub: React.FC<AdminInstructorHubProps> = ({
 
       {/* REQUEST EDIT MODAL */}
       {editRequestModalBookId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 animate-fade-in" dir="rtl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 animate-fade-in" dir={dir}>
           <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
             <h3 className="font-black text-slate-900 text-base">طلب تعديل على مقرر منشور</h3>
             <p className="text-xs text-slate-500">وضح للأدمن ما التعديلات التي تود إجراؤها على النسخة المنشورة:</p>
@@ -2990,7 +2992,7 @@ export const AdminInstructorHub: React.FC<AdminInstructorHubProps> = ({
 
       {/* 🌟 RECHARGE WALLET MODAL */}
       {isRechargeModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 animate-fade-in" dir="rtl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 animate-fade-in" dir={dir}>
           <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
@@ -3071,7 +3073,7 @@ export const AdminInstructorHub: React.FC<AdminInstructorHubProps> = ({
 
       {/* 🌟 WITHDRAWAL PAYOUT MODAL */}
       {isWithdrawModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 animate-fade-in" dir="rtl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 animate-fade-in" dir={dir}>
           <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
@@ -3470,7 +3472,7 @@ export const AdminInstructorHub: React.FC<AdminInstructorHubProps> = ({
 
       {/* 🌟 PREVIEW MODAL */}
       {previewReel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in" dir="rtl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in" dir={dir}>
           <div className="relative flex flex-col items-center">
             {/* CLOSE BUTTON */}
             <button

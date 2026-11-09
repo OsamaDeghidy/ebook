@@ -424,7 +424,7 @@ export default function QuizSection({
   };
 
   return (
-    <div className="space-y-6" dir="rtl">
+    <div className="space-y-6" dir={dir}>
       
       {/* HEADER BAR */}
       <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1097,7 +1097,7 @@ export default function QuizSection({
 
           {/* FLOATING BOTTOM SCORE BAR */}
           {Object.keys(practiceAnswers).length > 0 && (
-            <div className="fixed bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900/95 backdrop-blur-md text-white px-5 py-2.5 rounded-2xl shadow-2xl border border-slate-800 flex items-center gap-4 text-xs font-bold animate-slide-up" dir="rtl">
+            <div className="fixed bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900/95 backdrop-blur-md text-white px-5 py-2.5 rounded-2xl shadow-2xl border border-slate-800 flex items-center gap-4 text-xs font-bold animate-slide-up" dir={dir}>
               <span className="text-slate-300">
                 أجبت <strong className="text-white">{Object.keys(practiceAnswers).length}</strong> من <strong className="text-white">{effectiveQuestions.length}</strong>
               </span>
@@ -1359,7 +1359,7 @@ export default function QuizSection({
       {/* GENERATE CUSTOM EXAM MODAL */}
       {showGenerateModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl border border-gray-100 space-y-6 animate-scale-up" dir="rtl">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl border border-gray-100 space-y-6 animate-scale-up" dir={dir}>
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2 text-purple-600">
                 <Sparkles className="w-5 h-5" />
@@ -1510,7 +1510,7 @@ export default function QuizSection({
       {/* PRINTABLE OFFICIAL EXAM PAPER MODAL */}
       {examToPrint && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-gray-200" dir="rtl">
+          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-gray-200" dir={dir}>
             {/* MODAL CONTROL HEADER (Hidden on print) */}
             <div className="p-4 sm:p-5 border-b border-gray-200 flex items-center justify-between gap-3 bg-gray-50 rounded-t-3xl print:hidden">
               <div className="flex items-center gap-2">

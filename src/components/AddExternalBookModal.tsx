@@ -12,6 +12,7 @@ import {
   ACADEMIC_YEARS, 
   getGradesForSystem 
 } from '../constants/taxonomy';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface AddExternalBookModalProps {
   isOpen: boolean;
@@ -44,6 +45,7 @@ export const AddExternalBookModal: React.FC<AddExternalBookModalProps> = ({
   onClose,
   onAddBook
 }) => {
+  const { dir, t } = useLanguage();
   const [isAcademicMode, setIsAcademicMode] = useState<boolean>(true);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -141,7 +143,7 @@ export const AddExternalBookModal: React.FC<AddExternalBookModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4 overflow-y-auto" dir="rtl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4 overflow-y-auto" dir={dir}>
       <div className="bg-white border border-gray-200 rounded-3xl p-6 sm:p-8 max-w-2xl w-full shadow-2xl relative my-8">
         <button
           onClick={onClose}
@@ -191,7 +193,7 @@ export const AddExternalBookModal: React.FC<AddExternalBookModalProps> = ({
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 text-right">
+        <form onSubmit={handleSubmit} className="space-y-4 text-start">
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1">عنوان الكتاب أو المقرر التفاعلي</label>
             <div className="relative">
@@ -488,7 +490,7 @@ export const AddExternalBookModal: React.FC<AddExternalBookModalProps> = ({
                     type="button"
                     key={c.id}
                     onClick={() => setGeneralCategory(c.id as BookCategory)}
-                    className={`p-2.5 rounded-xl text-xs font-bold transition text-right border ${
+                    className={`p-2.5 rounded-xl text-xs font-bold transition text-start border ${
                       generalCategory === c.id
                         ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
                         : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'

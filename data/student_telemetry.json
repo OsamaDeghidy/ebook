@@ -3080,5 +3080,20 @@
     "quizAttempts": [],
     "isCompleted": false,
     "lastActive": "2026-11-09T18:22:59.580Z"
+  },
+  {
+    "studentId": "std_curr",
+    "studentName": "طالب المنصة",
+    "studentEmail": "",
+    "bookId": "active_book",
+    "bookTitle": "",
+    "chapterId": "ch-b657d0e2-9018-4328-823e-5b6019accef2-1",
+    "chapterTitle": "الوحدة الأولى: الكائنات الحية وتكييفها للبقاء",
+    "activeReadingSeconds": 25,
+    "audioListenPercentage": 14,
+    "quizScore": null,
+    "quizAttempts": [],
+    "isCompleted": false,
+    "lastActive": "2026-11-09T22:26:09.796Z"
   }
 ]

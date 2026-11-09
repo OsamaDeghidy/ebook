@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Chapter, MarketplaceBook, InteractiveLab } from '../types';
 import AuthenticExerciseBank from './AuthenticExerciseBank';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface InteractiveLabViewProps {
   chapter: Chapter;
@@ -15,6 +16,7 @@ interface InteractiveLabViewProps {
 }
 
 export default function InteractiveLabView({ chapter, book }: InteractiveLabViewProps) {
+  const { t, dir } = useLanguage();
   // 🔘 THE TWO CORE MODES AS REQUESTED BY THE USER:
   // 1. 'exercises': توليد أسئلة من المذكرة والإجابة عليها
   // 2. 'activity': توليد نشاط تفاعلي
@@ -219,7 +221,7 @@ export default function InteractiveLabView({ chapter, book }: InteractiveLabView
   const currentElement = elements.find(e => e.z === atomicNumber) || elements[2];
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto px-2 sm:px-4 animate-fade-in" dir="rtl">
+    <div className="space-y-6 max-w-6xl mx-auto px-2 sm:px-4 animate-fade-in" dir={dir}>
       
       {/* 🌟 1. TWO MASTER BUTTONS AS REQUESTED BY USER */}
       <div className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-200/90 shadow-sm space-y-4">

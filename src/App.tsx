@@ -712,7 +712,7 @@ function AppContent() {
   }, [location.pathname]);
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col font-sans selection:bg-teal-500 selection:text-white" dir="rtl">
+    <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col font-sans selection:bg-teal-500 selection:text-white" dir={dir}>
       {/* 🌟 GLOBAL SAAS NAVBAR (Dynamic White-Label & Responsive Design) */}
       <header className="bg-white/95 border-b border-gray-200 sticky top-0 z-40 px-3 sm:px-6 py-3 backdrop-blur-md flex items-center justify-between print:hidden">
         
@@ -737,7 +737,7 @@ function AppContent() {
               </div>
             )}
 
-            <div className="text-right">
+            <div className="text-start">
               <div className="flex items-center gap-1.5">
                 <span className="font-black text-sm sm:text-lg text-slate-900 tracking-tight leading-none line-clamp-1 max-w-[140px] sm:max-w-[200px] md:max-w-none">
                   {platformConfig.brandName}
@@ -981,7 +981,7 @@ function AppContent() {
 
       {/* 📱 SLIDE-OVER MOBILE NAVIGATION DRAWER */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden print:hidden" dir="rtl">
+        <div className="fixed inset-0 z-50 lg:hidden print:hidden" dir={dir}>
           {/* Backdrop Overlay */}
           <div 
             className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity animate-fade-in"
@@ -989,7 +989,7 @@ function AppContent() {
           />
 
           {/* Drawer Panel */}
-          <div className="fixed inset-y-0 right-0 max-w-xs w-full bg-white shadow-2xl border-l border-slate-200 flex flex-col justify-between overflow-y-auto animate-slide-left z-10">
+          <div className={`fixed inset-y-0 ${dir === 'rtl' ? 'right-0 border-l animate-slide-left' : 'left-0 border-r animate-slide-right'} max-w-xs w-full bg-white shadow-2xl border-slate-200 flex flex-col justify-between overflow-y-auto z-10`}>
             
             <div className="p-5 space-y-5">
               {/* Drawer Top Header */}
@@ -1010,12 +1010,15 @@ function AppContent() {
                   </div>
                 </div>
 
-                <button
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <LanguageSelector />
+                  <button
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
 
               {/* USER STATUS CARD (Mobile) */}
@@ -1068,8 +1071,8 @@ function AppContent() {
               )}
 
               {/* NAVIGATION LINKS LIST */}
-              <div className="space-y-1 text-right">
-                <p className="text-[10px] font-bold text-slate-400 px-3 pb-1">أقسام المنصة الرئيسية</p>
+              <div className="space-y-1 text-start">
+                <p className="text-[10px] font-bold text-slate-400 px-3 pb-1">{t('nav.home', 'أقسام المنصة الرئيسية')}</p>
                 
                 <Link
                   to="/"
@@ -1080,7 +1083,7 @@ function AppContent() {
                 >
                   <div className="flex items-center gap-2.5">
                     <Compass className="w-4 h-4 text-sky-500" />
-                    <span>الصفحة الرئيسية</span>
+                    <span>{t('nav.home', 'الصفحة الرئيسية')}</span>
                   </div>
                   <ChevronLeft className="w-4 h-4 opacity-60" />
                 </Link>
@@ -1094,7 +1097,7 @@ function AppContent() {
                 >
                   <div className="flex items-center gap-2.5">
                     <ShoppingCart className="w-4 h-4 text-emerald-500" />
-                    <span>متجر ومكتبة المقررات</span>
+                    <span>{t('nav.marketplace', 'متجر ومكتبة المقررات')}</span>
                   </div>
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
                     location.pathname === '/marketplace' ? 'bg-sky-700 text-white' : 'bg-slate-100 text-slate-700'
@@ -1113,7 +1116,7 @@ function AppContent() {
                   >
                     <div className="flex items-center gap-2.5">
                       <Sparkles className="w-4 h-4 text-purple-500" />
-                      <span>🎬 ريلز المعرفة والفيديوهات</span>
+                      <span>{t('nav.reels', '🎬 ريلز المعرفة والفيديوهات')}</span>
                     </div>
                     <ChevronLeft className="w-4 h-4 opacity-60" />
                   </Link>

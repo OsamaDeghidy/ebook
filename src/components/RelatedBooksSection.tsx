@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BookOpen, Star, Sparkles, ArrowLeft, Radio, HelpCircle } from 'lucide-react';
 import { MarketplaceBook } from '../types';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface RelatedBooksSectionProps {
   currentBook: MarketplaceBook;
@@ -15,6 +16,7 @@ export const RelatedBooksSection: React.FC<RelatedBooksSectionProps> = ({
   onOpenBook
 }) => {
   const navigate = useNavigate();
+  const { dir, t } = useLanguage();
 
   // Find 3 to 4 related books based on category, track, or other published books
   const relatedBooks = React.useMemo(() => {
@@ -37,7 +39,7 @@ export const RelatedBooksSection: React.FC<RelatedBooksSectionProps> = ({
   if (relatedBooks.length === 0) return null;
 
   return (
-    <div className="mt-12 pt-8 border-t border-gray-200/80 space-y-6" dir="rtl">
+    <div className="mt-12 pt-8 border-t border-gray-200/80 space-y-6" dir={dir}>
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg sm:text-xl font-black text-slate-900 flex items-center gap-2">

@@ -135,7 +135,7 @@ export default function MathRenderer({ text, className = '', inline = true }: Ma
       <span
         key={`math-${matchIndex}`}
         dir="ltr"
-        className={`inline-block select-text font-mono font-medium mx-1 align-middle ${isBlock ? 'block my-2 text-center' : ''}`}
+        className={`inline-block select-text font-mono font-medium mx-1 align-middle ${isBlock ? 'block my-2 text-center overflow-x-auto max-w-full' : ''}`}
         dangerouslySetInnerHTML={{ __html: html }}
       />
     );

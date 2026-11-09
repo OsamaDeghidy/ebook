@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { Flashcard, Chapter } from '../types';
 import MathRenderer from './MathRenderer';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface FlashcardsSectionProps {
   chapter: Chapter;
@@ -35,6 +36,7 @@ interface FlashcardsSectionProps {
 type LeitnerBox = 'all' | 'box1' | 'box2' | 'box3';
 
 export default function FlashcardsSection({ chapter, onUpdateFlashcards }: FlashcardsSectionProps) {
+  const { t, dir } = useLanguage();
   // Generate initial flashcards from chapter concepts or text
   const initialCards: Flashcard[] = Array.isArray(chapter.flashcards) && chapter.flashcards.length > 0
     ? chapter.flashcards
@@ -278,7 +280,7 @@ export default function FlashcardsSection({ chapter, onUpdateFlashcards }: Flash
   };
 
   return (
-    <div className="space-y-6 animate-fade-in" dir="rtl">
+    <div className="space-y-6 animate-fade-in" dir={dir}>
       
       {/* 🗂️ COMPACT LEITNER SYSTEM 3-BOX BAR */}
       <div className="bg-white border border-gray-200 rounded-2xl p-3 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -629,7 +631,7 @@ export default function FlashcardsSection({ chapter, onUpdateFlashcards }: Flash
 
       {/* ➕ ADD FLASHCARD MODAL */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4" dir="rtl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4" dir={dir}>
           <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-slate-200 space-y-4 animate-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-gray-100">
               <div className="flex items-center gap-2">

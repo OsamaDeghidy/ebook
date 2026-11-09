@@ -3,6 +3,7 @@ import {
   Play, Pause, Volume2, RefreshCw, X, RotateCcw, RotateCw 
 } from 'lucide-react';
 import { useGlobalAudio } from '../hooks/useGlobalAudio';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface FloatingAudioBarProps {
   onTriggerPlay?: () => void;
@@ -10,6 +11,7 @@ interface FloatingAudioBarProps {
 }
 
 export default function FloatingAudioBar({ onTriggerPlay, chapterTitle }: FloatingAudioBarProps) {
+  const { dir, t } = useLanguage();
   const { 
     activeId, 
     isPlaying, 
@@ -48,7 +50,7 @@ export default function FloatingAudioBar({ onTriggerPlay, chapterTitle }: Floati
     return (
       <div
         className="fixed bottom-16 sm:bottom-6 left-1/2 -translate-x-1/2 z-40 animate-slide-up"
-        dir="rtl"
+        dir={dir}
       >
         <button
           onClick={onTriggerPlay}
@@ -69,7 +71,7 @@ export default function FloatingAudioBar({ onTriggerPlay, chapterTitle }: Floati
   return (
     <div
       className="fixed bottom-20 sm:bottom-5 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-md bg-slate-950/95 backdrop-blur-xl text-white px-3 py-1.5 sm:px-4 sm:py-2 rounded-2xl shadow-2xl border border-slate-800/80 flex flex-col gap-1 animate-slide-up"
-      dir="rtl"
+      dir={dir}
     >
       {/* Main Single Row Controls */}
       <div className="flex items-center justify-between gap-1.5">

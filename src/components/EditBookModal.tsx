@@ -12,6 +12,7 @@ import {
   ACADEMIC_YEARS, 
   getGradesForSystem 
 } from '../constants/taxonomy';
+import { useLanguage } from '../i18n/LanguageContext';
 
 // Re-export for compatibility
 export { ACADEMIC_SUBJECTS, GENERAL_SUBJECTS, SEMESTERS, ACADEMIC_YEARS };
@@ -40,6 +41,7 @@ export const EditBookModal: React.FC<EditBookModalProps> = ({
   onClose,
   onSave
 }) => {
+  const { dir, t } = useLanguage();
   if (!isOpen || !book) return null;
 
   const [title, setTitle] = useState(book.title || '');
@@ -155,7 +157,7 @@ export const EditBookModal: React.FC<EditBookModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto" dir="rtl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto" dir={dir}>
       <div className="bg-white border border-gray-200 rounded-3xl p-4 sm:p-6 max-w-2xl w-full shadow-2xl my-auto animate-in zoom-in-95 duration-150">
         
         {/* MODAL HEADER */}

@@ -995,7 +995,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 
       {/* MOBILE FILTER DRAWER MODAL */}
       {isMobileFilterOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-gray-900/60 backdrop-blur-xs p-0 sm:p-4" dir="rtl">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-gray-900/60 backdrop-blur-xs p-0 sm:p-4" dir={dir}>
           <div className="bg-white rounded-t-3xl sm:rounded-3xl p-5 w-full sm:max-w-lg max-h-[85vh] overflow-y-auto shadow-2xl space-y-4 animate-in slide-in-from-bottom duration-200">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3 sticky top-0 bg-white z-10">
               <h3 className="font-black text-gray-900 text-sm flex items-center gap-2">
