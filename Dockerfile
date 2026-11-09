@@ -35,9 +35,9 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=8080
 
-# نسخ ملفات الحزم لتثبيت تبعيات الإنتاج فقط لتقليل حجم الحاوية
-COPY package*.json ./
-RUN npm install --omit=dev && npm cache clean --force
+# نسخ الحزم الجاهزة مباشرة من مرحلة البناء لتفادي تعارض esbuild
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package*.json ./
 
 # نسخ مخرجات البناء من المرحلة الأولى
 COPY --from=builder /app/dist ./dist
