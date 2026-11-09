@@ -837,6 +837,7 @@ async function syncBookToSupabase(book: any) {
       price: Number(book.price) || 0,
       thumbnail_url: book.thumbnail_url || "",
       preview_video_url: book.preview_video_url || null,
+      source_file_url: book.source_file_url || null,
       is_published: book.is_published !== false,
       chapters: book.chapters || [],
       mind_map: book.mind_map || [],
@@ -970,13 +971,43 @@ async function initSupabaseSync() {
         }
         const idx = ebooks.findIndex(b => b.id === dbBook.id);
         if (idx >= 0) {
-          const existingSourceUrl = ebooks[idx].source_file_url;
-          const existingPages = ebooks[idx].chapters?.some((c: any) => c.pages?.length > 0);
-          ebooks[idx] = { ...ebooks[idx], ...dbBook };
-          // 🛡️ PRESERVE LOCAL SOURCE FILE URL & PAGES FROM BEING WIPED BY REMOTE NULLS
-          if (!ebooks[idx].source_file_url && existingSourceUrl) {
-            ebooks[idx].source_file_url = existingSourceUrl;
-          }
+          const existingBook = ebooks[idx];
+          const existingSourceUrl = existingBook.source_file_url;
+
+          // 🛡️ DEEP-MERGE CHAPTERS: Never overwrite local pages, videos or timestamps with empty remote data!
+          const mergedChapters = (dbBook.chapters || []).map((dbCh: any) => {
+            const exCh = (existingBook.chapters || []).find((c: any) => c.id === dbCh.id || c.title === dbCh.title);
+            if (!exCh) return dbCh;
+            return {
+              ...dbCh,
+              pages: (exCh.pages && Array.isArray(exCh.pages) && exCh.pages.length > 0) ? exCh.pages : (dbCh.pages || []),
+              videos: (exCh.videos && Array.isArray(exCh.videos) && exCh.videos.length > 0) ? exCh.videos : (dbCh.videos || []),
+              start_page: exCh.start_page !== undefined ? exCh.start_page : dbCh.start_page,
+              end_page: exCh.end_page !== undefined ? exCh.end_page : dbCh.end_page,
+              physical_start_page: exCh.physical_start_page || dbCh.physical_start_page,
+              originalContent: exCh.originalContent || dbCh.originalContent,
+              content: dbCh.content || exCh.content,
+              quiz: (exCh.quiz && exCh.quiz.length > 0) ? exCh.quiz : (dbCh.quiz || []),
+              flashcards: (exCh.flashcards && exCh.flashcards.length > 0) ? exCh.flashcards : (dbCh.flashcards || []),
+              labs: (exCh.labs && exCh.labs.length > 0) ? exCh.labs : (dbCh.labs || []),
+            };
+          });
+
+          // Also preserve any newly generated local chapters that have not synced to Supabase yet
+          const dbChIds = new Set((dbBook.chapters || []).map((c: any) => c.id));
+          const localOnlyChapters = (existingBook.chapters || []).filter((c: any) => !dbChIds.has(c.id));
+          const allChapters = [...mergedChapters, ...localOnlyChapters];
+
+          ebooks[idx] = {
+            ...existingBook,
+            ...dbBook,
+            chapters: allChapters,
+            source_file_url: existingSourceUrl || dbBook.source_file_url || null,
+            blueprint: existingBook.blueprint || dbBook.blueprint,
+            mind_map: (existingBook.mind_map && existingBook.mind_map.length > 0) ? existingBook.mind_map : (dbBook.mind_map || []),
+            question_bank: (existingBook.question_bank && existingBook.question_bank.length > 0) ? existingBook.question_bank : (dbBook.question_bank || []),
+            exams: (existingBook.exams && existingBook.exams.length > 0) ? existingBook.exams : (dbBook.exams || [])
+          };
         } else {
           ebooks.push(dbBook);
         }
@@ -1892,10 +1923,12 @@ ${chapterRawText.substring(0, 15000)}
 3. **تنوع التخطيط البصري وقواعد النصوص داخل البطاقات (Card Formatting):**
    - في حقل "boxes": اكتب نص كل بطاقة بتركيز شديد وإيجاز ذكي (من 5 إلى 9 كلمات كحد أقصى) لتظهر البطاقة بسطر أو سطرين دون أي تكدس أو تداخل.
    - نوّع layoutType لكل مشهد بين:
-     * "concept_hero": عنوان + معادلة TeX في المنتصف + بطاقة شرح واضحة في الأسفل.
-     * "split_comparison": بطاقتان متجاورتان للمقارنة الثنائية.
-     * "step_by_step": ثلاث خطوات متتابعة (الخطوة 1، الخطوة 2، الخطوة 3).
-     * "golden_alert": بطاقة تنبيه ذهبية لفخاخ الامتحانات (Exam Trap).
+     * "process_flow": مراحل أو خطوات متتابعة (الخطوة 1، 2، 3) تُعرض كمسار أفقي مترابط بأسهم متحركة (ممنوع الصناديق المتراكمة فوق بعضها).
+     * "animated_list": قائمة نقاط وخصائص تعليمية تظهر بتتابع أنيق وسلس مع علامات تدقيق (Checkmarks).
+     * "annotated_formula": معادلة أو قانون رئيسي بالمنتصف مع دوائر وتأطير توضيحي (Annotation) وبطاقة تفسيرية سفلية.
+     * "split_comparison": بطاقتان متقابلتان للمقارنة الثنائية المباشرة (يمين مقابل يسار) مع سهم مقارنة.
+     * "concept_hero": مفهوم محوري مع أيقونة ضخمة وبطاقة تركيز واحدة مشروحة بإيجاز.
+     * "golden_alert": بطاقة تنبيه ذهبية لفخاخ الامتحانات (Exam Trap) والأخطاء الشائعة.
 
 4. **الرموز الرياضية وقواعد TeX الصارمة:**
    - ضع المعادلة الرياضية الصحيحة بصيغة TeX في حقل "mathFormula".
@@ -2161,36 +2194,78 @@ ${chapterRawText.substring(0, 15000)}
       const layoutType = sc.layoutType || (sc.boxes?.length === 3 ? 'step_by_step' : (sc.boxes?.length === 2 ? 'split_comparison' : 'concept_hero'));
       const boxes = Array.isArray(sc.boxes) ? sc.boxes : [];
 
-      if (layoutType === 'step_by_step') {
-        // --- 1. STEP-BY-STEP DERIVATION LAYOUT (Generous vertical spacing to prevent overlap) ---
+      if (layoutType === 'process_flow' || (layoutType === 'step_by_step' && !isVertical && boxes.length >= 2)) {
+        // --- 1. HORIZONTAL PROCESS PIPELINE (Connective nodes with dynamic arrows) ---
         if (hasValidMath) {
           scenesJs += `    s.math('${esc(rawFormula)}', { x: ${centerX}, y: ${isVertical ? 340 : 210}, size: ${isVertical ? 54 : 56}, color: 'yellow', at: 0.1 });\n`;
         }
 
-        boxes.forEach((b: any, bIdx: number) => {
-          const boxId = `step_${sc.id}_${bIdx}`;
-          const boxLabel = esc(b.label || `الخطوة ${bIdx + 1}`);
-          const boxIcon = esc(b.icon || (bIdx === 2 ? 'check' : 'calculator'));
-          const boxColor = esc(b.color || (bIdx === 0 ? 'teal' : (bIdx === 1 ? 'purple' : 'green')));
-          const markTag = `m${bIdx + 1}`;
+        if (isVertical) {
+          // Vertical layout: elegant top-to-bottom pipeline with connecting vertical arrows
+          boxes.forEach((b: any, bIdx: number) => {
+            const boxId = `pipe_${sc.id}_${bIdx}`;
+            const boxLabel = esc(b.label || `المرحلة ${bIdx + 1}`);
+            const boxIcon = esc(b.icon || (bIdx === boxes.length - 1 ? 'check' : 'calculator'));
+            const boxColor = esc(b.color || (bIdx === 0 ? 'teal' : (bIdx === 1 ? 'yellow' : 'purple')));
+            const markTag = `m${bIdx + 1}`;
+            const boxY = 560 + bIdx * 340;
 
-          if (isVertical) {
-            // Vertical 1080x1920: 400px step delta
-            const boxY = 600 + bIdx * 400;
-            scenesJs += `    s.box('${boxLabel}', { id: '${boxId}', x: ${centerX}, y: ${boxY}, w: 940, size: 34, iconSize: 40, icon: '${boxIcon}', color: '${boxColor}', at: '#${markTag}' });\n`;
+            scenesJs += `    s.box('${boxLabel}', { id: '${boxId}', x: ${centerX}, y: ${boxY}, w: 900, size: 32, iconSize: 36, icon: '${boxIcon}', color: '${boxColor}', at: '#${markTag}' });\n`;
             scenesJs += `    s.focus('${boxId}', { at: '#${markTag}' });\n`;
-          } else {
-            // Landscape 1920x1080: 220px step delta with compact 32px text font
-            const baseY = hasValidMath ? 370 : 330;
-            const stepDelta = hasValidMath ? 220 : 240;
-            const boxY = baseY + bIdx * stepDelta;
-            scenesJs += `    s.box('${boxLabel}', { id: '${boxId}', x: ${centerX}, y: ${boxY}, w: 1120, size: 32, iconSize: 36, icon: '${boxIcon}', color: '${boxColor}', at: '#${markTag}' });\n`;
+            if (bIdx > 0) {
+              const prevId = `pipe_${sc.id}_${bIdx - 1}`;
+              scenesJs += `    s.arrow('${prevId}', '${boxId}', { color: 'orange', bend: 0.1, at: '#${markTag}' });\n`;
+            }
+          });
+        } else {
+          // Landscape 1920x1080: True Horizontal Flowchart with connecting curved arrows
+          const total = boxes.length;
+          const totalSpan = Math.min(1560, total * 480);
+          const colW = Math.min(420, Math.floor(totalSpan / total) - 30);
+          const startX = centerX - (totalSpan / 2) + (colW / 2);
+          const stepX = total > 1 ? (totalSpan - colW) / (total - 1) : 0;
+          const nodeY = hasValidMath ? 580 : 530;
+
+          boxes.forEach((b: any, bIdx: number) => {
+            const boxId = `pipe_${sc.id}_${bIdx}`;
+            const boxLabel = esc(b.label || `المرحلة ${bIdx + 1}`);
+            const boxIcon = esc(b.icon || (bIdx === boxes.length - 1 ? 'check' : 'calculator'));
+            const boxColor = esc(b.color || (bIdx === 0 ? 'teal' : (bIdx === 1 ? 'yellow' : 'purple')));
+            const markTag = `m${bIdx + 1}`;
+            const curX = Math.round(startX + bIdx * stepX);
+
+            scenesJs += `    s.box('${boxLabel}', { id: '${boxId}', x: ${curX}, y: ${nodeY}, w: ${colW}, size: 28, iconSize: 34, icon: '${boxIcon}', color: '${boxColor}', at: '#${markTag}' });\n`;
             scenesJs += `    s.focus('${boxId}', { at: '#${markTag}' });\n`;
-          }
-        });
+            if (bIdx > 0) {
+              const prevId = `pipe_${sc.id}_${bIdx - 1}`;
+              scenesJs += `    s.arrow('${prevId}', '${boxId}', { color: 'orange', bend: 0.15, at: '#${markTag}' });\n`;
+            }
+          });
+        }
+
+      } else if (layoutType === 'animated_list') {
+        // --- 2. ANIMATED CHECKLIST (Clean handwritten list without box clutter) ---
+        if (hasValidMath) {
+          scenesJs += `    s.math('${esc(rawFormula)}', { x: ${centerX}, y: ${isVertical ? 340 : 220}, size: ${isVertical ? 54 : 60}, color: 'yellow', at: 0.1 });\n`;
+        }
+        const listItems = boxes.map((b: any) => `'${esc(b.label)}'`).join(', ');
+        const listX = isVertical ? 140 : (centerX - 460);
+        const listY = isVertical ? 650 : (hasValidMath ? 420 : 360);
+        scenesJs += `    s.list([${listItems}], { x: ${listX}, y: ${listY}, size: ${isVertical ? 32 : 36}, bullet: 'check', bulletColor: 'teal', stagger: 1.2, at: '#m1' });\n`;
+
+      } else if (layoutType === 'annotated_formula' && hasValidMath) {
+        // --- 3. ANNOTATED FORMULA HERO (Centerpiece equation with focus highlight and note) ---
+        const mathId = `formula_${sc.id}`;
+        scenesJs += `    s.math('${esc(rawFormula)}', { id: '${mathId}', x: ${centerX}, y: ${isVertical ? 480 : 350}, size: ${isVertical ? 66 : 76}, color: 'yellow', at: 0.1 });\n`;
+        scenesJs += `    s.annotate('${mathId}', { type: 'circle', color: 'teal', padding: 24, at: '#m1' });\n`;
+        if (boxes.length > 0) {
+          const noteY = isVertical ? 920 : 660;
+          scenesJs += `    s.box('${esc(boxes[0].label)}', { id: 'note_${sc.id}', x: ${centerX}, y: ${noteY}, w: ${isVertical ? 920 : 1060}, size: 32, icon: 'lightbulb', color: 'yellow', at: '#m2' });\n`;
+          scenesJs += `    s.focus('note_${sc.id}', { at: '#m2' });\n`;
+        }
 
       } else if (layoutType === 'split_comparison' && boxes.length >= 2) {
-        // --- 2. SPLIT COMPARISON LAYOUT (Right vs Left in Landscape, Top vs Bottom in Vertical) ---
+        // --- 4. SPLIT COMPARISON LAYOUT (Direct visual side-by-side) ---
         if (hasValidMath) {
           scenesJs += `    s.math('${esc(rawFormula)}', { x: ${centerX}, y: ${isVertical ? 340 : 220}, size: ${isVertical ? 56 : 58}, color: 'yellow', at: 0.1 });\n`;
         }
@@ -2214,7 +2289,7 @@ ${chapterRawText.substring(0, 15000)}
         }
 
       } else if (layoutType === 'golden_alert') {
-        // --- 3. GOLDEN ALERT / EXAM TRAP LAYOUT ---
+        // --- 5. GOLDEN ALERT / EXAM TRAP LAYOUT ---
         scenesJs += `    s.icon('award', { id: 'alert_icon_${sc.id}', x: ${centerX}, y: ${isVertical ? 380 : 270}, size: ${isVertical ? 140 : 130}, color: 'yellow', at: 0.1 });\n`;
         if (hasValidMath) {
           scenesJs += `    s.math('${esc(rawFormula)}', { x: ${centerX}, y: ${isVertical ? 620 : 460}, size: ${isVertical ? 58 : 64}, color: 'red', at: 0.4 });\n`;
@@ -2225,7 +2300,7 @@ ${chapterRawText.substring(0, 15000)}
         scenesJs += `    s.focus('alert_box_${sc.id}', { at: '#m1' });\n`;
 
       } else {
-        // --- 4. CONCEPT HERO & DEFAULT SUMMARY LAYOUT ---
+        // --- 6. CONCEPT HERO & DEFAULT SUMMARY LAYOUT ---
         if (hasValidMath) {
           scenesJs += `    s.math('${esc(rawFormula)}', { x: ${centerX}, y: ${isVertical ? 420 : 280}, size: ${isVertical ? 60 : 70}, color: 'yellow', at: 0.1 });\n`;
         } else {
@@ -2669,6 +2744,26 @@ async function resolveCloudOrLocalFileBuffer(fileUrl: string): Promise<{ buffer:
       const buf = fs.readFileSync(diskPath);
       console.log(`[Storage Resolver] Loaded from local disk cache: ${diskPath} (${(buf.length / 1048576).toFixed(1)}MB)`);
       return { buffer: buf, resolvedFileName: path.basename(diskPath) };
+    }
+
+    // 1b. 🛡️ EPHEMERAL CONTAINER SELF-HEALING: If local file was wiped during deploy, recover from GCS!
+    const baseName = path.basename(diskPath);
+    const gcsKey = `uploads/${baseName}`;
+    const gcsFallbackUrl = `https://storage.googleapis.com/${process.env.GCS_BUCKET_NAME || "ebookstoreg"}/${gcsKey}`;
+    console.log(`[Storage Resolver] Local file missing on ephemeral container. Attempting GCS recovery: ${gcsFallbackUrl}...`);
+    try {
+      const recovered = await resolveCloudOrLocalFileBuffer(gcsFallbackUrl);
+      if (recovered.buffer) {
+        try {
+          if (!fs.existsSync(path.dirname(diskPath))) {
+            fs.mkdirSync(path.dirname(diskPath), { recursive: true });
+          }
+          fs.writeFileSync(diskPath, recovered.buffer);
+        } catch (wErr) { }
+        return recovered;
+      }
+    } catch (recErr) {
+      console.warn("[Storage Resolver] GCS auto-recovery notice:", recErr);
     }
   }
 
@@ -3906,56 +4001,57 @@ app.post("/api/upload-to-gcp", gcpUploader.single("file"), async (req, res) => {
       try { fs.unlinkSync(req.file.path); } catch (e) { }
     }
     const localFileUrl = `/data/uploads/${safeFileName}`;
+    let effectiveFileUrl = localFileUrl;
+    let gcsUrl = "";
 
-    // 2. Respond to client IMMEDIATELY so the user experience is lightning fast (no blocking on cloud upload)
+    // 2. Upload to Google Cloud Storage (Bucket: ebookstoreg) for permanent cloud durability across deployments
+    if (process.env.GCS_ACCESS_KEY && process.env.GCS_SECRET_KEY) {
+      try {
+        const s3 = new S3Client({
+          endpoint: "https://storage.googleapis.com",
+          region: "auto",
+          credentials: {
+            accessKeyId: process.env.GCS_ACCESS_KEY!,
+            secretAccessKey: process.env.GCS_SECRET_KEY!
+          },
+          forcePathStyle: true
+        });
+
+        const safeKey = `uploads/${safeFileName}`;
+        const fileStream = fs.createReadStream(localFilePath);
+
+        const parallelUpload = new Upload({
+          client: s3,
+          params: {
+            Bucket: process.env.GCS_BUCKET_NAME || "ebookstoreg",
+            Key: safeKey,
+            Body: fileStream,
+            ContentType: effectiveMime
+          },
+          queueSize: 2,
+          partSize: 5 * 1024 * 1024
+        });
+
+        await parallelUpload.done();
+
+        gcsUrl = `https://storage.googleapis.com/${process.env.GCS_BUCKET_NAME || "ebookstoreg"}/${safeKey}`;
+        effectiveFileUrl = gcsUrl; // 🛡️ Permanent Cloud SSOT URL
+        console.log(`[Google Cloud Storage] Cloud upload completed successfully: ${gcsUrl}`);
+      } catch (gcsErr: any) {
+        console.warn("[Google Cloud Storage] Synchronous cloud upload warning, falling back to local:", gcsErr?.message || gcsErr);
+      }
+    }
+
+    // 3. Respond with permanent cloud URL to ensure stateless durability
     res.json({
       success: true,
-      fileUrl: localFileUrl,
+      fileUrl: effectiveFileUrl,
+      cloudUrl: gcsUrl || effectiveFileUrl,
       localFileUrl,
       fileName: req.file.originalname,
       fileType: effectiveMime,
       sizeBytes: req.file.size
     });
-
-    // 3. Asynchronously upload to Google Cloud Storage in the background using lib-storage multipart stream (Zero RAM impact, non-blocking)
-    if (process.env.GCS_ACCESS_KEY && process.env.GCS_SECRET_KEY) {
-      setImmediate(async () => {
-        try {
-          const s3 = new S3Client({
-            endpoint: "https://storage.googleapis.com",
-            region: "auto",
-            credentials: {
-              accessKeyId: process.env.GCS_ACCESS_KEY!,
-              secretAccessKey: process.env.GCS_SECRET_KEY!
-            },
-            forcePathStyle: true
-          });
-
-          const safeKey = `uploads/${safeFileName}`;
-          const fileStream = fs.createReadStream(localFilePath);
-
-          // Upload from @aws-sdk/lib-storage streams multipart chunks smoothly to Google Cloud Storage without InvalidArgument errors
-          const parallelUpload = new Upload({
-            client: s3,
-            params: {
-              Bucket: process.env.GCS_BUCKET_NAME || "ebookstoreg",
-              Key: safeKey,
-              Body: fileStream,
-              ContentType: effectiveMime
-            },
-            queueSize: 2,
-            partSize: 5 * 1024 * 1024
-          });
-
-          await parallelUpload.done();
-
-          const gcsUrl = `https://storage.googleapis.com/${process.env.GCS_BUCKET_NAME || "ebookstoreg"}/${safeKey}`;
-          console.log(`[Google Cloud Storage] Background backup completed safely via lib-storage: ${gcsUrl}`);
-        } catch (gcsErr: any) {
-          console.warn("[Google Cloud Storage] Background backup notice:", gcsErr?.message || gcsErr);
-        }
-      });
-    }
   } catch (err: any) {
     console.error("[Upload Error]:", err);
     if (req.file && fs.existsSync(req.file.path)) {
@@ -5556,7 +5652,19 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
       );
     }
 
-    ebook.chapters = [...currentChapters, ...newChapters];
+    // Filter out duplicates by title
+    const existingTitles = new Set(currentChapters.map((c: any) => cleanStr(c.title).toLowerCase()));
+    const nonDuplicateNewChapters = newChapters.filter((ch: any) => {
+      const t = cleanStr(ch.title).toLowerCase();
+      if (existingTitles.has(t)) {
+        console.warn(`[Expand Chapters] Skipping duplicate chapter title: "${ch.title}"`);
+        return false;
+      }
+      existingTitles.add(t);
+      return true;
+    });
+
+    ebook.chapters = [...currentChapters, ...nonDuplicateNewChapters];
     saveEbooks(ebooks, ebook);
 
     console.log("\x1b[35m-------------------------------------------------------\x1b[0m");
@@ -6119,9 +6227,41 @@ app.get("/api/ebooks/:id/chapters/:chapterId/pages", async (req, res) => {
 
     const pageOffset = Number((book as any).page_offset) || 0;
 
-    // 1. Check if pages are already cached in the chapter object
+    const cleanBookId = String(bookId || 'book').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const cleanChapterId = String(chapterId || 'chapter').replace(/[^a-zA-Z0-9_-]/g, '_');
+
+    // 1. Check if pages are already cached in memory
     if (chapter.pages && Array.isArray(chapter.pages) && chapter.pages.length > 0) {
       return res.json({ success: true, pages: chapter.pages, pageOffset, source: "cache" });
+    }
+
+    // 1.1 🛡️ DISK CACHE REHYDRATION: If memory/DB was cleared, restore directly from disk cache!
+    const diskPagesDir = path.join(PAGE_CACHE_DIR, cleanBookId, cleanChapterId);
+    if (fs.existsSync(diskPagesDir)) {
+      try {
+        const diskFiles = fs.readdirSync(diskPagesDir).filter(f => f.startsWith('p_') && /\.(jpg|jpeg|png)$/i.test(f));
+        if (diskFiles.length > 0) {
+          const rehydrated = diskFiles
+            .sort((a, b) => {
+              const numA = parseInt(a.replace(/[^0-9]/g, '')) || 0;
+              const numB = parseInt(b.replace(/[^0-9]/g, '')) || 0;
+              return numA - numB;
+            })
+            .map(f => {
+              const pNum = parseInt(f.replace(/[^0-9]/g, '')) || 1;
+              return {
+                pageNumber: pNum,
+                dataUrl: `/api/page-cache/${cleanBookId}/${cleanChapterId}/${f}`
+              };
+            });
+          chapter.pages = rehydrated;
+          saveEbooks(ebooks, book);
+          console.log(`[Chapter Pages] 🛡️ Successfully rehydrated ${rehydrated.length} pages from disk cache for "${chapter.title}".`);
+          return res.json({ success: true, pages: chapter.pages, pageOffset, source: "disk_cache" });
+        }
+      } catch (diskErr) {
+        console.warn("[Chapter Pages] Disk rehydration notice:", diskErr);
+      }
     }
 
     // 2. Determine start and end pages
@@ -6235,7 +6375,7 @@ app.get("/api/ebooks/:id/chapters/:chapterId/pages", async (req, res) => {
       chapter.pages = persistedImages;
       chapter.start_page = startPage;
       chapter.end_page = endPage;
-      saveEbooks(ebooks);
+      saveEbooks(ebooks, book);
 
       return res.json({
         success: true,
