@@ -2730,6 +2730,21 @@
         "title": "مقدمة",
         "videos": [
           {
+            "id": "vid_1794230244877_9tjr",
+            "title": "مقدمة",
+            "topic": "شرح مفاهيم الدرس الأساسية والمصطلحات العلمية",
+            "aspectRatio": "16:9",
+            "videoType": "explainer",
+            "theme": "chalk",
+            "teacherName": "فارس ",
+            "teacherPhone": "01066906132",
+            "subjectName": "حاسب ",
+            "videoUrl": "/api/explainroo-projects/ch-47d10d6f-de2a-4d97-8ddf-04b8fab0329a-1_vid_1794230244877_9tjr/video.mp4",
+            "sizeMb": 1,
+            "duration": "50 ثانية",
+            "createdAt": "2026-11-09T13:17:41.479Z"
+          },
+          {
             "id": "v-ch-47d10d6f-de2a-4d97-8ddf-04b8fab0329a-1-1",
             "url": "https://www.youtube.com/results?search_query=الرخصة+المهنية+لحاسب+آلي",
             "title": "أهمية الرخصة المهنية لمعلمي الحاسب الآلي",
