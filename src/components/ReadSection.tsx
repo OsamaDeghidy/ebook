@@ -1282,18 +1282,6 @@ export function ReadSection({ chapter, bookId, isInstructorOrAdmin, isEditMode, 
             <FileText className="w-4 h-4" />
             <span>📖 النص القرائي للمذكرة</span>
           </button>
-
-          <button
-            onClick={() => setReaderTab('teacher_sos')}
-            className={`px-4 py-2 rounded-lg text-xs font-black transition flex items-center gap-2 cursor-pointer ${
-              readerTab === 'teacher_sos'
-                ? 'bg-rose-600 text-white shadow-xs'
-                : 'text-slate-700 hover:text-slate-950 hover:bg-white/60'
-            }`}
-          >
-            <HelpCircle className="w-4 h-4" />
-            <span>🙋‍♂️ استفسار المعلم (SOS)</span>
-          </button>
         </div>
 
         {/* 🔄 LIVE PDF TRANSCRIBE ACTION TRIGGER */}

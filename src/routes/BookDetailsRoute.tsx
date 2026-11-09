@@ -1140,6 +1140,17 @@ export default function BookDetailsRoute({
             <span>النشاط والمعمل التفاعلي 🧪</span>
           </button>
 
+          {/* TAB 3: EXPLAINROO STUDIO LAB / شرح الدرس */}
+          <button
+            onClick={() => setActiveTab('explainroo')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
+              activeTab === 'explainroo' ? 'bg-amber-600 text-white font-black shadow-xs' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>شرح الدرس 🎬</span>
+          </button>
+
           {/* TAB 4: FULL CURRICULUM EXPLANATION & MINDMAP */}
           <button
             onClick={() => setActiveTab('mindmap')}
@@ -1151,7 +1162,7 @@ export default function BookDetailsRoute({
             <span>شرح وخريطة المنهج 🗺️</span>
           </button>
 
-          {/* TAB 3: VIDEOS */}
+          {/* TAB 5: VIDEOS */}
           <button
             onClick={() => setActiveTab('videos')}
             className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
@@ -1159,21 +1170,10 @@ export default function BookDetailsRoute({
             }`}
           >
             <Film className="w-3.5 h-3.5" />
-            <span>الفيديوهات 🎬</span>
+            <span>مكتبة الفيديوهات 🎥</span>
           </button>
 
-          {/* TAB 4: TEACHER DIRECT SOS HELPDESK */}
-          <button
-            onClick={() => setActiveTab('teacher_sos')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
-              activeTab === 'teacher_sos' ? 'bg-rose-600 text-white font-black shadow-xs' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <HelpCircle className="w-3.5 h-3.5" />
-            <span>استفسار المعلم (SOS) 🙋‍♂️</span>
-          </button>
-
-          {/* TAB 5: PRACTICE & ASSESSMENT */}
+          {/* TAB 6: PRACTICE & ASSESSMENT */}
           <button
             onClick={() => setActiveTab('practice')}
             className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
@@ -1184,15 +1184,15 @@ export default function BookDetailsRoute({
             <span>التقييم والمذاكرة 📝</span>
           </button>
 
-          {/* TAB 6: EXPLAINROO STUDIO LAB */}
+          {/* TAB 7: TEACHER DIRECT SOS HELPDESK */}
           <button
-            onClick={() => setActiveTab('explainroo')}
+            onClick={() => setActiveTab('teacher_sos')}
             className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
-              activeTab === 'explainroo' ? 'bg-amber-600 text-white font-black shadow-xs' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              activeTab === 'teacher_sos' ? 'bg-rose-600 text-white font-black shadow-xs' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>مختبر Explainroo للفيديو 🎬</span>
+            <HelpCircle className="w-3.5 h-3.5" />
+            <span>استفسار المعلم (SOS) 🙋‍♂️</span>
           </button>
 
           {/* TAB 6: TEACHER CONTENT EDITOR (Only visible in Teacher Edit Mode) */}

@@ -31,9 +31,19 @@ FROM node:22-slim AS runner
 
 WORKDIR /app
 
+# تثبيت Chromium و FFmpeg والخطوط الأساسية لدعم Explainroo وإنتاج الفيديوهات الحركية
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    chromium \
+    ffmpeg \
+    fonts-noto-color-emoji \
+    fonts-freefont-ttf \
+    fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
 # ضبط متغيرات البيئة الأساسية
 ENV NODE_ENV=production
 ENV PORT=8080
+ENV EXPLAINROO_CHROME=/usr/bin/chromium
 
 # نسخ الحزم الجاهزة مباشرة من مرحلة البناء لتفادي تعارض esbuild
 COPY --from=builder /app/node_modules ./node_modules

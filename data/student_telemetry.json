@@ -3065,5 +3065,20 @@
     "quizAttempts": [],
     "isCompleted": true,
     "lastActive": "2026-11-09T12:02:16.043Z"
+  },
+  {
+    "studentId": "std_curr",
+    "studentName": "طالب المنصة",
+    "studentEmail": "",
+    "bookId": "active_book",
+    "bookTitle": "",
+    "chapterId": "ch-b64fb303-3d5a-407a-adae-eb9157982746-1",
+    "chapterTitle": "الأعداد الحقيقية",
+    "activeReadingSeconds": 16,
+    "audioListenPercentage": 9,
+    "quizScore": null,
+    "quizAttempts": [],
+    "isCompleted": false,
+    "lastActive": "2026-11-09T18:22:59.580Z"
   }
 ]

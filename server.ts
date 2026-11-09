@@ -2449,10 +2449,25 @@ ${chapterRawText.substring(0, 15000)}
     fs.mkdirSync(path.join(projDir, "out"), { recursive: true });
 
     const sizeFlag = isVertical ? "--size 9:16" : "--size 16:9";
-    const renderCmd = `node bin/explainroo.js render "${renderFolder}" ${renderFlags} ${sizeFlag} --out "${targetOutMp4}" --workers 4`;
+    const workerCount = Math.max(1, Math.min(os.cpus()?.length || 2, 2));
+    const renderCmd = `node bin/explainroo.js render "${renderFolder}" ${renderFlags} ${sizeFlag} --out "${targetOutMp4}" --workers ${workerCount}`;
 
-    console.log(`[Explainroo] Executing render command: ${renderCmd}...`);
-    execSync(renderCmd, { cwd: explainrooPath, stdio: "inherit" });
+    console.log(`[Explainroo] Executing render command: ${renderCmd} (Workers: ${workerCount})...`);
+    try {
+      execSync(renderCmd, { 
+        cwd: explainrooPath, 
+        stdio: "pipe",
+        env: {
+          ...process.env,
+          EXPLAINROO_CHROME: process.env.EXPLAINROO_CHROME || (process.platform === 'linux' ? '/usr/bin/chromium' : undefined)
+        }
+      });
+    } catch (renderErr: any) {
+      const stderr = renderErr?.stderr?.toString('utf8') || '';
+      const stdout = renderErr?.stdout?.toString('utf8') || '';
+      console.error(`[Explainroo Render Error Details]:`, { stderr, stdout, message: renderErr.message });
+      throw new Error(`فشل ريندر الفيديو على السيرفر: ${stderr || stdout || renderErr.message}`);
+    }
 
     // Also copy to canonical chapter video path so player always loads latest
     const canonicalDir = path.join(EXPLAINROO_PROJECTS_DIR, cleanChapterId);
