@@ -45,6 +45,7 @@ COPY --from=builder /app/public ./public
 
 # نسخ ملفات البيانات والإعدادات التي يحتاجها السيرفر عند الإقلاع
 COPY --from=builder /app/data ./data
+COPY --from=builder /app/explainroo ./explainroo
 COPY --from=builder /app/ebooks-db.json ./ebooks-db.json
 COPY --from=builder /app/voices.json ./voices.json
 COPY --from=builder /app/vouchers.json ./vouchers.json

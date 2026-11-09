@@ -18,3 +18,8 @@ data/page-cache/
 *.tmp
 *.bak
 scratch/
+
+explainroo/node_modules/
+explainroo/videos/
+explainroo/projects/
+explainroo/build/
