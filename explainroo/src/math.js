@@ -50,7 +50,7 @@ export async function typesetMath(tex, display = true, cacheFile = null) {
       const h = Number(a.getAttribute(node, 'height'));
       d = `M${x} ${y}h${w}v${h}h${-w}Z`;
     }
-    if (kind === 'text' || kind === 'use') throw new Error('math: this character has no glyph path; use TeX symbols');
+    if (kind === 'text' || kind === 'use') return;
     if (d) paths.push(serialize(absolutize(parsePath(d)).map(({ c, v }) => {
       if (c === 'A') throw new Error('math: this glyph has an unsupported arc');
       const points = [];

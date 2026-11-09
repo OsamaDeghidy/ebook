@@ -2203,18 +2203,42 @@ ${chapterRawText.substring(0, 15000)}
       // Check if scene has valid TeX mathFormula
       const rawFormula = sanitizeTexFormula(sc.mathFormula || "");
       const hasValidMath = !!rawFormula;
-      if (hasValidMath) {
-        // Explainroo natively renders TeX via s.math
-      }
+      const hasArabicInFormula = /[\u0600-\u06FF]/.test(rawFormula);
+      const cleanArabicFormula = rawFormula
+        .replace(/\\text\{([^}]+)\}/g, '$1')
+        .replace(/\\to/g, ' ➔ ')
+        .replace(/\\rightarrow/g, ' ➔ ')
+        .replace(/\\leftarrow/g, ' ⟵ ')
+        .replace(/\\longleftarrow/g, ' ⟵ ')
+        .replace(/\\times/g, ' × ')
+        .replace(/\\div/g, ' ÷ ')
+        .replace(/\\pm/g, ' ± ')
+        .replace(/\\sum/g, ' مجموع ')
+        .replace(/\\geq/g, ' ≥ ')
+        .replace(/\\leq/g, ' ≤ ')
+        .replace(/\\neq/g, ' ≠ ')
+        .replace(/\\approx/g, ' ≈ ')
+        .replace(/\\[a-zA-Z]+/g, ' ')
+        .replace(/[{}]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      const emitFormulaCode = (yPos: number, sizeNormal: number, atTime = 0.1, customColor = 'yellow') => {
+        if (!hasValidMath) return '';
+        if (hasArabicInFormula) {
+          const fontSize = Math.min(sizeNormal - 10, isVertical ? 38 : 42);
+          return `    s.text('${esc(cleanArabicFormula)}', { x: ${centerX}, y: ${yPos}, size: ${fontSize}, font: 'display', color: '${customColor}' });\n`;
+        } else {
+          return `    s.math('${esc(rawFormula)}', { x: ${centerX}, y: ${yPos}, size: ${sizeNormal}, color: '${customColor}', at: ${atTime} });\n`;
+        }
+      };
 
       const layoutType = sc.layoutType || (sc.boxes?.length === 3 ? 'step_by_step' : (sc.boxes?.length === 2 ? 'split_comparison' : 'concept_hero'));
       const boxes = Array.isArray(sc.boxes) ? sc.boxes : [];
 
       if (layoutType === 'process_flow' || (layoutType === 'step_by_step' && !isVertical && boxes.length >= 2)) {
         // --- 1. HORIZONTAL PROCESS PIPELINE (Connective nodes with dynamic arrows) ---
-        if (hasValidMath) {
-          scenesJs += `    s.math('${esc(rawFormula)}', { x: ${centerX}, y: ${isVertical ? 340 : 210}, size: ${isVertical ? 54 : 56}, color: 'yellow', at: 0.1 });\n`;
-        }
+        scenesJs += emitFormulaCode(isVertical ? 340 : 210, isVertical ? 54 : 56, 0.1);
 
         if (isVertical) {
           // Vertical layout: elegant top-to-bottom pipeline with connecting vertical arrows
@@ -2261,9 +2285,7 @@ ${chapterRawText.substring(0, 15000)}
 
       } else if (layoutType === 'animated_list') {
         // --- 2. ANIMATED CHECKLIST (Clean handwritten list without box clutter) ---
-        if (hasValidMath) {
-          scenesJs += `    s.math('${esc(rawFormula)}', { x: ${centerX}, y: ${isVertical ? 340 : 220}, size: ${isVertical ? 54 : 60}, color: 'yellow', at: 0.1 });\n`;
-        }
+        scenesJs += emitFormulaCode(isVertical ? 340 : 220, isVertical ? 54 : 60, 0.1);
         const listItems = boxes.map((b: any) => `'${esc(b.label)}'`).join(', ');
         const listX = isVertical ? 140 : (centerX - 460);
         const listY = isVertical ? 650 : (hasValidMath ? 420 : 360);
@@ -2272,7 +2294,11 @@ ${chapterRawText.substring(0, 15000)}
       } else if (layoutType === 'annotated_formula' && hasValidMath) {
         // --- 3. ANNOTATED FORMULA HERO (Centerpiece equation with focus highlight and note) ---
         const mathId = `formula_${sc.id}`;
-        scenesJs += `    s.math('${esc(rawFormula)}', { id: '${mathId}', x: ${centerX}, y: ${isVertical ? 480 : 350}, size: ${isVertical ? 66 : 76}, color: 'yellow', at: 0.1 });\n`;
+        if (hasArabicInFormula) {
+          scenesJs += `    s.text('${esc(cleanArabicFormula)}', { id: '${mathId}', x: ${centerX}, y: ${isVertical ? 480 : 350}, size: ${isVertical ? 44 : 50}, font: 'display', color: 'yellow' });\n`;
+        } else {
+          scenesJs += `    s.math('${esc(rawFormula)}', { id: '${mathId}', x: ${centerX}, y: ${isVertical ? 480 : 350}, size: ${isVertical ? 66 : 76}, color: 'yellow', at: 0.1 });\n`;
+        }
         scenesJs += `    s.annotate('${mathId}', { type: 'circle', color: 'teal', padding: 24, at: '#m1' });\n`;
         if (boxes.length > 0) {
           const noteY = isVertical ? 920 : 660;
@@ -2282,9 +2308,7 @@ ${chapterRawText.substring(0, 15000)}
 
       } else if (layoutType === 'split_comparison' && boxes.length >= 2) {
         // --- 4. SPLIT COMPARISON LAYOUT (Direct visual side-by-side) ---
-        if (hasValidMath) {
-          scenesJs += `    s.math('${esc(rawFormula)}', { x: ${centerX}, y: ${isVertical ? 340 : 220}, size: ${isVertical ? 56 : 58}, color: 'yellow', at: 0.1 });\n`;
-        }
+        scenesJs += emitFormulaCode(isVertical ? 340 : 220, isVertical ? 56 : 58, 0.1);
         const b0 = boxes[0];
         const b1 = boxes[1];
         const id0 = `split_${sc.id}_0`;
@@ -2307,9 +2331,7 @@ ${chapterRawText.substring(0, 15000)}
       } else if (layoutType === 'golden_alert') {
         // --- 5. GOLDEN ALERT / EXAM TRAP LAYOUT ---
         scenesJs += `    s.icon('award', { id: 'alert_icon_${sc.id}', x: ${centerX}, y: ${isVertical ? 380 : 270}, size: ${isVertical ? 140 : 130}, color: 'yellow', at: 0.1 });\n`;
-        if (hasValidMath) {
-          scenesJs += `    s.math('${esc(rawFormula)}', { x: ${centerX}, y: ${isVertical ? 620 : 460}, size: ${isVertical ? 58 : 64}, color: 'red', at: 0.4 });\n`;
-        }
+        scenesJs += emitFormulaCode(isVertical ? 620 : 460, isVertical ? 58 : 64, 0.4, 'red');
         const alertLabel = esc(boxes[0]?.label || 'تنبيه هام: تجنب الوقوع في أخطاء الامتحانات الشائعة!');
         const alertY = isVertical ? (hasValidMath ? 980 : 800) : (hasValidMath ? 720 : 580);
         scenesJs += `    s.box('${alertLabel}', { id: 'alert_box_${sc.id}', x: ${centerX}, y: ${alertY}, w: ${isVertical ? 940 : 1120}, size: 34, iconSize: 40, icon: 'check', color: 'yellow', at: '#m1' });\n`;
@@ -2318,7 +2340,7 @@ ${chapterRawText.substring(0, 15000)}
       } else {
         // --- 6. CONCEPT HERO & DEFAULT SUMMARY LAYOUT ---
         if (hasValidMath) {
-          scenesJs += `    s.math('${esc(rawFormula)}', { x: ${centerX}, y: ${isVertical ? 420 : 280}, size: ${isVertical ? 60 : 70}, color: 'yellow', at: 0.1 });\n`;
+          scenesJs += emitFormulaCode(isVertical ? 420 : 280, isVertical ? 60 : 70, 0.1);
         } else {
           const sceneIcon = esc(sc.icon || "calculator");
           scenesJs += `    s.icon('${sceneIcon}', { id: 'hero_icon_${sc.id}', x: ${centerX}, y: ${isVertical ? 420 : 280}, size: ${isVertical ? 140 : 150}, color: 'teal', at: 0.1 });\n`;
@@ -2444,6 +2466,11 @@ ${chapterRawText.substring(0, 15000)}
 
       const marks: Record<string, number> = {};
       const boxes = Array.isArray(sc.boxes) ? sc.boxes : [];
+      // Guarantee markers m1 through m10 always exist to prevent any missing mark exception in Explainroo
+      for (let k = 1; k <= 10; k++) {
+        const ratio = Math.max(0.12, Math.min(0.92, (k / 6) * 0.85 + 0.1));
+        marks[`m${k}`] = Number((duration * ratio).toFixed(2));
+      }
       boxes.forEach((_: any, bIdx: number) => {
         const ratio = Math.max(0.15, Math.min(0.90, (bIdx + 1) / (boxes.length + 1)));
         marks[`m${bIdx + 1}`] = Number((duration * ratio).toFixed(2));
