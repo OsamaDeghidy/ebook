@@ -90,6 +90,7 @@ export default function ContentUploader({
   } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isUploadingCloud, setIsUploadingCloud] = useState(false);
+  const debounceTimerRef = useRef<any>(null);
 
   // AI Automatic Suggestion states
   const [isAnalyzingAi, setIsAnalyzingAi] = useState<boolean>(false);
@@ -518,13 +519,17 @@ export default function ContentUploader({
                 dir="ltr"
                 value={cloudPdfUrl}
                 onChange={(e) => {
-                  setCloudPdfUrl(e.target.value);
-                  if (e.target.value.trim().length > 10) {
-                    fetchAiSuggestions(e.target.value);
+                  const val = e.target.value;
+                  setCloudPdfUrl(val);
+                  if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+                  if (val.trim().length > 10) {
+                    debounceTimerRef.current = setTimeout(() => {
+                      fetchAiSuggestions(val.trim());
+                    }, 300);
                   }
                 }}
                 disabled={isConverting}
-                placeholder="https://storage.googleapis.com/ebookstoreg/uploads/... أو gs://..."
+                placeholder="https://storage.googleapis.com/ebookstoreg/uploads/... أو https://storage.cloud.google.com/..."
                 className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:border-indigo-500"
               />
             </div>

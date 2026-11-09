@@ -80,6 +80,15 @@ export interface VideoLink {
   title: string;
   url: string;
   description: string;
+  videoUrl?: string;
+  aspectRatio?: '16:9' | '9:16' | string;
+  voice?: string;
+  duration?: string;
+  topicFocus?: string;
+  sizeMb?: number;
+  createdAt?: string;
+  isReady?: boolean;
+  videoType?: string;
 }
 
 export interface MindMapNode {

@@ -2959,6 +2959,36 @@
     "quizScore": null,
     "quizAttempts": [],
     "isCompleted": false,
-    "lastActive": "2026-11-08T22:50:24.335Z"
+    "lastActive": "2026-11-08T22:50:47.164Z"
+  },
+  {
+    "studentId": "std_curr",
+    "studentName": "طالب المنصة",
+    "studentEmail": "",
+    "bookId": "active_book",
+    "bookTitle": "",
+    "chapterId": "ch-6fa0e52e-bab1-46b9-a924-dae7e9f7c923-1",
+    "chapterTitle": "الدرس الأول: الأنظمة الذكية وتأثيرها على التغيرات المناخية",
+    "activeReadingSeconds": 25,
+    "audioListenPercentage": 14,
+    "quizScore": null,
+    "quizAttempts": [],
+    "isCompleted": false,
+    "lastActive": "2026-11-08T23:33:24.882Z"
+  },
+  {
+    "studentId": "std_curr",
+    "studentName": "طالب المنصة",
+    "studentEmail": "",
+    "bookId": "active_book",
+    "bookTitle": "",
+    "chapterId": "ch-afa85262-e5d8-4b4d-b714-ffe5a56303e0-1",
+    "chapterTitle": "1-1 الأعداد الحقيقية",
+    "activeReadingSeconds": 46,
+    "audioListenPercentage": 26,
+    "quizScore": null,
+    "quizAttempts": [],
+    "isCompleted": false,
+    "lastActive": "2026-11-09T03:49:47.897Z"
   }
 ]

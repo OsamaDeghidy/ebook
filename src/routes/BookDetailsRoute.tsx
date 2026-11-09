@@ -23,6 +23,7 @@ import { SeoStructuredData } from '../components/seo/SeoStructuredData';
 import { InteractiveLessonExplanation } from '../components/interactive/InteractiveLessonExplanation';
 import { FullCurriculumExplanation } from '../components/interactive/FullCurriculumExplanation';
 import { CurriculumMindMap } from '../components/interactive/CurriculumMindMap';
+import { ExplainrooStudioView } from '../components/interactive/ExplainrooStudioView';
 import { BookQrCodeModal } from '../components/common/BookQrCodeModal';
 import { showToast } from '../components/common/Toast';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -411,7 +412,8 @@ export default function BookDetailsRoute({
   }, [id, passedBook]);
 
   const [activeChapterId, setActiveChapterId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'read' | 'labs' | 'mindmap' | 'practice' | 'videos' | 'teacher_sos' | 'editor'>(() => {
+  const [activeTab, setActiveTab] = useState<'read' | 'labs' | 'mindmap' | 'practice' | 'videos' | 'teacher_sos' | 'editor' | 'explainroo'>(() => {
+    if (initialTab === 'explainroo') return 'explainroo';
     if (initialTab === 'labs') return 'labs';
     if (initialTab === 'quiz' || initialTab === 'flashcards' || initialTab === 'sandbox' || initialTab === 'practice') return 'practice';
     if (initialTab === 'reels' || initialTab === 'videos') return 'videos';
@@ -1182,6 +1184,17 @@ export default function BookDetailsRoute({
             <span>التقييم والمذاكرة 📝</span>
           </button>
 
+          {/* TAB 6: EXPLAINROO STUDIO LAB */}
+          <button
+            onClick={() => setActiveTab('explainroo')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
+              activeTab === 'explainroo' ? 'bg-amber-600 text-white font-black shadow-xs' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>مختبر Explainroo للفيديو 🎬</span>
+          </button>
+
           {/* TAB 6: TEACHER CONTENT EDITOR (Only visible in Teacher Edit Mode) */}
           {isInstructorOrAdmin && isTeacherEditMode && (
             <>
@@ -1950,6 +1963,11 @@ export default function BookDetailsRoute({
               <VideoSection videos={Array.isArray(activeChapter.videos) ? activeChapter.videos : []} />
             )}
           </div>
+        )}
+
+        {/* 🎬 EXPLAINROO STUDIO LAB TAB */}
+        {activeTab === 'explainroo' && (
+          <ExplainrooStudioView book={book} chapter={activeChapter} />
         )}
 
         {activeTab === 'editor' && activeChapter && (
