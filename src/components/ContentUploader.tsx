@@ -92,7 +92,44 @@ export default function ContentUploader({
   } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isUploadingCloud, setIsUploadingCloud] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
   const debounceTimerRef = useRef<any>(null);
+
+  const uploadFileWithProgress = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const formData = new FormData();
+      formData.append("file", file);
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          const pct = Math.round((e.loaded / e.total) * 100);
+          setUploadProgress(pct);
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            if (data.fileUrl) {
+              resolve(data.fileUrl);
+            } else {
+              reject(new Error(data.error || "لم يرجع السيرفر رابطاً للملف."));
+            }
+          } catch (e) {
+            reject(new Error("استجابة غير صالحة من السيرفر أثناء الرفع."));
+          }
+        } else {
+          reject(new Error(`فشل رفع الملف إلى السيرفر (كود ${xhr.status})`));
+        }
+      };
+
+      xhr.onerror = () => reject(new Error("حدث انقطاع في الاتصال أثناء رفع الملف."));
+      xhr.open("POST", "/api/upload-to-gcp");
+      xhr.send(formData);
+    });
+  };
 
   // AI Automatic Suggestion states
   const [isAnalyzingAi, setIsAnalyzingAi] = useState<boolean>(false);
@@ -321,18 +358,12 @@ export default function ContentUploader({
     if (selectedFile?.rawFile) {
       try {
         setIsUploadingCloud(true);
-        const formData = new FormData();
-        formData.append("file", selectedFile.rawFile);
-
-        const uploadRes = await fetch("/api/upload-to-gcp", {
-          method: "POST",
-          body: formData
-        });
-
-        if (uploadRes.ok) {
-          const uploadData = await uploadRes.json();
-          fileUrl = uploadData.fileUrl;
-        } else {
+        setUploadProgress(5);
+        try {
+          fileUrl = await uploadFileWithProgress(selectedFile.rawFile);
+          setUploadProgress(100);
+        } catch (primaryErr) {
+          console.warn("Primary upload failed, attempting Supabase fallback...", primaryErr);
           // Fallback to Supabase Storage if file is small (< 50MB)
           if (selectedFile.rawFile.size < 48 * 1024 * 1024) {
             const fileExt = selectedFile.rawFile.name.split('.').pop();
@@ -352,6 +383,7 @@ export default function ContentUploader({
                 .from('ebook-files')
                 .getPublicUrl(filePath);
               fileUrl = publicUrl;
+              setUploadProgress(100);
             }
           }
         }
@@ -359,6 +391,14 @@ export default function ContentUploader({
         console.warn("Direct storage upload warning:", uploadErr);
       } finally {
         setIsUploadingCloud(false);
+      }
+
+      // 🛡️ CRITICAL INTEGRITY CHECK:
+      // If a file was selected but upload failed and there is no base64, NEVER GENERATE BLINDLY!
+      if (!fileUrl && !selectedFile.base64) {
+        setErrorMsg("تعذر رفع ملف المذكرة إلى السيرفر بنجاح. يرجى التحقق من اتصال الإنترنت وإعادة المحاولة حتى لا يفقد المنهج محتواه الأصلي.");
+        setIsUploadingCloud(false);
+        return;
       }
     }
 
@@ -705,7 +745,11 @@ export default function ContentUploader({
           {isConverting || isUploadingCloud ? (
             <>
               <RefreshCw className="w-5 h-5 animate-spin" />
-              <span>{isUploadingCloud ? 'جاري تجهيز ورفع المستند للسحابة...' : 'جاري التحليل والبناء بالذكاء الاصطناعي...'}</span>
+              <span>
+                {isUploadingCloud
+                  ? `جاري رفع المذكرة إلى السحابة بأمان... (${uploadProgress}%)`
+                  : 'جاري التحليل والبناء بالذكاء الاصطناعي...'}
+              </span>
             </>
           ) : (
             <>
@@ -718,6 +762,24 @@ export default function ContentUploader({
             </>
           )}
         </button>
+
+        {isUploadingCloud && (
+          <div className="p-3.5 rounded-2xl bg-indigo-50 border border-indigo-200 space-y-2 animate-fade-in">
+            <div className="flex items-center justify-between text-xs font-bold text-indigo-950">
+              <span className="flex items-center gap-2">
+                <RefreshCw className="w-3.5 h-3.5 text-indigo-600 animate-spin" />
+                <span>جاري إرسال المستند ({selectedFile?.name})...</span>
+              </span>
+              <span className="font-mono text-indigo-600 font-black">{uploadProgress}%</span>
+            </div>
+            <div className="w-full h-2 rounded-full bg-indigo-200/60 overflow-hidden">
+              <div
+                className="h-full bg-indigo-600 rounded-full transition-all duration-200"
+                style={{ width: `${Math.max(5, uploadProgress)}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         {/* ⚙️ COLLAPSIBLE ADVANCED SETTINGS (PRICE, PROMPT, LANGUAGE) */}
         <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white">

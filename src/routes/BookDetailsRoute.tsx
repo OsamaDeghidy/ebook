@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { BookOpen, ArrowLeft, Brain, HelpCircle, Youtube, Edit, Radio, Sparkles, RefreshCw, Layers, Terminal, Volume2, Eye, EyeOff, Check, Flame, Lock, ShoppingCart, CheckCircle2, ExternalLink, X, Maximize2, Minimize2, ShieldCheck, Shield, Play, Film, Smartphone, QrCode, Trash2, Plus, FlaskConical } from 'lucide-react';
+import { BookOpen, ArrowLeft, Brain, HelpCircle, Youtube, Edit, Radio, Sparkles, RefreshCw, Layers, Terminal, Volume2, Eye, EyeOff, Check, Flame, Lock, ShoppingCart, CheckCircle2, ExternalLink, X, Maximize2, Minimize2, ShieldCheck, Shield, Play, Film, Smartphone, QrCode, Trash2, Plus, FlaskConical, FileUp, AlertTriangle } from 'lucide-react';
 import { MarketplaceBook, MindMapNode, Flashcard, Chapter, UserRole, EduReel, EduReelStyle } from '../types';
 import MindMap from '../components/MindMap';
 import QuizSection from '../components/QuizSection';
@@ -786,12 +786,55 @@ export default function BookDetailsRoute({
         }
         showToast(`تم استكمال وتوليد (${newCh?.title || `الفصل ${nextChapterNum}`}) بنجاح!`, 'success');
       } else {
-        showToast(data.message || 'تم استعراض وتغطية فصول المستند المتاحة بنجاح.', 'info');
+        if (data.needsSourceFile) {
+          showToast(data.message || 'المقرر غير مرتبط بملف المذكرة الأصلية.', 'warning');
+        } else {
+          showToast(data.message || 'تم استعراض وتغطية فصول المستند المتاحة بنجاح.', 'info');
+        }
       }
     } catch (err: any) {
       showToast('حدث خطأ أثناء استكمال الفصول: ' + err.message, 'error');
     } finally {
       setIsExpandingChapters(false);
+    }
+  };
+
+  const [isAttachingFile, setIsAttachingFile] = useState(false);
+  const attachFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAttachSourceFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !book) return;
+    setIsAttachingFile(true);
+    try {
+      showToast('جاري فحص وربط ملف المذكرة واستخراج فهرس المعايير...', 'info');
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch(`/api/ebooks/${book.id}/attach-source-file`, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'تعذر ربط ملف المذكرة.');
+      }
+
+      const data = await res.json();
+      if (data.success && data.book) {
+        setEbooks(prev => prev.map(b => b.id === book.id ? { ...b, ...data.book } : b));
+        setLocalBook(data.book);
+        showToast(data.message || 'تم ربط المذكرة واستخراج الفصول بنجاح!', 'success');
+        setTimeout(() => {
+          handleExpandChapters();
+        }, 800);
+      }
+    } catch (err: any) {
+      showToast('حدث خطأ أثناء ربط الملف: ' + err.message, 'error');
+    } finally {
+      setIsAttachingFile(false);
+      if (attachFileInputRef.current) attachFileInputRef.current.value = '';
     }
   };
 
@@ -1083,6 +1126,24 @@ export default function BookDetailsRoute({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {/* 📎 Attach/Update Source Booklet File Input & Button */}
+            <input
+              type="file"
+              ref={attachFileInputRef}
+              onChange={handleAttachSourceFile}
+              accept=".pdf,.docx,.txt"
+              className="hidden"
+            />
+            <button
+              onClick={() => attachFileInputRef.current?.click()}
+              disabled={isAttachingFile}
+              className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white rounded-xl text-xs font-black flex items-center gap-1.5 transition shadow-xs active:scale-95 cursor-pointer"
+              title="إرفاق أو استبدال ملف المذكرة الأصلي لاستخراج كافة الفصول والمعايير"
+            >
+              <FileUp className="w-3.5 h-3.5 text-amber-300" />
+              <span>{isAttachingFile ? 'جاري فحص المذكرة...' : 'إرفاق/تحديث المذكرة الأصلية (PDF) 📎'}</span>
+            </button>
+
             <button
               onClick={handleAddChapter}
               className="px-3 py-1.5 bg-teal-500 hover:bg-teal-400 text-slate-950 rounded-xl text-xs font-black flex items-center gap-1.5 transition shadow-xs active:scale-95 cursor-pointer"
@@ -1119,6 +1180,31 @@ export default function BookDetailsRoute({
               <span>محرر الفصول الشامل ✏️</span>
             </button>
           </div>
+        </div>
+      )}
+
+      {/* ⚠️ MISSING SOURCE FILE ALERT BANNER (If Book Has Incomplete Source Link) */}
+      {book && (!book.source_file_url || ((book.chapters?.length || 0) <= 2 && (!book.blueprint || (book.blueprint.total_lessons || 0) <= 2))) && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-amber-950 animate-fade-in" dir={dir}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-600 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-5 h-5 text-amber-600" />
+            </div>
+            <div>
+              <h4 className="text-xs sm:text-sm font-black text-amber-900">المقرر يحتاج إلى ربط ملف المذكرة الأصلية (PDF)</h4>
+              <p className="text-[11px] text-amber-800/80 mt-0.5">
+                لم يتم ربط ملف الـ PDF الأصلي أو أن الفهرس لم يكتمل بعد. ارفع ملف المذكرة ليقوم النظام بقراءة الفهرس كاملاً وتوليد باقي الفصول طبقاً للمحتوى الحقيقي.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => attachFileInputRef.current?.click()}
+            disabled={isAttachingFile}
+            className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-black shrink-0 transition active:scale-95 cursor-pointer flex items-center justify-center gap-2 shadow-xs"
+          >
+            <FileUp className="w-4 h-4" />
+            <span>{isAttachingFile ? 'جاري الفحص والربط...' : 'إرفاق ملف المذكرة الآن 📎'}</span>
+          </button>
         </div>
       )}
 

@@ -1024,13 +1024,23 @@ export function ReadSection({ chapter, bookId, isInstructorOrAdmin, isEditMode, 
 
   // Domain Subject Theme
   const combinedMeta = `${chapter.title} ${normalizedSummary} ${normalizedContent}`.toLowerCase();
+  const isComputerScience = combinedMeta.includes('حاسب') || combinedMeta.includes('برمج') || combinedMeta.includes('كمبيوتر') || combinedMeta.includes('شبكات') || combinedMeta.includes('ذكاء اصطناعي') || combinedMeta.includes('computer') || combinedMeta.includes('ict') || combinedMeta.includes('تقنية') || combinedMeta.includes('خوارزم') || combinedMeta.includes('أمن سيبراني') || combinedMeta.includes('قواعد بيانات');
   const isArabicHistory = combinedMeta.includes('عربي') || combinedMeta.includes('نحو') || combinedMeta.includes('تاريخ') || combinedMeta.includes('دراسات') || combinedMeta.includes('قصة') || combinedMeta.includes('بلاغة');
-  const isStem = combinedMeta.includes('كيمياء') || combinedMeta.includes('فيزياء') || combinedMeta.includes('علوم') || combinedMeta.includes('chemistry') || combinedMeta.includes('physics');
-  const isBio = combinedMeta.includes('أحياء') || combinedMeta.includes('biology') || combinedMeta.includes('جيولوجيا') || combinedMeta.includes('خلية');
-  const isMath = combinedMeta.includes('رياضيات') || combinedMeta.includes('math') || combinedMeta.includes('جبر') || combinedMeta.includes('هندسة') || combinedMeta.includes('مالية') || combinedMeta.includes('حساب');
+  const isStem = !isComputerScience && (combinedMeta.includes('كيمياء') || combinedMeta.includes('فيزياء') || combinedMeta.includes('علوم') || combinedMeta.includes('chemistry') || combinedMeta.includes('physics'));
+  const isBio = !isComputerScience && (combinedMeta.includes('أحياء') || combinedMeta.includes('biology') || combinedMeta.includes('جيولوجيا') || combinedMeta.includes('خلية'));
+  const isMath = !isComputerScience && (combinedMeta.includes('رياضيات') || combinedMeta.includes('math') || combinedMeta.includes('جبر') || combinedMeta.includes('هندسة') || combinedMeta.includes('مالية') || combinedMeta.includes('حساب'));
   const isLanguage = combinedMeta.includes('english') || combinedMeta.includes('إنجليزي') || combinedMeta.includes('grammar') || combinedMeta.includes('french');
 
-  const theme = isArabicHistory
+  const theme = isComputerScience
+    ? {
+        gradient: 'from-slate-950 via-slate-900 to-indigo-950',
+        border: 'border-cyan-500/50',
+        badgeBg: 'bg-cyan-500/20 text-cyan-300 border-cyan-400/30',
+        badgeText: '💻 حاسب آلي وتكنولوجيا معلوماتية',
+        accentBtn: 'bg-cyan-400 text-slate-950 hover:bg-cyan-300 shadow-cyan-400/20',
+        progressColor: 'from-cyan-500 to-indigo-400'
+      }
+    : isArabicHistory
     ? {
         gradient: 'from-amber-950 via-amber-900 to-stone-950',
         border: 'border-amber-800/60',
