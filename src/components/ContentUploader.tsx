@@ -95,7 +95,51 @@ export default function ContentUploader({
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const debounceTimerRef = useRef<any>(null);
 
-  const uploadFileWithProgress = (file: File): Promise<string> => {
+  const uploadFileWithProgress = async (file: File): Promise<string> => {
+    // 🚀 ULTRA-HIGH-CAPACITY DIRECT UPLOAD ARCHITECTURE (Supports 100MB - 500MB without size bottlenecks)
+    // Attempt 1: Direct-to-GCS Signed URL Upload (Bypasses any intermediate server body limits completely!)
+    try {
+      const signedRes = await fetch("/api/gcp/signed-upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileName: file.name,
+          fileType: file.type || "application/pdf"
+        })
+      });
+
+      if (signedRes.ok) {
+        const signedData = await signedRes.json();
+        if (signedData.signedUrl && signedData.publicUrl) {
+          console.log("[Direct Uploader] Uploading directly to Google Cloud Storage (Bucket: ebookstoreg)...");
+          return await new Promise<string>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.upload.onprogress = (e) => {
+              if (e.lengthComputable) {
+                const pct = Math.round((e.loaded / e.total) * 100);
+                setUploadProgress(pct);
+              }
+            };
+            xhr.onload = () => {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                console.log("[Direct Uploader] Direct GCS upload succeeded:", signedData.publicUrl);
+                resolve(signedData.publicUrl);
+              } else {
+                reject(new Error(`GCS upload returned status ${xhr.status}`));
+              }
+            };
+            xhr.onerror = () => reject(new Error("Direct GCS network error."));
+            xhr.open("PUT", signedData.signedUrl);
+            xhr.setRequestHeader("Content-Type", file.type || "application/pdf");
+            xhr.send(file);
+          });
+        }
+      }
+    } catch (directErr) {
+      console.warn("[Direct Uploader] Direct GCS upload bypassed, attempting standard server upload...", directErr);
+    }
+
+    // Attempt 2: Standard multipart upload to /api/upload-to-gcp
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       const formData = new FormData();
@@ -396,12 +440,7 @@ export default function ContentUploader({
       // 🛡️ CRITICAL INTEGRITY CHECK:
       // If a file was selected but upload failed and there is no base64, NEVER GENERATE BLINDLY!
       if (!fileUrl && !selectedFile.base64) {
-        if (selectedFile.rawFile && selectedFile.rawFile.size > 30 * 1024 * 1024) {
-          const szMb = (selectedFile.rawFile.size / (1024 * 1024)).toFixed(1);
-          setErrorMsg(`حجم هذه المذكرة (${szMb} ميجابايت) يتجاوز سقف الرفع المباشر المسموح به لاستضافة Cloud Run (32 ميجابايت). للمذكرات الكبيرة، يرجى لصق رابطها السحابي من Google Cloud Storage في الخانة المخصصة بالأسفل لبناء المقرر بدقة 100%.`);
-        } else {
-          setErrorMsg("تعذر رفع ملف المذكرة إلى السيرفر بنجاح. يرجى التحقق من اتصال الإنترنت وإعادة المحاولة حتى لا يفقد المنهج محتواه الأصلي.");
-        }
+        setErrorMsg("تعذر رفع ملف المذكرة إلى التخزين السحابي. يرجى التحقق من اتصال الإنترنت وإعادة المحاولة.");
         setIsUploadingCloud(false);
         return;
       }

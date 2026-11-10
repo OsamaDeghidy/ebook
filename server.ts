@@ -4480,6 +4480,67 @@ async function runBackgroundEbookConversion(
   }
 }
 
+// 4.8 Direct Cloud Storage Signed Upload URL Generator (Supports files up to 500MB directly to GCS)
+app.post("/api/gcp/signed-upload-url", (req, res) => {
+  try {
+    const { fileName, fileType } = req.body;
+    if (!fileName) {
+      return res.status(400).json({ error: "fileName is required." });
+    }
+
+    const accessKey = process.env.GCS_ACCESS_KEY;
+    const secretKey = process.env.GCS_SECRET_KEY;
+    const bucket = process.env.GCS_BUCKET_NAME || "ebookstoreg";
+
+    if (!accessKey || !secretKey) {
+      return res.status(503).json({ error: "GCS credentials not configured on server." });
+    }
+
+    // Decode original name properly
+    let decodedName = String(fileName);
+    try {
+      const latinBuf = Buffer.from(fileName, 'latin1');
+      const candidate = latinBuf.toString('utf8');
+      if (/[\u0600-\u06FF]/.test(candidate)) decodedName = candidate;
+    } catch (e) { }
+
+    const safeClean = decodedName.replace(/[^\w\u0600-\u06FF.-]/g, "_");
+    const safeKey = `uploads/${Date.now()}-${safeClean}`;
+    const effectiveMime = fileType || "application/pdf";
+    const expiresInSeconds = 1800; // 30 minutes
+    const expires = Math.floor(Date.now() / 1000) + expiresInSeconds;
+
+    const stringToSign = [
+      "PUT",
+      "",
+      effectiveMime,
+      expires,
+      `/${bucket}/${safeKey}`
+    ].join("\n");
+
+    const signature = crypto
+      .createHmac("sha1", secretKey)
+      .update(stringToSign)
+      .digest("base64");
+
+    const signedUrl = `https://storage.googleapis.com/${bucket}/${safeKey}?GoogleAccessId=${encodeURIComponent(accessKey)}&Expires=${expires}&Signature=${encodeURIComponent(signature)}`;
+    const publicUrl = `https://storage.googleapis.com/${bucket}/${safeKey}`;
+
+    console.log(`[Signed URL Generator] Generated direct GCS upload URL for "${decodedName}" -> Key: ${safeKey}`);
+
+    res.json({
+      success: true,
+      signedUrl,
+      publicUrl,
+      key: safeKey,
+      bucket
+    });
+  } catch (err: any) {
+    console.error("[Signed URL Error]:", err);
+    res.status(500).json({ error: "Failed to generate signed URL: " + err.message });
+  }
+});
+
 // 4.9 Dedicated Large-File Upload Endpoint directly to Google Cloud Storage + Local Cache (up to 250MB)
 const uploadDir = path.join(os.tmpdir(), "ebook_uploads");
 if (!fs.existsSync(uploadDir)) {
