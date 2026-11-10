@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Upload, FileText, Sparkles, X, GraduationCap, BookMarked, Wand2, 
   School, Building2, BookOpen, RefreshCw, AlertCircle, Shield, ChevronDown, 
-  ChevronUp, Check, Edit2, Globe, DollarSign, HelpCircle, ArrowRight
+  ChevronUp, Check, CheckCircle2, Edit2, Globe, DollarSign, HelpCircle, ArrowRight
 } from 'lucide-react';
 import { BookCategory, BookTrack } from '../types';
 import { 
@@ -93,6 +93,8 @@ export default function ContentUploader({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isUploadingCloud, setIsUploadingCloud] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [uploadedCloudUrl, setUploadedCloudUrl] = useState<string | null>(null);
+  const uploadPromiseRef = useRef<Promise<string> | null>(null);
   const debounceTimerRef = useRef<any>(null);
 
   const uploadFileWithProgress = async (file: File): Promise<string> => {
@@ -139,40 +141,44 @@ export default function ContentUploader({
       console.warn("[Direct Uploader] Direct GCS upload bypassed, attempting standard server upload...", directErr);
     }
 
-    // Attempt 2: Standard multipart upload to /api/upload-to-gcp
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      const formData = new FormData();
-      formData.append("file", file);
+    // Attempt 2: Standard multipart upload to /api/upload-to-gcp (Only for files < 30MB)
+    if (file.size < 30 * 1024 * 1024) {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        const formData = new FormData();
+        formData.append("file", file);
 
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) {
-          const pct = Math.round((e.loaded / e.total) * 100);
-          setUploadProgress(pct);
-        }
-      };
-
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try {
-            const data = JSON.parse(xhr.responseText);
-            if (data.fileUrl) {
-              resolve(data.fileUrl);
-            } else {
-              reject(new Error(data.error || "لم يرجع السيرفر رابطاً للملف."));
-            }
-          } catch (e) {
-            reject(new Error("استجابة غير صالحة من السيرفر أثناء الرفع."));
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const pct = Math.round((e.loaded / e.total) * 100);
+            setUploadProgress(pct);
           }
-        } else {
-          reject(new Error(`فشل رفع الملف إلى السيرفر (كود ${xhr.status})`));
-        }
-      };
+        };
 
-      xhr.onerror = () => reject(new Error("حدث انقطاع في الاتصال أثناء رفع الملف."));
-      xhr.open("POST", "/api/upload-to-gcp");
-      xhr.send(formData);
-    });
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const data = JSON.parse(xhr.responseText);
+              if (data.fileUrl) {
+                resolve(data.fileUrl);
+              } else {
+                reject(new Error(data.error || "لم يرجع السيرفر رابطاً للملف."));
+              }
+            } catch (e) {
+              reject(new Error("استجابة غير صالحة من السيرفر أثناء الرفع."));
+            }
+          } else {
+            reject(new Error(`فشل رفع الملف إلى السيرفر (كود ${xhr.status})`));
+          }
+        };
+
+        xhr.onerror = () => reject(new Error("حدث انقطاع في الاتصال أثناء رفع الملف."));
+        xhr.open("POST", "/api/upload-to-gcp");
+        xhr.send(formData);
+      });
+    }
+
+    throw new Error("تعذر الرفع المباشر إلى التخزين السحابي. يرجى التحقق من الاتصال بالإنترنت.");
   };
 
   // AI Automatic Suggestion states
@@ -294,7 +300,8 @@ export default function ContentUploader({
       return;
     }
 
-    if (file.size <= 15 * 1024 * 1024) {
+    // 🛡️ For small files (< 5MB), read base64 as immediate fallback; for larger files, keep base64 empty to avoid payload overflows
+    if (file.size <= 5 * 1024 * 1024) {
       const reader = new FileReader();
       reader.onload = () => {
         const base64String = (reader.result as string).split(',')[1];
@@ -322,6 +329,29 @@ export default function ContentUploader({
 
     // Instantly trigger AI analysis on the selected file name!
     fetchAiSuggestions(file.name);
+
+    // 🚀 ZERO-FRICTION AUTOMATION: Start background cloud storage upload immediately!
+    setUploadedCloudUrl(null);
+    setIsUploadingCloud(true);
+    setUploadProgress(2);
+    setErrorMsg(null);
+
+    const uploadTask = uploadFileWithProgress(file)
+      .then((url) => {
+        console.log("[Auto-Uploader] Seamless background upload finished:", url);
+        setUploadedCloudUrl(url);
+        setIsUploadingCloud(false);
+        setUploadProgress(100);
+        return url;
+      })
+      .catch((err) => {
+        console.warn("[Auto-Uploader] Background upload error:", err);
+        setIsUploadingCloud(false);
+        // Do not block yet, handleSubmit will retry or report cleanly
+        return '';
+      });
+
+    uploadPromiseRef.current = uploadTask;
   };
 
   const handleDrag = (e: React.DragEvent) => {
@@ -352,6 +382,10 @@ export default function ContentUploader({
   const clearSelectedFile = (e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedFile(null);
+    setUploadedCloudUrl(null);
+    uploadPromiseRef.current = null;
+    setIsUploadingCloud(false);
+    setUploadProgress(0);
     setAiSuggestion(null);
     setCustomTitle('');
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -388,7 +422,7 @@ export default function ContentUploader({
       return;
     }
 
-    let fileUrl: string | undefined = trimmedCloudUrl || undefined;
+    let fileUrl: string | undefined = trimmedCloudUrl || (uploadedCloudUrl || undefined);
     let resolvedFileName: string | undefined = selectedFile?.name;
     let resolvedFileType: string | undefined = selectedFile?.type;
 
@@ -398,38 +432,18 @@ export default function ContentUploader({
       resolvedFileType = 'application/pdf';
     }
 
-    // 1. Direct Cloud Upload to Google Cloud Storage / Supabase
-    if (selectedFile?.rawFile) {
+    // 1. Ensure file is uploaded to GCS (Wait for background upload or trigger now)
+    if (selectedFile?.rawFile && !fileUrl) {
       try {
         setIsUploadingCloud(true);
-        setUploadProgress(5);
-        try {
+        if (uploadPromiseRef.current) {
+          fileUrl = await uploadPromiseRef.current;
+        }
+        if (!fileUrl) {
+          setUploadProgress(5);
           fileUrl = await uploadFileWithProgress(selectedFile.rawFile);
+          setUploadedCloudUrl(fileUrl);
           setUploadProgress(100);
-        } catch (primaryErr) {
-          console.warn("Primary upload failed, attempting Supabase fallback...", primaryErr);
-          // Fallback to Supabase Storage if file is small (< 50MB)
-          if (selectedFile.rawFile.size < 48 * 1024 * 1024) {
-            const fileExt = selectedFile.rawFile.name.split('.').pop();
-            const safeId = crypto.randomUUID();
-            const fileName = `${Date.now()}-${safeId}.${fileExt}`;
-            const filePath = `uploads/${fileName}`;
-
-            const { data: uploadData, error: uploadError } = await supabase.storage
-              .from('ebook-files')
-              .upload(filePath, selectedFile.rawFile, {
-                cacheControl: '3600',
-                upsert: false
-              });
-
-            if (!uploadError && uploadData) {
-              const { data: { publicUrl } } = supabase.storage
-                .from('ebook-files')
-                .getPublicUrl(filePath);
-              fileUrl = publicUrl;
-              setUploadProgress(100);
-            }
-          }
         }
       } catch (uploadErr: any) {
         console.warn("Direct storage upload warning:", uploadErr);
@@ -458,7 +472,7 @@ export default function ContentUploader({
     onConvert({
       promptText: finalPromptText,
       fileUrl,
-      fileBase64: fileUrl ? undefined : selectedFile?.base64,
+      fileBase64: fileUrl ? undefined : (selectedFile?.rawFile && selectedFile.rawFile.size <= 5 * 1024 * 1024 ? selectedFile?.base64 : undefined),
       fileName: customTitle.trim() || resolvedFileName,
       fileType: resolvedFileType,
       category: isAcademicMode ? 'academic_curriculum' : generalCategory,
@@ -542,10 +556,16 @@ export default function ContentUploader({
           <div className="flex flex-col items-center justify-center space-y-2.5">
             {selectedFile ? (
               <>
-                <div className="w-12 h-12 bg-emerald-100 text-emerald-700 rounded-2xl flex items-center justify-center shadow-xs">
-                  <FileText className="w-6 h-6" />
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-xs transition ${
+                  uploadedCloudUrl ? 'bg-emerald-100 text-emerald-700' : isUploadingCloud ? 'bg-indigo-100 text-indigo-700 animate-pulse' : 'bg-slate-100 text-slate-700'
+                }`}>
+                  {isUploadingCloud ? (
+                    <RefreshCw className="w-6 h-6 animate-spin text-indigo-600" />
+                  ) : (
+                    <FileText className="w-6 h-6" />
+                  )}
                 </div>
-                <div className="space-y-1 max-w-sm">
+                <div className="space-y-1.5 max-w-sm w-full text-center">
                   <div className="font-black text-sm text-slate-800 flex items-center justify-center gap-2">
                     <span className="truncate">{selectedFile.name}</span>
                     <button
@@ -557,7 +577,27 @@ export default function ContentUploader({
                       <X className="w-4 h-4" />
                     </button>
                   </div>
-                  <p className="text-[11px] text-slate-500 font-bold">{selectedFile.size} • تم تجهيز الملف بنجاح</p>
+                  {isUploadingCloud ? (
+                    <div className="space-y-1 px-4">
+                      <div className="flex items-center justify-between text-[11px] font-bold text-indigo-700">
+                        <span>جاري الحفظ السحابي التلقائي...</span>
+                        <span className="font-mono">{uploadProgress}%</span>
+                      </div>
+                      <div className="w-full bg-indigo-100 h-1.5 rounded-full overflow-hidden">
+                        <div
+                          className="bg-indigo-600 h-full rounded-full transition-all duration-200"
+                          style={{ width: `${Math.max(5, uploadProgress)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ) : uploadedCloudUrl ? (
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-black">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      <span>{selectedFile.size} • تم الحفظ السحابي بنجاح جاهزة للبناء ⚡</span>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-slate-500 font-bold">{selectedFile.size} • تم تجهيز الملف</p>
+                  )}
                 </div>
               </>
             ) : (
