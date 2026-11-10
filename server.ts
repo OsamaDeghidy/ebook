@@ -1659,11 +1659,24 @@ if (!fs.existsSync(PERSISTENT_UPLOADS_DIR)) {
   try { fs.mkdirSync(PERSISTENT_UPLOADS_DIR, { recursive: true }); } catch (e) { }
 }
 
-const PAGE_CACHE_DIR = path.join(process.cwd(), "data", "page-cache");
-if (!fs.existsSync(PAGE_CACHE_DIR)) {
-  try { fs.mkdirSync(PAGE_CACHE_DIR, { recursive: true }); } catch (e) { }
-}
+const PAGE_CACHE_DIR = (() => {
+  const localDir = path.join(process.cwd(), "data", "page-cache");
+  try {
+    if (!fs.existsSync(localDir)) fs.mkdirSync(localDir, { recursive: true });
+    fs.accessSync(localDir, fs.constants.W_OK);
+    return localDir;
+  } catch (e) {
+    const tmpDir = path.join(os.tmpdir(), "ebook_page_cache");
+    if (!fs.existsSync(tmpDir)) {
+      try { fs.mkdirSync(tmpDir, { recursive: true }); } catch (err) { }
+    }
+    return tmpDir;
+  }
+})();
 app.use("/api/page-cache", express.static(PAGE_CACHE_DIR, { maxAge: "7d" }));
+if (PAGE_CACHE_DIR !== path.join(process.cwd(), "data", "page-cache")) {
+  app.use("/api/page-cache", express.static(path.join(process.cwd(), "data", "page-cache"), { maxAge: "7d" }));
+}
 
 // 🎬 Explainroo Video Engine Static Mounts
 const EXPLAINROO_VIDEOS_DIR = path.join(process.cwd(), "explainroo", "videos");
@@ -3299,14 +3312,18 @@ async function resolveCloudOrLocalFileBuffer(fileUrl: string): Promise<{ buffer:
         // Verify it's actually a PDF or binary, not an HTML error or redirect page
         if (buf.length > 100 && buf.toString("utf8", 0, 5).startsWith("%PDF")) {
           console.log(`[Storage Resolver] Successfully downloaded authentic PDF via HTTP fetch (${(buf.length / 1048576).toFixed(1)}MB)`);
-          // Cache locally for instant page rendering
+          // Cache locally under the authentic key filename for instant subsequent page rendering & offline caching
           try {
-            const fallbackName = `${Date.now()}_cloud_download.pdf`;
-            const localSave = path.join(PERSISTENT_UPLOADS_DIR, fallbackName);
+            const rawKey = path.basename(directFetchUrl.split("?")[0]);
+            const baseKey = rawKey.replace(/[^a-zA-Z0-9._-]/g, "_");
             if (!fs.existsSync(PERSISTENT_UPLOADS_DIR)) fs.mkdirSync(PERSISTENT_UPLOADS_DIR, { recursive: true });
-            fs.writeFileSync(localSave, buf);
+            fs.writeFileSync(path.join(PERSISTENT_UPLOADS_DIR, rawKey), buf);
+            if (rawKey !== baseKey) {
+              fs.writeFileSync(path.join(PERSISTENT_UPLOADS_DIR, baseKey), buf);
+            }
+            console.log(`[Storage Resolver] Cached cloud PDF object locally as: ${rawKey}`);
           } catch (e) { }
-          return { buffer: buf };
+          return { buffer: buf, resolvedFileName: path.basename(directFetchUrl) };
         } else if (buf.length > 0 && !buf.toString("utf8", 0, 15).includes("<!DOCTYPE") && !buf.toString("utf8", 0, 15).includes("<html")) {
           return { buffer: buf };
         } else {
@@ -4080,8 +4097,10 @@ async function runBackgroundEbookConversion(
         syllabusBlueprint.source_file_url = fileUrl;
       }
 
-      // 🌟 VISUAL TOC ENHANCER: If text OCR only found 1 lesson for a multi-page book, scan visual TOC!
-      if (syllabusBlueprint && syllabusBlueprint.total_lessons <= 1) {
+      // 🌟 VISUAL TOC ENHANCER: If text OCR found only 1 lesson or produced heuristic "(الجزء 1)" lessons, scan visual TOC!
+      const hasHeuristicInitial = syllabusBlueprint && Array.isArray(syllabusBlueprint.lessons) &&
+        syllabusBlueprint.lessons.some((l: any) => !l.start_page || (l.lesson_title && l.lesson_title.includes('(الجزء')));
+      if (syllabusBlueprint && (syllabusBlueprint.total_lessons <= 1 || hasHeuristicInitial)) {
         const activeSource = fileUrl || savedLocalFile;
         if (activeSource) {
           try {
@@ -5914,10 +5933,12 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
   console.log(`📊 Current Chapters: \x1b[33m${currentChapters.length}\x1b[0m | Requested Batch: \x1b[33m${batchSize}\x1b[0m`);
   console.log("\x1b[35m-------------------------------------------------------\x1b[0m");
 
-  // 🩺 SELF-HEALING VISUAL TOC RECOVERY: If blueprint only has 1 lesson, upgrade it with full Visual TOC!
+  // 🩺 SELF-HEALING VISUAL TOC RECOVERY: If blueprint only has 1 lesson or has heuristic placeholder lessons, upgrade it with full Visual TOC!
   const candidateUrl = ebook.source_file_url || (ebook.blueprint as any)?.source_file_url;
   const currentLessonCount = ebook.blueprint && Array.isArray(ebook.blueprint.lessons) ? ebook.blueprint.lessons.length : 0;
-  if (candidateUrl && currentLessonCount <= 1) {
+  const hasHeuristicLessons = ebook.blueprint && Array.isArray(ebook.blueprint.lessons) &&
+    ebook.blueprint.lessons.some((l: any) => !l.start_page || (l.lesson_title && l.lesson_title.includes('(الجزء')));
+  if (candidateUrl && (currentLessonCount <= 1 || hasHeuristicLessons)) {
     try {
       console.log(`[Expand Chapters Self-Healing] Blueprint has <= 1 lesson for "${ebook.title}". Running Visual TOC discovery...`);
       const { buffer } = await resolveCloudOrLocalFileBuffer(candidateUrl);

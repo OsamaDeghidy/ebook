@@ -396,7 +396,12 @@ export default function ContentUploader({
       // 🛡️ CRITICAL INTEGRITY CHECK:
       // If a file was selected but upload failed and there is no base64, NEVER GENERATE BLINDLY!
       if (!fileUrl && !selectedFile.base64) {
-        setErrorMsg("تعذر رفع ملف المذكرة إلى السيرفر بنجاح. يرجى التحقق من اتصال الإنترنت وإعادة المحاولة حتى لا يفقد المنهج محتواه الأصلي.");
+        if (selectedFile.rawFile && selectedFile.rawFile.size > 30 * 1024 * 1024) {
+          const szMb = (selectedFile.rawFile.size / (1024 * 1024)).toFixed(1);
+          setErrorMsg(`حجم هذه المذكرة (${szMb} ميجابايت) يتجاوز سقف الرفع المباشر المسموح به لاستضافة Cloud Run (32 ميجابايت). للمذكرات الكبيرة، يرجى لصق رابطها السحابي من Google Cloud Storage في الخانة المخصصة بالأسفل لبناء المقرر بدقة 100%.`);
+        } else {
+          setErrorMsg("تعذر رفع ملف المذكرة إلى السيرفر بنجاح. يرجى التحقق من اتصال الإنترنت وإعادة المحاولة حتى لا يفقد المنهج محتواه الأصلي.");
+        }
         setIsUploadingCloud(false);
         return;
       }
