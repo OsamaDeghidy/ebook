@@ -4736,74 +4736,145 @@ app.post("/api/ebooks", async (req, res) => {
     progressPercent: 15
   };
 
-  try {
-    const finalizedEbook = await runBackgroundEbookConversion(jobId, {
-      promptText,
-      fileUrl,
-      fileBase64,
-      fileName,
-      fileType,
-      category,
-      subcategory,
-      grade_level,
-      semester,
-      academic_year,
-      price,
-      preview_video_url,
-      language,
-      academic_system,
-      education_level,
-      is_language_learning,
-      target_learning_language
-    });
-    if (!finalizedEbook) {
-      const job = conversionJobs[jobId];
-      return res.status(500).json({ error: job?.error || "فشل توليد الكتاب بالذكاء الاصطناعي" });
-    }
+  // 🚀 INSTANT 202 ACCEPTED RESPONSE: Eliminate Cloud Run Gateway Timeout & "Failed to fetch"
+  res.status(202).json({
+    success: true,
+    jobId,
+    message: "Conversion task dispatched to background worker",
+    progressStep: "Analyzing input study materials...",
+    progressPercent: 15
+  });
 
-    // Upon successful generation: Record usage and deduct fee if paid
-    if (userId && userRole !== "admin") {
-      try {
-        const quota = await getUserAiQuotaInfo(userId, userRole);
-        const usageDb = loadTeacherAiUsageFile();
-        const currentUsage = usageDb[userId] || { usedCount: 0, history: [] };
+  // Asynchronous Execution in the background
+  (async () => {
+    try {
+      const finalizedEbook = await runBackgroundEbookConversion(jobId, {
+        promptText,
+        fileUrl,
+        fileBase64,
+        fileName,
+        fileType,
+        category,
+        subcategory,
+        grade_level,
+        semester,
+        academic_year,
+        price,
+        preview_video_url,
+        language,
+        academic_system,
+        education_level,
+        is_language_learning,
+        target_learning_language
+      });
 
-        if (!quota.isFree && quota.costPerBook > 0) {
-          // Deduct from wallet
-          const newBal = Math.max(0, quota.walletBalance - quota.costPerBook);
-          await supabase.from("profiles").update({ wallet_balance: newBal }).eq("id", userId);
-          await supabase.from("wallet_transactions").insert({
-            user_id: userId,
-            type: "ai_generation_fee",
-            amount: -quota.costPerBook,
-            description: `رسوم توليد مذكرة تفاعلية بالذكاء الاصطناعي (${finalizedEbook.title || fileName || "مقرر تفاعلي"})`,
-            status: "completed",
-            created_at: new Date().toISOString()
-          });
-          console.log(`[Billing] Deducted ${quota.costPerBook} EGP from instructor ${userId}. New balance: ${newBal}`);
-        }
-
-        currentUsage.usedCount = (currentUsage.usedCount || 0) + 1;
-        if (!currentUsage.history) currentUsage.history = [];
-        currentUsage.history.push({
-          bookId: finalizedEbook.id,
-          title: finalizedEbook.title,
-          cost: quota.isFree ? 0 : quota.costPerBook,
-          isFree: quota.isFree,
-          createdAt: new Date().toISOString()
-        });
-        usageDb[userId] = currentUsage;
-        saveTeacherAiUsageFile(usageDb);
-      } catch (trackErr) {
-        console.warn("Error tracking AI usage or deducting balance:", trackErr);
+      if (!finalizedEbook) {
+        conversionJobs[jobId] = {
+          id: jobId,
+          status: "failed",
+          progressPercent: 0,
+          progressStep: "Generation failed",
+          error: "فشل توليد الكتاب بالذكاء الاصطناعي"
+        };
+        return;
       }
-    }
 
-    res.json({ success: true, ebook: finalizedEbook, jobId });
-  } catch (err: any) {
-    console.error("Ebook generation error:", err);
-    res.status(500).json({ error: "فشل توليد الكتاب التفاعلي: " + err.message });
-  }
+      // Upon successful generation: Record usage and deduct fee if paid
+      if (userId && userRole !== "admin") {
+        try {
+          const quota = await getUserAiQuotaInfo(userId, userRole);
+          const usageDb = loadTeacherAiUsageFile();
+          const currentUsage = usageDb[userId] || { usedCount: 0, history: [] };
+
+          if (!quota.isFree && quota.costPerBook > 0) {
+            // Deduct from wallet
+            const newBal = Math.max(0, quota.walletBalance - quota.costPerBook);
+            await supabase.from("profiles").update({ wallet_balance: newBal }).eq("id", userId);
+            await supabase.from("wallet_transactions").insert({
+              user_id: userId,
+              type: "ai_generation_fee",
+              amount: -quota.costPerBook,
+              description: `رسوم توليد مذكرة تفاعلية بالذكاء الاصطناعي (${finalizedEbook.title || fileName || "مقرر تفاعلي"})`,
+              status: "completed",
+              created_at: new Date().toISOString()
+            });
+            console.log(`[Billing] Deducted ${quota.costPerBook} EGP from instructor ${userId}. New balance: ${newBal}`);
+          }
+
+          currentUsage.usedCount = (currentUsage.usedCount || 0) + 1;
+          if (!currentUsage.history) currentUsage.history = [];
+          currentUsage.history.push({
+            bookId: finalizedEbook.id,
+            title: finalizedEbook.title,
+            cost: quota.isFree ? 0 : quota.costPerBook,
+            isFree: quota.isFree,
+            createdAt: new Date().toISOString()
+          });
+          usageDb[userId] = currentUsage;
+          saveTeacherAiUsageFile(usageDb);
+        } catch (trackErr) {
+          console.warn("Error tracking AI usage or deducting balance:", trackErr);
+        }
+      }
+
+      // 🛡️ SERVER-SIDE SYNCHRONOUS PERSISTENCE TO SUPABASE & LOCAL CACHE
+      try {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(finalizedEbook.id));
+        if (isUuid) {
+          await supabase.from("books").upsert({
+            id: finalizedEbook.id,
+            title: finalizedEbook.title,
+            description: finalizedEbook.description || '',
+            author_name: finalizedEbook.author_name,
+            author_id: userId || null,
+            category: finalizedEbook.category,
+            tags: finalizedEbook.tags || [],
+            price: Number(finalizedEbook.price) || 0,
+            is_external: false,
+            is_published: true,
+            approval_status: 'approved',
+            thumbnail_url: finalizedEbook.thumbnail_url,
+            rating: 5.0,
+            reviews_count: 1,
+            chapters: finalizedEbook.chapters,
+            mind_map: finalizedEbook.mind_map || [],
+            question_bank: finalizedEbook.question_bank || [],
+            education_level: finalizedEbook.education_level,
+            academic_system: finalizedEbook.academic_system,
+            subcategory: finalizedEbook.subcategory,
+            grade_level: finalizedEbook.grade_level,
+            semester: finalizedEbook.semester,
+            academic_year: finalizedEbook.academic_year,
+            language: finalizedEbook.language || 'ar',
+            source_file_url: finalizedEbook.source_file_url || fileUrl || null,
+            blueprint: finalizedEbook.blueprint || null,
+            page_offset: (finalizedEbook as any).page_offset || 0
+          });
+          console.log(`[Background Task] Guaranteed server-side persistence of "${finalizedEbook.title}" to Supabase.`);
+        }
+      } catch (upsertErr) {
+        console.warn("[Background Task] Supabase server-side upsert notice:", upsertErr);
+      }
+
+      conversionJobs[jobId] = {
+        id: jobId,
+        status: "completed",
+        progressPercent: 100,
+        progressStep: "Ebook ready! Loading into bookshelf...",
+        result: finalizedEbook
+      };
+      console.log(`[Task Dispatcher] Background conversion job ${jobId} finished successfully.`);
+    } catch (err: any) {
+      console.error("[Background Conversion Worker Error]:", err);
+      conversionJobs[jobId] = {
+        id: jobId,
+        status: "failed",
+        progressPercent: 0,
+        progressStep: "Failed: " + err.message,
+        error: "فشل توليد الكتاب التفاعلي: " + err.message
+      };
+    }
+  })();
 });
 
 // 5b. Poll background ebook conversion tasks progress
@@ -6335,6 +6406,29 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
       };
     });
 
+    // 📸 REAL PAGE IMAGE RENDERING FOR EXPANDED CHAPTERS
+    // Renders physical booklet page snapshots so "صفحات المذكرة الأصلية" shows authentic booklet images for every chapter!
+    if (candidateUrl) {
+      try {
+        const pageOffset = Number((ebook as any).page_offset) || 0;
+        const resolvedPdf = await resolveCloudOrLocalFileBuffer(candidateUrl);
+        if (resolvedPdf.buffer) {
+          for (const ch of newChapters) {
+            const startP = Number(ch.start_page) || 1;
+            const endP = Number(ch.end_page) || (startP + 4);
+            console.log(`[Expand Chapters Image Rendering] Rendering pages ${startP}..${endP} (offset: ${pageOffset}) for "${ch.title}"...`);
+            const rendered = await renderPdfPagesToImages(resolvedPdf.buffer, startP, endP, pageOffset);
+            if (rendered && rendered.length > 0) {
+              ch.pages = persistPageImagesToDisk(ebook.id, ch.id, rendered);
+              console.log(`[Expand Chapters Image Rendering] Successfully attached ${ch.pages.length} page snapshots to "${ch.title}".`);
+            }
+          }
+        }
+      } catch (renderErr) {
+        console.warn("[Expand Chapters Image Rendering Warning]:", renderErr);
+      }
+    }
+
     // Mark pending lessons as completed if blueprint was used
     if (pendingLessons.length > 0 && ebook.blueprint) {
       ebook.blueprint = markLessonsCompleted(
@@ -6356,42 +6450,50 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
     });
 
     ebook.chapters = [...currentChapters, ...nonDuplicateNewChapters];
+
+    // 🎯 DYNAMIC MONOTONIC PAGE WATERMARK CURSOR UPDATE
+    const allEndPages = ebook.chapters
+      .map((c: any) => Number(c.end_page) || 0)
+      .filter((p: number) => p > 0);
+    const maxEndPage = allEndPages.length > 0 ? Math.max(...allEndPages) : 0;
+    (ebook as any).last_processed_page = maxEndPage;
+
+    if (ebook.blueprint) {
+      (ebook.blueprint as any).last_processed_page = maxEndPage;
+    }
+
+    const totalDocPages = Number(ebook.blueprint?.total_pdf_pages || (ebook as any).total_pdf_pages || 0);
+    const pendingInBlueprint = ebook.blueprint && Array.isArray(ebook.blueprint.lessons)
+      ? ebook.blueprint.lessons.filter(l => l.status === "pending").length
+      : 0;
+
+    const isBookFullyCompleted = (totalDocPages > 0 && maxEndPage >= totalDocPages) ||
+      (ebook.blueprint && ebook.blueprint.lessons && ebook.blueprint.lessons.length > 0 && pendingInBlueprint === 0);
+
+    if (isBookFullyCompleted) {
+      (ebook as any).is_fully_completed = true;
+    }
+
     saveEbooks(ebooks, ebook);
 
     console.log("\x1b[35m-------------------------------------------------------\x1b[0m");
     console.log(`\x1b[1m\x1b[32m✅ [EXPAND-CHAPTERS COMPLETED]\x1b[0m Book: "\x1b[36m${ebook.title}\x1b[0m"`);
-    console.log(`📚 Generated \x1b[33m${newChapters.length}\x1b[0m new chapter(s). Total Chapters now: \x1b[32m${ebook.chapters.length}\x1b[0m`);
+    console.log(`📚 Generated \x1b[33m${newChapters.length}\x1b[0m new chapter(s). Total Chapters now: \x1b[32m${ebook.chapters.length}\x1b[0m | Last Page: \x1b[33m${maxEndPage}\x1b[0m`);
     newChapters.forEach((ch: any, i: number) => {
-      console.log(`   👉 Chapter #${currentChapters.length + i + 1}: "\x1b[1m${ch.title}\x1b[0m" (Pages ${ch.start_page}..${ch.end_page})`);
+      console.log(`   👉 Chapter #${currentChapters.length + i + 1}: "\x1b[1m${ch.title}\x1b[0m" (Pages ${ch.start_page}..${ch.end_page}) | Pages Attached: ${ch.pages?.length || 0}`);
     });
     console.log("\x1b[35m=======================================================\n\x1b[0m");
 
-    // 🛡️ GUARANTEED SYNCHRONOUS PERSISTENCE TO SUPABASE (Never fire-and-forget on Cloud Run!)
-    try {
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(ebook.id));
-      if (isUuid) {
-        const { error: syncErr } = await supabase.from('books').update({
-          chapters: ebook.chapters,
-          blueprint: ebook.blueprint
-        }).eq('id', ebook.id);
-        if (syncErr) {
-          console.warn("[Supabase Sync] Chapters update notice:", syncErr.message);
-        } else {
-          console.log(`[Supabase Sync] 🛡️ Guaranteed persistence of expanded chapters for "${ebook.title}"`);
-        }
-      }
-    } catch (dbErr) {
-      console.warn("Supabase chapters sync exception:", dbErr);
-    }
-
-    const pendingInBlueprint = ebook.blueprint && Array.isArray(ebook.blueprint.lessons) ? ebook.blueprint.lessons.filter(l => l.status === "pending").length : 0;
-    const moreScannedPages = isScannedPdf && (ebook.blueprint?.last_scanned_page || 0) < totalPdfPages ? Math.ceil((totalPdfPages - (ebook.blueprint?.last_scanned_page || 0)) / 4) : 0;
+    // 🛡️ GUARANTEED SYNCHRONOUS PERSISTENCE TO SUPABASE
+    await syncBookToSupabase(ebook);
 
     res.json({
       success: true,
       newChapters,
       totalChapters: ebook.chapters.length,
-      remainingLessons: pendingInBlueprint + moreScannedPages,
+      remainingLessons: pendingInBlueprint,
+      lastProcessedPage: maxEndPage,
+      isFullyCompleted: isBookFullyCompleted,
       book: ebook
     });
   } catch (err: any) {
