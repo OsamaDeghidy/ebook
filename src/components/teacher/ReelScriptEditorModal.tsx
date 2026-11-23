@@ -20,6 +20,26 @@ export const ReelScriptEditorModal: React.FC<ReelScriptEditorModalProps> = ({
 }) => {
   if (!isOpen || !reel) return null;
 
+  return (
+    <ReelScriptEditorModalContent
+      reel={reel}
+      onClose={onClose}
+      onSave={onSave}
+    />
+  );
+};
+
+interface ReelScriptEditorModalContentProps {
+  reel: EduReel;
+  onClose: () => void;
+  onSave: (updatedReel: EduReel) => Promise<void>;
+}
+
+const ReelScriptEditorModalContent: React.FC<ReelScriptEditorModalContentProps> = ({
+  reel,
+  onClose,
+  onSave
+}) => {
   const [chapterTitle, setChapterTitle] = useState(reel.chapter_title);
   const [scenes, setScenes] = useState(reel.scenes || []);
   const [quickQuiz, setQuickQuiz] = useState(reel.quickQuiz || {

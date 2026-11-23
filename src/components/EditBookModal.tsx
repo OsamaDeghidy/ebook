@@ -41,8 +41,29 @@ export const EditBookModal: React.FC<EditBookModalProps> = ({
   onClose,
   onSave
 }) => {
-  const { dir, t } = useLanguage();
   if (!isOpen || !book) return null;
+
+  return (
+    <EditBookModalContent
+      book={book}
+      onClose={onClose}
+      onSave={onSave}
+    />
+  );
+};
+
+interface EditBookModalContentProps {
+  book: MarketplaceBook;
+  onClose: () => void;
+  onSave: (updatedBook: MarketplaceBook) => Promise<void>;
+}
+
+const EditBookModalContent: React.FC<EditBookModalContentProps> = ({
+  book,
+  onClose,
+  onSave
+}) => {
+  const { dir, t } = useLanguage();
 
   const [title, setTitle] = useState(book.title || '');
   const [description, setDescription] = useState(book.description || '');

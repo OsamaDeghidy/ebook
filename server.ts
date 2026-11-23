@@ -2945,9 +2945,26 @@ ${chapterRawText.substring(0, 15000)}
     };
 
     for (const sc of scriptData.scenes) {
+      const rawNarration = sc.narration || sc.heading || "";
       // Clean narration text removing {shown|spoken} syntax
-      const cleanNarration = (sc.narration || sc.heading || "").replace(/\{([^|}]*)\|?([^}]*)\}/g, '$1');
-      const words = cleanNarration.split(/\s+/).filter(Boolean);
+      const cleanNarration = rawNarration.replace(/\{([^|}]*)\|?([^}]*)\}/g, '$1');
+
+      // 1. Extract markers and their exact word positions before stripping them
+      const rawTokens = cleanNarration.split(/\s+/).filter(Boolean);
+      const extractedMarks = new Map<string, number>();
+      let spokenCount = 0;
+      for (const tok of rawTokens) {
+        const m = tok.match(/\[#m(\d+)\]/i);
+        if (m) {
+          extractedMarks.set(`m${m[1]}`, spokenCount);
+        } else {
+          spokenCount++;
+        }
+      }
+
+      // 2. Pure Spoken Speech Text: CRITICAL -> Strip [#m1], [#m2]... so Google TTS NEVER speaks them and captions NEVER show them!
+      const speechText = cleanNarration.replace(/\[#m\d+\]/gi, ' ').replace(/\s+/g, ' ').trim();
+      const words = speechText.split(/\s+/).filter(Boolean);
       const sceneText = words.join(" ");
 
       const mp3Buffer = await synthesizeGoogleCloudTTS(sceneText, voice, "ar-XA");
@@ -2988,16 +3005,28 @@ ${chapterRawText.substring(0, 15000)}
         matched: true
       }));
 
+      const totalWords = Math.max(1, words.length);
       const marks: Record<string, number> = {};
       const boxes = Array.isArray(sc.boxes) ? sc.boxes : [];
+
       // Guarantee markers m1 through m10 always exist to prevent any missing mark exception in Explainroo
       for (let k = 1; k <= 10; k++) {
         const ratio = Math.max(0.12, Math.min(0.92, (k / 6) * 0.85 + 0.1));
         marks[`m${k}`] = Number((duration * ratio).toFixed(2));
       }
+
+      // If marks were placed in the script, set their exact timestamp to the moment that sentence part is spoken!
+      extractedMarks.forEach((wordIdx, markKey) => {
+        const ratio = Math.max(0.05, Math.min(0.95, wordIdx / totalWords));
+        marks[markKey] = Number((duration * ratio).toFixed(2));
+      });
+
       boxes.forEach((_: any, bIdx: number) => {
-        const ratio = Math.max(0.15, Math.min(0.90, (bIdx + 1) / (boxes.length + 1)));
-        marks[`m${bIdx + 1}`] = Number((duration * ratio).toFixed(2));
+        const markKey = `m${bIdx + 1}`;
+        if (!extractedMarks.has(markKey)) {
+          const ratio = Math.max(0.15, Math.min(0.90, (bIdx + 1) / (boxes.length + 1)));
+          marks[markKey] = Number((duration * ratio).toFixed(2));
+        }
       });
 
       const info = {
@@ -3007,7 +3036,7 @@ ${chapterRawText.substring(0, 15000)}
         words: wordObjs,
         marks,
         chunks,
-        transcript: words.join(' '),
+        transcript: sceneText,
         matchRate: 1,
         unmatched: []
       };
