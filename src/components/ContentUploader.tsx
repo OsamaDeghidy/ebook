@@ -141,44 +141,40 @@ export default function ContentUploader({
       console.warn("[Direct Uploader] Direct GCS upload bypassed, attempting standard server upload...", directErr);
     }
 
-    // Attempt 2: Standard multipart upload to /api/upload-to-gcp (Only for files < 30MB)
-    if (file.size < 30 * 1024 * 1024) {
-      return new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        const formData = new FormData();
-        formData.append("file", file);
+    // Attempt 2: Standard multipart upload to /api/upload-to-gcp (Robust fallback)
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const formData = new FormData();
+      formData.append("file", file);
 
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) {
-            const pct = Math.round((e.loaded / e.total) * 100);
-            setUploadProgress(pct);
-          }
-        };
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          const pct = Math.round((e.loaded / e.total) * 100);
+          setUploadProgress(pct);
+        }
+      };
 
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-              const data = JSON.parse(xhr.responseText);
-              if (data.fileUrl) {
-                resolve(data.fileUrl);
-              } else {
-                reject(new Error(data.error || "لم يرجع السيرفر رابطاً للملف."));
-              }
-            } catch (e) {
-              reject(new Error("استجابة غير صالحة من السيرفر أثناء الرفع."));
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            if (data.fileUrl) {
+              resolve(data.fileUrl);
+            } else {
+              reject(new Error(data.error || "لم يرجع السيرفر رابطاً للملف."));
             }
-          } else {
-            reject(new Error(`فشل رفع الملف إلى السيرفر (كود ${xhr.status})`));
+          } catch (e) {
+            reject(new Error("استجابة غير صالحة من السيرفر أثناء الرفع."));
           }
-        };
+        } else {
+          reject(new Error(`فشل رفع الملف إلى السيرفر (كود ${xhr.status})`));
+        }
+      };
 
-        xhr.onerror = () => reject(new Error("حدث انقطاع في الاتصال أثناء رفع الملف."));
-        xhr.open("POST", "/api/upload-to-gcp");
-        xhr.send(formData);
-      });
-    }
-
-    throw new Error("تعذر الرفع المباشر إلى التخزين السحابي. يرجى التحقق من الاتصال بالإنترنت.");
+      xhr.onerror = () => reject(new Error("حدث انقطاع في الاتصال أثناء رفع الملف."));
+      xhr.open("POST", "/api/upload-to-gcp");
+      xhr.send(formData);
+    });
   };
 
   // AI Automatic Suggestion states
@@ -295,8 +291,8 @@ export default function ContentUploader({
       return;
     }
 
-    if (file.size > 250 * 1024 * 1024) {
-      setErrorMsg("حجم الملف كبير جداً. الحد الأقصى المسموح به هو 250 ميجابايت.");
+    if (file.size > 500 * 1024 * 1024) {
+      setErrorMsg("حجم الملف يتجاوز 500 ميجابايت. يرجى اختيار ملف بحجم أقل من 500 ميجابايت.");
       return;
     }
 

@@ -3536,6 +3536,7 @@ app.post("/api/ai/suggest-book-metadata", async (req, res) => {
     }
 
     // 🌐 If cleanFileName is a URL (GCS, HTTPS, GS), extract the clean filename
+    const originalInputUrl = (fileName || "").trim().startsWith("http") || (fileName || "").trim().startsWith("gs://") ? (fileName || "").trim() : "";
     if (cleanFileName.startsWith("http://") || cleanFileName.startsWith("https://") || cleanFileName.startsWith("gs://")) {
       try {
         const u = new URL(cleanFileName);
@@ -3553,10 +3554,29 @@ app.post("/api/ai/suggest-book-metadata", async (req, res) => {
       cleanFileName = cleanFileName.replace(/^\d+-/, "");
     }
 
+    // 📖 AUTO-INSPECT PDF HEADER: If filename is generic or obfuscated (e.g. all underscores), read first pages from PDF!
+    let pdfSampleText = "";
+    const isObfuscatedOrUrl = Boolean(originalInputUrl || cleanFileName.replace(/[^a-zA-Z0-9\u0600-\u06FF]/g, '').length < 4);
+    if (isObfuscatedOrUrl && originalInputUrl && cleanSnippet.length < 100) {
+      try {
+        console.log(`[AI Metadata Classifier] Reading cover pages from PDF for authentic identification: ${originalInputUrl}...`);
+        const { buffer } = await resolveCloudOrLocalFileBuffer(originalInputUrl);
+        if (buffer) {
+          const sample = await extractPdfPageRange(buffer, 1, 3);
+          if (sample && sample.length > 50) {
+            pdfSampleText = sample.slice(0, 3000);
+            console.log(`[AI Metadata Classifier] Read ${pdfSampleText.length} characters from authentic PDF!`);
+          }
+        }
+      } catch (pdfErr) {
+        console.warn("[AI Metadata Classifier] PDF preview notice:", pdfErr);
+      }
+    }
+
     console.log(`[AI Metadata Classifier] Analyzing curriculum data: "${cleanFileName}" | Snippet: "${cleanSnippet.slice(0, 100)}..."`);
 
     // Rule-based heuristic analyzer (serves as smart instant baseline and robust fallback)
-    const normalizedInput = `${cleanFileName} ${cleanSnippet}`.toLowerCase().replace(/[-_]+/g, " ");
+    const normalizedInput = `${cleanFileName} ${cleanSnippet} ${pdfSampleText}`.toLowerCase().replace(/[-_]+/g, " ");
 
     // Default baseline values
     let detectedLevel = "pre_university";
@@ -3567,8 +3587,12 @@ app.post("/api/ai/suggest-book-metadata", async (req, res) => {
     let detectedLanguage = "ar";
     let summaryNotes = "تم فحص المذكرة والتعرف على المرحلة والصف والمادة تلقائياً بنجاح ✨";
 
-    // 1. Grade detection (supporting Egyptian official book codes: prep1, prep2, prim4, etc.)
-    if (normalizedInput.includes("3ث") || normalizedInput.includes("ثالث ثانوي") || normalizedInput.includes("ثانوية عامة") || normalizedInput.includes("sec3") || normalizedInput.includes("sec 3")) {
+    // 1. Grade & Domain detection (supporting Teacher Licensure, Egyptian schools, university)
+    if (normalizedInput.includes("رخصة مهنية") || normalizedInput.includes("رخصه مهنيه") || normalizedInput.includes("معلم الحاسب") || normalizedInput.includes("تخصص الحاسب")) {
+      detectedGrade = "الرخصة المهنية - تخصص الحاسب الآلي";
+      detectedLevel = "university";
+      detectedSubject = "الحاسب الآلي وتكنولوجيا المعلومات";
+    } else if (normalizedInput.includes("3ث") || normalizedInput.includes("ثالث ثانوي") || normalizedInput.includes("ثانوية عامة") || normalizedInput.includes("sec3") || normalizedInput.includes("sec 3")) {
       detectedGrade = "الصف الثالث الثانوي";
       detectedLevel = "pre_university";
     } else if (normalizedInput.includes("2ث") || normalizedInput.includes("ثاني ثانوي") || normalizedInput.includes("sec2") || normalizedInput.includes("sec 2")) {
@@ -3605,8 +3629,25 @@ app.post("/api/ai/suggest-book-metadata", async (req, res) => {
       detectedGrade = "الفرقة الأولى";
     }
 
-    // 2. Subject detection
-    if (normalizedInput.includes("احياء") || normalizedInput.includes("أحياء") || normalizedInput.includes("biology") || normalizedInput.includes("جيولوجيا")) {
+    // 2. Subject detection (Computer Science & ICT prioritized first to prevent misclassifying CS books with math standards as pure math!)
+    if (
+      normalizedInput.includes("برمج") || 
+      normalizedInput.includes("حاسب") || 
+      normalizedInput.includes("كمبيوتر") || 
+      normalizedInput.includes("تكنولوجيا") || 
+      normalizedInput.includes("ذكاء اصطناعي") || 
+      normalizedInput.includes("ai") || 
+      normalizedInput.includes("python") || 
+      normalizedInput.includes("ict") ||
+      normalizedInput.includes("كارنوف") ||
+      normalizedInput.includes("تصميم منطقي") ||
+      normalizedInput.includes("أنظمة العد") ||
+      normalizedInput.includes("خوارزم") ||
+      normalizedInput.includes("قواعد بيانات") ||
+      normalizedInput.includes("شبكات")
+    ) {
+      detectedSubject = "الحاسب الآلي وتكنولوجيا المعلومات";
+    } else if (normalizedInput.includes("احياء") || normalizedInput.includes("أحياء") || normalizedInput.includes("biology") || normalizedInput.includes("جيولوجيا")) {
       detectedSubject = "الأحياء والجيولوجيا";
     } else if (normalizedInput.includes("فيزياء") || normalizedInput.includes("physics")) {
       detectedSubject = "الفيزياء والكيمياء";
@@ -3630,8 +3671,6 @@ app.post("/api/ai/suggest-book-metadata", async (req, res) => {
       detectedSubject = "التاريخ والجغرافيا";
     } else if (normalizedInput.includes("فلسفة") || normalizedInput.includes("منطق") || normalizedInput.includes("علم نفس") || normalizedInput.includes("اجتماع")) {
       detectedSubject = "الفلسفة وعلم النفس";
-    } else if (normalizedInput.includes("برمج") || normalizedInput.includes("حاسب") || normalizedInput.includes("كمبيوتر") || normalizedInput.includes("تكنولوجيا") || normalizedInput.includes("ذكاء اصطناعي") || normalizedInput.includes("ai") || normalizedInput.includes("python") || normalizedInput.includes("ict")) {
-      detectedSubject = "الحاسب الآلي وتكنولوجيا المعلومات";
     }
 
     // 3. Semester detection
@@ -3659,7 +3698,7 @@ app.post("/api/ai/suggest-book-metadata", async (req, res) => {
         const prompt = `You are an expert curriculum classifier for Arab and Middle Eastern education.
 Analyze this book file name and text snippet:
 - File Name: "${cleanFileName}"
-- Context/Snippet: "${cleanSnippet.slice(0, 1500)}"
+- Context/Snippet: "${(cleanSnippet || pdfSampleText).slice(0, 2000)}"
 
 Return ONLY a valid JSON object matching this schema without any markdown wrapping or code blocks:
 {
@@ -4687,9 +4726,12 @@ app.post("/api/gcp/signed-upload-url", (req, res) => {
       if (/[\u0600-\u06FF]/.test(candidate)) decodedName = candidate;
     } catch (e) { }
 
-    const safeClean = decodedName.replace(/[^\w\u0600-\u06FF.-]/g, "_");
-    const safeKey = `uploads/${Date.now()}-${safeClean}`;
+    // Retain clean ASCII key for S3/GCS storage while keeping original Arabic name for metadata
     const effectiveMime = fileType || "application/pdf";
+    const ext = path.extname(decodedName) || (effectiveMime.includes("word") ? ".docx" : ".pdf");
+    const asciiClean = decodedName.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 30);
+    const uniqueSuffix = crypto.randomBytes(4).toString("hex");
+    const safeKey = `uploads/${Date.now()}-${uniqueSuffix}${asciiClean ? "_" + asciiClean : "_doc"}${ext}`;
     const expiresInSeconds = 1800; // 30 minutes
     const expires = Math.floor(Date.now() / 1000) + expiresInSeconds;
 
@@ -4716,7 +4758,8 @@ app.post("/api/gcp/signed-upload-url", (req, res) => {
       signedUrl,
       publicUrl,
       key: safeKey,
-      bucket
+      bucket,
+      fileName: decodedName
     });
   } catch (err: any) {
     console.error("[Signed URL Error]:", err);
@@ -4732,7 +4775,7 @@ if (!fs.existsSync(uploadDir)) {
 
 const gcpUploader = multer({
   dest: uploadDir,
-  limits: { fileSize: 250 * 1024 * 1024 } // 250 MB max
+  limits: { fileSize: 500 * 1024 * 1024 } // 500 MB max
 });
 
 app.post("/api/upload-to-gcp", gcpUploader.single("file"), async (req, res) => {
@@ -4754,9 +4797,10 @@ app.post("/api/upload-to-gcp", gcpUploader.single("file"), async (req, res) => {
     } catch (e) { }
 
     const effectiveMime = req.file.mimetype || (decodedName.toLowerCase().endsWith(".pdf") ? "application/pdf" : "application/pdf");
-    // Retain Arabic letters, alphanumeric, dots, hyphens, and underscores
-    const safeClean = decodedName.replace(/[^\w\u0600-\u06FF.-]/g, "_");
-    const safeFileName = `${Date.now()}-${safeClean}`;
+    const ext = path.extname(decodedName) || (effectiveMime.includes("word") ? ".docx" : ".pdf");
+    const asciiClean = decodedName.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 30);
+    const uniqueSuffix = crypto.randomBytes(4).toString("hex");
+    const safeFileName = `${Date.now()}-${uniqueSuffix}${asciiClean ? "_" + asciiClean : "_doc"}${ext}`;
 
     console.log(`[Fast Upload] Processing ${decodedName} (${sizeMB}MB)...`);
 
@@ -6577,7 +6621,12 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
       const matchedLesson = pendingLessons[idx];
       const rawSlice = matchedLesson?.raw_text_snippet || "";
       const originalText = cleanStr(ch.originalContent) || rawSlice || "";
-      const cleanTitle = cleanStr(ch.title) || cleanStr(matchedLesson?.lesson_title) || `الدرس ${cIdx}`;
+      let cleanTitle = cleanStr(ch.title) || cleanStr(matchedLesson?.lesson_title) || `الدرس ${cIdx}`;
+      // 🛡️ TITLE POLISHER: Strip redundant repetitive standard prefixes so the index remains clear and diverse
+      cleanTitle = cleanTitle.replace(/^المعيار\s+[^\s:]+:\s*الرياضيات\s+[-–—]?\s*/i, "");
+      cleanTitle = cleanTitle.replace(/^المعيار\s+[^\s:]+\s+الرياضيات\s+[-–—]?\s*/i, "");
+      cleanTitle = cleanTitle.replace(/^تخصص\s+الحاسب\s+الآلي\s+[-–—]?\s*/i, "");
+      if (!cleanTitle.trim()) cleanTitle = cleanStr(ch.title) || `الدرس ${cIdx}`;
       const deepContent = detailedContents[idx] || sanitizeServerContent(ch.content) || "محتوى الدرس قيد المعالجة.";
 
       // Extract concepts from keyConcepts array or content headings
