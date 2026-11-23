@@ -2111,56 +2111,70 @@ ${allowedBuiltinIcons}
 `;
     } else if (isShakhbata) {
       prompt = `
-أنت المخرج البيداغوجي والسيناريست المتخصص الأول في أسلوب "شخبطة" ورسوم السبورة البيضاء والقصص التفاعلية (RSA Animate / Whiteboard Storytelling) لمنصة Osera AI.
-المهمة الصارمة: تحويل محتوى الدرس أدناه إلى سكريبت فيديو أنيميشن سبورة بيضاء يعتمد كلياً على أسلوب الحكواتي المشوق (Storytelling) والاستعارات البصرية اليومية (Visual Metaphors / Analogies).
+أنت كبير مخرجي السرد البصري والسبورة التفاعلية (بأسلوب "شخبطة" و "RSA Animate") لمنصة Osera AI.
+المهمة الصارمة: تحويل محتوى الدرس أدناه إلى سكريبت فيديو تعليمي تفاعلي كامل يشرح الدرس بعمق ومتعة دون أي حشو إنشائي، مدعوماً برسم سبورة بيضاء واستعارات وتوضيحات بصرية دلالية.
+
 المقرر المعتمد: "${book?.title || 'مقرر دراسي'}"
 المادة والمرحلة: "${subjectName || book?.category || 'عام'}"
 الفصل / الدرس المطلوب: "${chapter.title}"
 ${specificTopicPrompt}
 أبعاد الفيديو المطلوبة: ${aspectRatio} (${isVertical ? 'Vertical Reels 1080x1920' : 'Landscape 1920x1080'})
-العدد المطلوب: 5 إلى 7 مشاهد قصصية بصرية مترابطة (مدة 2.5 إلى 4 دقائق).
 
-المحتوى المصدري المعتمد للدرس:
+المحتوى المصدري المعتمد للدرس (المصدر العلمي الحصري والوحيد):
 """
-${chapterRawText.substring(0, 15000)}
+${chapterRawText.substring(0, 16000)}
 """
 
-قواعد سكريبت "شخبطة" والقصة التفاعلية:
-1. البناء السردي الدرامي والاستعارة البصرية (Visual Metaphor):
-   - المشهد 1 (الخطاف القصصي Hook): يبدأ بسؤال حقيقي أو معضلة يومية تشد الانتباه (مثال: "تخيل لو دخلت متجر، والأسعار كلها مكتوبة بلغة غير مفهومة...").
-   - المشهد 2 (المقارنة الواقعية Analogy): ربط المفهوم الأكاديمي بشيء حسي ملموس من واقع الحياة اليومية (تشبيه الذاكرة بخزانة، أو النظام الثنائي بمفاتيح الإنارة On/Off).
-   - المشاهد 3 إلى 5 (التفكيك البصري والحل خطوة بخطوة): شرح القاعدة العلمية أو المعادلة من خلال التشبيه البصري، مع مقارنة مباشرة بين المفهوم العلمي والمثال الواقعي.
-   - المشهد الأخير (الخلاصة المبهجة): الحكمة الذهبية المستفادة وتطبيق عملي يثبت في الذاكرة.
+=== القواعد الحتمية لصياغة السكريبت الصوتي (Narration Rules) ===
+1. **العمق البيداغوجي وعدد المشاهد (متوسط 15 إلى 20 مشهداً):**
+   - متوسط عدد المشاهد المطلوب من 15 إلى 20 مشهداً تعليمياً حسب طول الدرس وتشعب أفكاره (دون حشو أو تكرار، وليس رقماً إجبارياً متعسفاً؛ المهم استيعاب كافة الأفكار وتوضيح الشرح كاملاً مدعوماً بأشكال دلالية).
+   - قسّم الدرس إلى تسلسل أفكار متتابعة، حيث يناقش كل مشهد فكرة جزئية واحدة بعمق وسلاسة.
+2. **البداية الفورية المباشرة (Zero-Delay Hook):**
+   - ابدأ المشهد الأول فوراً بسؤال ذكي أو موقف مشوق يشد انتباه الطالب في أول ثانيتين بدون أي ترحيبات أو ذكر أسماء.
+3. **حظر اللغة الإنشائية والشعرية المتكلفة:**
+   - ممنوع العبارات البلاغية الجافة (مثل "فنار بحري"، "رقصة تبادل"، "المهد البهي").
+   - اشرح كما يشرح معلم خبير متمكن لصديقه: بأسلوب حكواتي دافئ، مع تبسيط وتفكيك المعادلات والمصطلحات بالأرقام والأمثلة الدقيقة.
+4. **قاعدة النبضات الثلاث لكل فكرة (The 3-Beat Rule):**
+   - النبضة الأولى: تشبيه ملموس من واقع الحياة اليومية يقرب المفهوم.
+   - النبضة الثانية: الحقيقة العلمية أو القانون أو الحسابات من صلب المذكرة بدقة وبفصحى مشكولة.
+   - النبضة الثالثة: النتيجة المترتبة أو التطبيق العملي وأثره في الامتحان.
+5. **إيقاع العلامات الزمنية (4 Marks per Scene):**
+   - قسّم نص كل مشهد (من 35 إلى 50 كلمة مشكولة) إلى 4 مراحل متوازنة تسبقها العلامات: [#m1]، [#m2]، [#m3]، [#m4]، ليتغير شيء على الشاشة كل 3 إلى 4 ثوانٍ.
 
-2. التعليق الصوتي (Narration) بأسلوب الحكواتي:
-   - لغة الإلقاء: فصحى مبسطة وقريبة جداً من فهم الطالب، دافئة وذكية وتطرح تساؤلات تفاعلية، ومشكولة بدقة.
-   - الطول: من 40 إلى 55 كلمة مشكولة لكل مشهد لتلائم رتم الرسم الهادئ وموسيقى الجيتار الحالمة.
-   - ممنوع الترحيبات أو ذكر أسماء أشخاص. ادخل فوراً في القصة والتشبيه.
-
-3. التخطيط البصري لكل مشهد (Scenes Layout):
-   - استخدم layoutType من الأنواع التالية:
-     * "doodle_story": بطاقتان متقابلتان: الأولى للمفهوم العلمي (Academic Concept)، والثانية للتشبيه الواقعي المستعار (Real-world Analogy) يربط بينهما سهم تفاعلي مع تركيز الكاميرا.
-     * "concept_analogy": فكرة محورية مع تشبيه واقعي ذكي وبطاقة تركيز توضيحية.
-     * "step_by_step": خطوات متسلسلة للحل تمشي مع تدفق القصة.
-     * "golden_alert": تنبيه ذكي لأكبر خطأ يقع فيه الطلاب مع إبراز الحل.
-   - في حقل "boxes": ضع 2 إلى 3 عناصر مركزة (كل عنصر عبارة عن تشبيه مقتضب وواضح من 4 إلى 7 كلمات).
-   - اختر أيقونات حصراً من قائمة الأيقونات المعتمدة المدمجة:
+=== القواعد الحتمية للإخراج البصري (Visual Layout Rules) ===
+1. **حظر تسريب أسماء الهيكل في العناوين:**
+   - ممنوع منعاً باتاً كتابة كلمات مثل ("الخطاف القصصي"، "المقدمة"، "الخلاصة المبهجة") في حقل "heading".
+   - يجب أن يكون "heading" عنواناً علمياً مباشراً أو سؤالاً تفاعلياً من صلب الفكرة (مثال: "ما هو النظام الثنائي ولماذا نستخدمه؟" أو "طريقة التحويل من ثنائي لعشري").
+2. **تنوع التخطيطات البصرية الدلالية (Visual Isomorphism):**
+   - اختر "layoutType" المناسب لطبيعة المعلومة ونوّع بين المشاهد:
+     * "numeric_hero": عندما يتناول المشهد أرقاماً أو نسباً أو تحويلات حسابية (ضع الرقم في "heroNumber" والوصف في "heroUnit").
+     * "spatial_hub": للمفاهيم المحورية التي تتفرع منها عناصر محيطة أو اتجاهات.
+     * "causal_flow": للخطوات المتسلسلة أو السبب والنتيجة (مع كتابة فعل الربط الحقيقي في "arrowLabel" مثل: "ينتج عنه"، "يتحول إلى").
+     * "doodle_story": للمقارنة المباشرة بين المفهوم العلمي والتشبيه الواقعي (صندوق للمفهوم وصندوق للمثال الواقعي).
+     * "annotated_formula": للقوانين والمعادلات الحسابية (وضع المعادلة في "mathFormula").
+     * "golden_alert": لتنبيهات الامتحانات والأخطاء الشائعة.
+3. **إيجاز نصوص البطاقات:**
+   - نصوص "boxes" مكثفة ومختصرة جداً (من 4 إلى 7 كلمات كحد أقصى) لتقرأ بسهولة أثناء تحرك الكاميرا.
+   - اختر أيقونات حصراً من:
      ${allowedBuiltinIcons}
 
-المطلوب: أجب حصراً بكائن JSON صالح مطابق تماماً للبنية الآتية بدون أي نصوص خارجها:
+المطلوب: أجب حصراً بكائن JSON صالح مطابق تماماً للبنية الآتية بدون أي نصوص أو كتل خارجها:
 {
-  "title": "رحلة استكشاف: ${chapter.title}",
+  "title": "${chapter.title}",
   "scenes": [
     {
       "id": "scene1",
-      "heading": "المدخل القصصي",
+      "heading": "سؤال أو عنوان تعليمي واضح ومحدد من الدرس",
       "layoutType": "doodle_story",
+      "heroNumber": "",
+      "heroUnit": "",
+      "arrowLabel": "يشبه في الواقع",
       "mathFormula": "",
       "icon": "lightbulb",
-      "narration": "نص التعليق الصوتي القصصي المشكول بأسلوب دافئ ومبسط يبدأ بالخطاف ويثير الفضول.",
+      "narration": "[#m1] نص النبضة الأولى والتشبيه الملموس [#m2] نص النبضة الثانية والحقيقة العلمية من المذكرة [#m3] استكمال الشرح والتطبيق العملي [#m4] الخلاصة والأثر في الاختبار.",
       "boxes": [
         { "label": "المفهوم العلمي المحدد", "icon": "cpu", "color": "teal" },
-        { "label": "التشبيه الواقعي الملموس", "icon": "lightbulb", "color": "yellow" }
+        { "label": "التشبيه الواقعي الملموس", "icon": "lightbulb", "color": "orange" }
       ]
     }
   ]
@@ -2252,6 +2266,8 @@ ${chapterRawText.substring(0, 15000)}
     const sanitizeNarrationForScript = (rawText: string): string => {
       if (!rawText) return "";
       let s = String(rawText);
+      // Temporarily protect markers like [#m1], [#m2], [#m3], etc.
+      s = s.replace(/\[#m(\d+)\]/g, '___MARK_$1___');
       // Convert TeX fractions like \frac{a}{b} to plain Arabic 'a على b'
       s = s.replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '$1 على $2');
       // Convert TeX \mathbb{R} to R
@@ -2262,6 +2278,8 @@ ${chapterRawText.substring(0, 15000)}
       s = s.replace(/\{([^|}]*)\}/g, '($1)');
       // Strip any isolated curly braces
       s = s.replace(/[{}]/g, '');
+      // Restore protected timing markers
+      s = s.replace(/___MARK_(\d+)___/g, '[#m$1]');
       return s.replace(/\s+/g, ' ').trim();
     };
 
@@ -2344,27 +2362,31 @@ ${chapterRawText.substring(0, 15000)}
           });
         }
       } else if (isShakhbata) {
-        // Fallback for Shakhbata Storytelling
+        // Fallback for Shakhbata Storytelling with rich coverage
         const metaphors = [
-          { concept: "الفكرة الأساسية في الحياة اليومية", analogy: "تشبيه بسيط من واقعنا يوضح الفكرة", icon: "lightbulb" },
-          { concept: "القاعدة العلمية والخطوات", analogy: "مثل تروس الساعة التي تعمل بتناغم تام", icon: "layers" },
-          { concept: "التطبيق العملي بالأرقام", analogy: "التحويل خطوة بخطوة كما نعد النقود", icon: "calculator" },
-          { concept: "الفخ الشائع الذي يخدع الجميع", analogy: "احذر من الوقوع في هذا الشرك المعتاد", icon: "alert-circle" },
-          { concept: "الخلاصة الذهبية", analogy: "القاعدة السحرية التي ستحفظها للأبد", icon: "star" }
+          { concept: "الفكرة الأساسية والمدخل الملموس", analogy: "تشبيه بسيط من واقعنا يوضح الفكرة", icon: "lightbulb", layout: "doodle_story", arrow: "يشبه في الواقع" },
+          { concept: "القاعدة العلمية والخطوات المتبعة", analogy: "مثل تروس الساعة التي تعمل بتناغم تام", icon: "layers", layout: "causal_flow", arrow: "يؤدي إلى" },
+          { concept: "الأرقام والنسب والحسابات الدقيقة", analogy: "التحويل خطوة بخطوة بالأرقام المؤكدة", icon: "calculator", layout: "numeric_hero", arrow: "ينتج عنه" },
+          { concept: "التفرعات والمكونات المحيطة", analogy: "توزيع محوري متناسق لجميع الجوانب", icon: "compass", layout: "spatial_hub", arrow: "يتفرع إلى" },
+          { concept: "الفخ الشائع الذي يخدع الكثيرين", analogy: "تجنب الخطأ المعتاد في الامتحان", icon: "alert-circle", layout: "golden_alert", arrow: "احذر من" },
+          { concept: "الخلاصة الذهبية والتطبيق العملي", analogy: "القاعدة السحرية الثابتة في الذاكرة", icon: "star", layout: "doodle_story", arrow: "يثمر عن" }
         ];
-        const totalScenes = Math.min(6, Math.max(4, rawLines.length));
+        const totalScenes = Math.min(16, Math.max(8, rawLines.length));
         for (let sIdx = 0; sIdx < totalScenes; sIdx++) {
           const m = metaphors[sIdx % metaphors.length];
           const lineText = rawLines[sIdx % rawLines.length] || `مفهوم ${chapter.title}`;
           generatedScenes.push({
             id: `scene${sIdx + 1}`,
-            heading: sIdx === 0 ? `المدخل القصصي: ${chapter.title}` : `المحور ${sIdx + 1}: ${m.concept}`,
-            layoutType: sIdx === 0 || sIdx === 2 ? 'doodle_story' : (sIdx === 3 ? 'golden_alert' : 'concept_analogy'),
+            heading: sIdx === 0 ? chapter.title : `فكرة ${sIdx + 1}: ${lineText.substring(0, 32)}...`,
+            layoutType: m.layout,
+            heroNumber: m.layout === 'numeric_hero' ? `${(sIdx + 1) * 2}` : '',
+            heroUnit: m.layout === 'numeric_hero' ? 'قاعدة أساسية' : '',
+            arrowLabel: m.arrow,
             icon: m.icon,
-            narration: `تخيل معي في هذا المحور من درس ${chapter.title}، كيف يمكننا تبسيط الأمر: ${lineText}. إن الأمر يشبه تماماً ${m.analogy}، حيث تتضح الرؤية ويسهل التطبيق في الاختبار.`,
+            narration: `[#m1] تخيل معي في هذا المحور من درس ${chapter.title} كيف يمكننا تبسيط الأمر: [#m2] ${lineText}. [#m3] إن الأمر يشبه تماماً ${m.analogy}، [#m4] وبذلك تتضح الرؤية ويسهل التطبيق والتفوق في الاختبار.`,
             boxes: [
-              { label: `${m.concept}: ${lineText.substring(0, 35)}`, icon: "check", color: "teal" },
-              { label: m.analogy, icon: m.icon, color: "yellow" }
+              { label: `${m.concept}: ${lineText.substring(0, 32)}`, icon: "check", color: "teal" },
+              { label: m.analogy, icon: m.icon, color: "orange" }
             ]
           });
         }
@@ -2437,45 +2459,50 @@ ${chapterRawText.substring(0, 15000)}
     for (const sc of scriptData.scenes) {
       scriptMd += `## ${sc.id}\n`;
       const cleanNarrationText = sanitizeNarrationForScript(sc.narration || "");
-      const words = cleanNarrationText.split(/\s+/).filter(Boolean);
-      const boxesCount = Array.isArray(sc.boxes) ? sc.boxes.length : 0;
-
-      // Calculate evenly spaced marks across the full narration words
-      const markPositions = new Map<number, string>();
-      if (sc.layoutType === 'question_solution') {
-        const p1 = Math.max(1, Math.floor(words.length * 0.15));
-        const p2 = Math.max(p1 + 2, Math.floor(words.length * 0.40));
-        const p3 = Math.max(p2 + 2, Math.floor(words.length * 0.65));
-        const p4 = Math.max(p3 + 2, Math.floor(words.length * 0.85));
-        markPositions.set(p1, "m1");
-        markPositions.set(p2, "m2");
-        markPositions.set(p3, "m3");
-        markPositions.set(p4, "m4");
-      } else if (boxesCount === 1) {
-        const p1 = Math.max(1, Math.floor(words.length * 0.15));
-        markPositions.set(p1, "m1");
-      } else if (boxesCount === 2) {
-        const p1 = Math.max(1, Math.floor(words.length * 0.15));
-        const p2 = Math.max(p1 + 2, Math.floor(words.length * 0.55));
-        markPositions.set(p1, "m1");
-        markPositions.set(p2, "m2");
-      } else if (boxesCount >= 3) {
-        const p1 = Math.max(1, Math.floor(words.length * 0.15));
-        const p2 = Math.max(p1 + 2, Math.floor(words.length * 0.50));
-        const p3 = Math.max(p2 + 2, Math.floor(words.length * 0.80));
-        markPositions.set(p1, "m1");
-        markPositions.set(p2, "m2");
-        markPositions.set(p3, "m3");
-      }
 
       let markedNarration = "";
-      for (let i = 0; i < words.length; i++) {
-        if (i === 0 && markPositions.has(0)) {
-          markedNarration += `[#${markPositions.get(0)}] `;
+      if (/\[#m\d+\]/.test(cleanNarrationText)) {
+        markedNarration = cleanNarrationText;
+      } else {
+        const words = cleanNarrationText.split(/\s+/).filter(Boolean);
+        const boxesCount = Array.isArray(sc.boxes) ? sc.boxes.length : 0;
+
+        // Calculate evenly spaced marks across the full narration words
+        const markPositions = new Map<number, string>();
+        if (sc.layoutType === 'question_solution') {
+          const p1 = Math.max(1, Math.floor(words.length * 0.15));
+          const p2 = Math.max(p1 + 2, Math.floor(words.length * 0.40));
+          const p3 = Math.max(p2 + 2, Math.floor(words.length * 0.65));
+          const p4 = Math.max(p3 + 2, Math.floor(words.length * 0.85));
+          markPositions.set(p1, "m1");
+          markPositions.set(p2, "m2");
+          markPositions.set(p3, "m3");
+          markPositions.set(p4, "m4");
+        } else if (boxesCount === 1) {
+          const p1 = Math.max(1, Math.floor(words.length * 0.15));
+          markPositions.set(p1, "m1");
+        } else if (boxesCount === 2) {
+          const p1 = Math.max(1, Math.floor(words.length * 0.15));
+          const p2 = Math.max(p1 + 2, Math.floor(words.length * 0.55));
+          markPositions.set(p1, "m1");
+          markPositions.set(p2, "m2");
+        } else if (boxesCount >= 3) {
+          const p1 = Math.max(1, Math.floor(words.length * 0.15));
+          const p2 = Math.max(p1 + 2, Math.floor(words.length * 0.50));
+          const p3 = Math.max(p2 + 2, Math.floor(words.length * 0.80));
+          markPositions.set(p1, "m1");
+          markPositions.set(p2, "m2");
+          markPositions.set(p3, "m3");
         }
-        markedNarration += words[i] + " ";
-        if (markPositions.has(i + 1)) {
-          markedNarration += `[#${markPositions.get(i + 1)}] `;
+
+        for (let i = 0; i < words.length; i++) {
+          if (i === 0 && markPositions.has(0)) {
+            markedNarration += `[#${markPositions.get(0)}] `;
+          }
+          markedNarration += words[i] + " ";
+          if (markPositions.has(i + 1)) {
+            markedNarration += `[#${markPositions.get(i + 1)}] `;
+          }
         }
       }
       scriptMd += markedNarration.trim() + "\n\n";
@@ -2521,8 +2548,11 @@ ${chapterRawText.substring(0, 15000)}
       scenesJs += `  ${sc.id}(s) {\n`;
 
       // Scene Title with display font
-      const headerTitle = esc(sc.heading || chapter.title);
-      scenesJs += `    s.text('${headerTitle}', { x: ${centerX}, y: ${isVertical ? 180 : 120}, size: ${isVertical ? 46 : 52}, font: 'display', color: 'yellow' });\n`;
+      let cleanHeading = (sc.heading || chapter.title).trim();
+      cleanHeading = cleanHeading.replace(/^(الخطاف القصصي|المقدمة|الخلاصة المبهجة|الخلاصة الذهبية|النبضة الأولى|النبضة الثانية|النبضة الثالثة|المحور \d+|المشهد \d+)\s*[:\-–]?\s*/i, '');
+      const headerTitle = esc(cleanHeading || chapter.title);
+      const titleColor = (activeTheme === 'paper' || isShakhbata) ? 'ink' : 'yellow';
+      scenesJs += `    s.text('${headerTitle}', { x: ${centerX}, y: ${isVertical ? 150 : 105}, size: ${isVertical ? 40 : 46}, font: 'display', color: '${titleColor}', maxWidth: ${isVertical ? 960 : 1600} });\n`;
 
       // Check if scene has valid TeX mathFormula
       const rawFormula = sanitizeTexFormula(sc.mathFormula || "");
@@ -2560,40 +2590,112 @@ ${chapterRawText.substring(0, 15000)}
       const layoutType = sc.layoutType || (sc.boxes?.length === 3 ? 'step_by_step' : (sc.boxes?.length === 2 ? 'split_comparison' : 'concept_hero'));
       const boxes = Array.isArray(sc.boxes) ? sc.boxes : [];
 
-      if (layoutType === 'doodle_story' || layoutType === 'concept_analogy') {
-        // --- DOODLE STORY & VISUAL METAPHOR LAYOUT (RSA Animate / Shakhbata style) ---
+      if (layoutType === 'numeric_hero') {
+        // --- 1. NUMERIC HERO LAYOUT (Large Animated Number/Stat + Insight Card) ---
+        scenesJs += emitFormulaCode(isVertical ? 320 : 200, isVertical ? 50 : 54, 0.1);
+        const heroNum = esc(sc.heroNumber || (boxes[0]?.label?.match(/\d+[\d.,%]*/)?.[0]) || '100%');
+        const heroUnit = esc(sc.heroUnit || '');
+        const numId = `num_${sc.id}`;
+        scenesJs += `    s.text('${heroNum}', { id: '${numId}', x: ${centerX}, y: ${isVertical ? 460 : 330}, size: ${isVertical ? 92 : 110}, font: 'display', color: 'orange', at: 0.2 });\n`;
+        if (heroUnit) {
+          scenesJs += `    s.text('${heroUnit}', { x: ${centerX}, y: ${isVertical ? 540 : 410}, size: ${isVertical ? 32 : 36}, font: 'body', color: 'muted', at: 0.2 });\n`;
+        }
+        if (boxes.length > 0) {
+          const cardId = `num_card_${sc.id}`;
+          const cardY = isVertical ? 860 : (hasValidMath ? 660 : 590);
+          scenesJs += `    s.box('${esc(boxes[0].label)}', { id: '${cardId}', x: ${centerX}, y: ${cardY}, w: ${isVertical ? 900 : 1080}, size: 32, icon: '${esc(boxes[0].icon || "lightbulb")}', color: 'teal', at: '#m2' });\n`;
+          scenesJs += `    s.annotate('${cardId}', { type: 'circle', color: 'orange', padding: 20, at: '#m3' });\n`;
+          scenesJs += `    s.focus('${cardId}', { at: '#m4' });\n`;
+        }
+
+      } else if (layoutType === 'spatial_hub') {
+        // --- 2. SPATIAL HUB LAYOUT (Central Core with Connected Spokes) ---
+        const centerId = `hub_center_${sc.id}`;
+        const centerLabel = esc(sc.centerLabel || boxes[0]?.label || chapter.title);
+        scenesJs += `    s.box('${centerLabel}', { id: '${centerId}', x: ${centerX}, y: ${isVertical ? 620 : 470}, w: ${isVertical ? 560 : 480}, size: 30, icon: '${esc(sc.icon || "compass")}', color: 'ink', at: 0.2 });\n`;
+        scenesJs += `    s.focus('${centerId}', { at: 0.2 });\n`;
+
+        const spokes = boxes.slice(1, 4).length > 0 ? boxes.slice(1, 4) : boxes.slice(0, 3);
+        const arrowText = esc(sc.arrowLabel || 'يرتبط بـ');
+        spokes.forEach((sp: any, idx: number) => {
+          const spokeId = `spoke_${sc.id}_${idx}`;
+          const isLeft = idx % 2 === 0;
+          const posX = isVertical ? (isLeft ? (centerX - 240) : (centerX + 240)) : (isLeft ? (centerX - 460) : (centerX + 460));
+          const posY = isVertical ? (idx === 2 ? 1120 : 920) : (idx === 2 ? 680 : 470);
+          const spColor = esc(sp.color || (idx === 0 ? "teal" : (idx === 1 ? "orange" : "purple")));
+          scenesJs += `    s.box('${esc(sp.label)}', { id: '${spokeId}', x: ${posX}, y: ${posY}, w: ${isVertical ? 440 : 400}, size: 26, icon: '${esc(sp.icon || "check")}', color: '${spColor}', at: '#m2' });\n`;
+          scenesJs += `    s.arrow('${centerId}', '${spokeId}', { color: 'orange', label: '${arrowText}', at: '#m3' });\n`;
+        });
+        scenesJs += `    s.annotate('${centerId}', { type: 'circle', color: 'orange', padding: 22, at: '#m4' });\n`;
+
+      } else if (layoutType === 'causal_flow') {
+        // --- 3. CAUSAL FLOW LAYOUT (Steps with Dynamic Action Arrows) ---
+        scenesJs += emitFormulaCode(isVertical ? 340 : 210, isVertical ? 54 : 56, 0.1);
+        const arrowText = esc(sc.arrowLabel || 'يؤدي إلى');
+        const flowBoxes = boxes.slice(0, 3);
+        if (isVertical) {
+          flowBoxes.forEach((b: any, bIdx: number) => {
+            const boxId = `flow_${sc.id}_${bIdx}`;
+            const boxY = 540 + bIdx * 320;
+            scenesJs += `    s.box('${esc(b.label)}', { id: '${boxId}', x: ${centerX}, y: ${boxY}, w: 900, size: 30, icon: '${esc(b.icon || "check")}', color: '${esc(b.color || (bIdx === 0 ? "teal" : "orange"))}', at: '#m${bIdx + 1}' });\n`;
+            scenesJs += `    s.focus('${boxId}', { at: '#m${bIdx + 1}' });\n`;
+            if (bIdx > 0) {
+              const prevId = `flow_${sc.id}_${bIdx - 1}`;
+              scenesJs += `    s.arrow('${prevId}', '${boxId}', { color: 'orange', label: '${arrowText}', at: '#m${bIdx + 1}' });\n`;
+            }
+          });
+        } else {
+          const total = flowBoxes.length || 1;
+          const totalSpan = Math.min(1500, total * 480);
+          const colW = Math.min(440, Math.floor(totalSpan / total) - 30);
+          const startX = centerX - (totalSpan / 2) + (colW / 2);
+          const stepX = total > 1 ? (totalSpan - colW) / (total - 1) : 0;
+          flowBoxes.forEach((b: any, bIdx: number) => {
+            const boxId = `flow_${sc.id}_${bIdx}`;
+            const curX = Math.round(startX + bIdx * stepX);
+            scenesJs += `    s.box('${esc(b.label)}', { id: '${boxId}', x: ${curX}, y: 530, w: ${colW}, size: 28, icon: '${esc(b.icon || "check")}', color: '${esc(b.color || (bIdx === 0 ? "teal" : "orange"))}', at: '#m${bIdx + 1}' });\n`;
+            scenesJs += `    s.focus('${boxId}', { at: '#m${bIdx + 1}' });\n`;
+            if (bIdx > 0) {
+              const prevId = `flow_${sc.id}_${bIdx - 1}`;
+              scenesJs += `    s.arrow('${prevId}', '${boxId}', { color: 'orange', label: '${arrowText}', at: '#m${bIdx + 1}' });\n`;
+            }
+          });
+        }
+
+      } else if (layoutType === 'doodle_story' || layoutType === 'concept_analogy') {
+        // --- 4. RESPONSIVE DOODLE STORY LAYOUT (Never Clipped, Dynamic Arrow, Instant 0.2s start) ---
         scenesJs += emitFormulaCode(isVertical ? 340 : 210, isVertical ? 54 : 58, 0.1);
 
         const b0 = boxes[0] || { label: 'المفهوم العلمي', icon: 'cpu', color: 'teal' };
-        const b1 = boxes[1] || { label: 'التشبيه الواقعي الملموس', icon: 'lightbulb', color: 'yellow' };
+        const b1 = boxes[1] || { label: 'التشبيه الواقعي الملموس', icon: 'lightbulb', color: 'orange' };
         const id0 = `doodle_${sc.id}_0`;
         const id1 = `doodle_${sc.id}_1`;
+        const arrowText = esc(sc.arrowLabel || 'يشبه في الواقع');
 
         if (isVertical) {
-          // Vertical Layout (9:16)
-          scenesJs += `    s.box('${esc(b0.label)}', { id: '${id0}', x: ${centerX}, y: 640, w: 920, size: 34, iconSize: 42, icon: '${esc(b0.icon || "check")}', color: '${esc(b0.color || "teal")}', at: '#m1' });\n`;
-          scenesJs += `    s.focus('${id0}', { at: '#m1' });\n`;
-          scenesJs += `    s.box('${esc(b1.label)}', { id: '${id1}', x: ${centerX}, y: 1140, w: 920, size: 34, iconSize: 42, icon: '${esc(b1.icon || "lightbulb")}', color: '${esc(b1.color || "yellow")}', at: '#m2' });\n`;
+          scenesJs += `    s.box('${esc(b0.label)}', { id: '${id0}', x: ${centerX}, y: 600, w: 900, size: 32, iconSize: 38, icon: '${esc(b0.icon || "check")}', color: '${esc(b0.color || "teal")}', at: 0.2 });\n`;
+          scenesJs += `    s.focus('${id0}', { at: 0.2 });\n`;
+          scenesJs += `    s.box('${esc(b1.label)}', { id: '${id1}', x: ${centerX}, y: 1100, w: 900, size: 32, iconSize: 38, icon: '${esc(b1.icon || "lightbulb")}', color: '${esc(b1.color || "orange")}', at: '#m2' });\n`;
           scenesJs += `    s.focus('${id1}', { at: '#m2' });\n`;
-          scenesJs += `    s.arrow('${id0}', '${id1}', { color: 'orange', label: 'يشبه في الواقع', at: '#m2' });\n`;
-          scenesJs += `    s.annotate('${id1}', { type: 'circle', color: 'teal', padding: 20, at: '#m2' });\n`;
+          scenesJs += `    s.arrow('${id0}', '${id1}', { color: 'orange', label: '${arrowText}', at: '#m3' });\n`;
+          scenesJs += `    s.annotate('${id1}', { type: 'circle', color: 'teal', padding: 20, at: '#m4' });\n`;
         } else {
-          // Landscape Layout (16:9): Split screen with metaphorical connection
-          const compY = hasValidMath ? 580 : 540;
-          scenesJs += `    s.box('${esc(b0.label)}', { id: '${id0}', x: ${centerX - 440}, y: ${compY}, w: 720, size: 34, iconSize: 40, icon: '${esc(b0.icon || "cpu")}', color: '${esc(b0.color || "teal")}', at: '#m1' });\n`;
-          scenesJs += `    s.focus('${id0}', { at: '#m1' });\n`;
-          scenesJs += `    s.box('${esc(b1.label)}', { id: '${id1}', x: ${centerX + 440}, y: ${compY}, w: 720, size: 34, iconSize: 40, icon: '${esc(b1.icon || "lightbulb")}', color: '${esc(b1.color || "yellow")}', at: '#m2' });\n`;
+          // Landscape 16:9: Safe width 650px (leaves 210px margin on each side, eliminating card edge clipping!)
+          const compY = hasValidMath ? 580 : 530;
+          scenesJs += `    s.box('${esc(b0.label)}', { id: '${id0}', x: ${centerX - 420}, y: ${compY}, w: 650, size: 32, iconSize: 38, icon: '${esc(b0.icon || "cpu")}', color: '${esc(b0.color || "teal")}', at: 0.2 });\n`;
+          scenesJs += `    s.focus('${id0}', { at: 0.2 });\n`;
+          scenesJs += `    s.box('${esc(b1.label)}', { id: '${id1}', x: ${centerX + 420}, y: ${compY}, w: 650, size: 32, iconSize: 38, icon: '${esc(b1.icon || "lightbulb")}', color: '${esc(b1.color || "orange")}', at: '#m2' });\n`;
           scenesJs += `    s.focus('${id1}', { at: '#m2' });\n`;
-          scenesJs += `    s.arrow('${id0}', '${id1}', { color: 'orange', label: 'يشبه في الواقع', at: '#m2' });\n`;
-          scenesJs += `    s.annotate('${id1}', { type: 'circle', color: 'teal', padding: 22, at: '#m2' });\n`;
+          scenesJs += `    s.arrow('${id0}', '${id1}', { color: 'orange', label: '${arrowText}', at: '#m3' });\n`;
+          scenesJs += `    s.annotate('${id1}', { type: 'circle', color: 'teal', padding: 22, at: '#m4' });\n`;
         }
 
         if (boxes.length >= 3) {
           const b2 = boxes[2];
           const id2 = `doodle_${sc.id}_2`;
-          const noteY = isVertical ? 1540 : 860;
-          scenesJs += `    s.box('${esc(b2.label)}', { id: '${id2}', x: ${centerX}, y: ${noteY}, w: ${isVertical ? 920 : 1060}, size: 30, icon: '${esc(b2.icon || "star")}', color: 'purple', at: '#m3' });\n`;
-          scenesJs += `    s.focus('${id2}', { at: '#m3' });\n`;
+          const noteY = isVertical ? 1520 : 850;
+          scenesJs += `    s.box('${esc(b2.label)}', { id: '${id2}', x: ${centerX}, y: ${noteY}, w: ${isVertical ? 900 : 1040}, size: 28, icon: '${esc(b2.icon || "star")}', color: 'purple', at: '#m4' });\n`;
+          scenesJs += `    s.focus('${id2}', { at: '#m4' });\n`;
         }
 
       } else if (layoutType === 'process_flow' || (layoutType === 'step_by_step' && !isVertical && boxes.length >= 2)) {

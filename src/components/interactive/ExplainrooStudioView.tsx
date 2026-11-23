@@ -132,7 +132,7 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
     setIsStartingBatch(true);
     try {
       const computedTopic = videoTopicOption === 'shakhbata'
-        ? 'أسلوب شخبطة والسبورة البيضاء: قصة تفاعلية واستعارات بصرية شيقة تبسط المفاهيم'
+        ? 'أسلوب شخبطة والسبورة البيضاء: قصة تفاعلية وصور دلالية ومخططات وشرح عميق من 15 إلى 20 مشهداً يوضح كافة المفاهيم'
         : videoTopicOption === 'masterclass'
         ? 'حصة تدريسية شاملة وكاملة من 6 إلى 10 مشاهد تغطي كافة المفاهيم والقوانين والتمارين بالتفصيل الأكاديمي'
         : videoTopicOption === 'exercises' 
@@ -218,7 +218,7 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
     const clientRunId = `run_${Date.now()}`;
 
     const computedTopic = videoTopicOption === 'shakhbata'
-      ? 'أسلوب شخبطة والسبورة البيضاء: قصة تفاعلية واستعارات بصرية شيقة تبسط المفاهيم'
+      ? 'أسلوب شخبطة والسبورة البيضاء: قصة تفاعلية وصور دلالية ومخططات وشرح عميق من 15 إلى 20 مشهداً يوضح كافة المفاهيم'
       : videoTopicOption === 'masterclass'
       ? 'حصة تدريسية شاملة وكاملة من 6 إلى 10 مشاهد تغطي كافة المفاهيم والقوانين والتمارين بالتفصيل الأكاديمي'
       : videoTopicOption === 'exercises' 
@@ -539,7 +539,7 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
                 <span>العمق التدريسي وعدد المشاهد:</span>
               </label>
               <span className="text-[10px] text-purple-700 font-bold bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
-                {videoTopicOption === 'shakhbata' ? '🎨 5 - 7 مشاهد (قصص واستعارات بصرية)' : videoTopicOption === 'masterclass' ? '🔥 6 - 10 مشاهد (3 - 4 دقائق)' : videoTopicOption === 'exercises' ? '🎯 4 - 6 أسئلة (استبعاد ذكي)' : videoTopicOption === 'concepts' ? '📺 6 - 8 مشاهد' : '⚡ 3 - 5 مشاهد'}
+                {videoTopicOption === 'shakhbata' ? '🎨 15 - 20 مشهداً (قصص وشرح دلالي عميق)' : videoTopicOption === 'masterclass' ? '🔥 6 - 10 مشاهد (3 - 4 دقائق)' : videoTopicOption === 'exercises' ? '🎯 4 - 6 أسئلة (استبعاد ذكي)' : videoTopicOption === 'concepts' ? '📺 6 - 8 مشاهد' : '⚡ 3 - 5 مشاهد'}
               </span>
             </div>
 
@@ -559,7 +559,7 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
                     <span className="text-xs font-black">أسلوب شخبطة والسبورة (Whiteboard Storytelling)</span>
                     <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${aspectRatio === '16:9' && videoTopicOption === 'shakhbata' ? 'bg-white/20 text-white' : 'bg-amber-200 text-amber-900'}`}>جديد ومميز ✨</span>
                   </div>
-                  <div className="text-[10px] opacity-90 font-normal">قصة تفاعلية، استعارات بصرية وواقعية، خامة ورق، رسم متحرك، وموسيقى جيتار دافئة</div>
+                  <div className="text-[10px] opacity-90 font-normal">سرد قصصي، صور دلالية ومخططات، خامة ورق، رسم متحرك، وموسيقى جيتار دافئة (15-20 مشهداً)</div>
                 </div>
               </button>
 
