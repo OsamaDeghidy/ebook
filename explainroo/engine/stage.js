@@ -973,6 +973,10 @@ export class Stage {
     const th = this.theme;
     const A = this._point(from);
     const B = this._point(to);
+    if (o && typeof o === 'object') {
+      if (!o._fromBox) o._fromBox = A;
+      if (!o._toBox) o._toBox = B;
+    }
     const gap = o.gap ?? 14;
     const a = typeof from === 'string' ? this._edge(A, B, gap) : A;
     const b = typeof to === 'string' ? this._edge(B, A, gap) : B;
@@ -1011,7 +1015,8 @@ export class Stage {
     const seed = this._seed('arrow', o);
     this.pen.draw(ctx, { kind: 'path', d }, { stroke: color, width, dashed: o.dashed, seed, single: true, glow: o.glow ?? 0 }, { stroke: prog, fill: 1 });
     const head = o.head ?? 'end';
-    const hs = o.headSize ?? width * 3.2 + 12;
+    const arrowDist = Math.hypot(b.x - a.x, b.y - a.y);
+    const hs = o.headSize ?? Math.min(width * 3.2 + 12, Math.max(8, arrowDist * 0.45));
     const L = pathLength(d);
     const drawHead = (dist, dir) => {
       const tip = pointAt(d, dist);
@@ -1070,13 +1075,24 @@ export class Stage {
         ny = -ny;
       }
     }
-    const off = o.labelOffset ?? 34;
+    let off = o.labelOffset ?? 34;
     const size = o.labelSize ?? 34;
     const font = fontString(this.theme, o.labelFont ?? 'hand', size);
     this.ctx.save();
     this.ctx.font = font;
     const w = this.ctx.measureText(String(o.label)).width;
     this.ctx.restore();
+
+    // Intelligent boundary clearance: If horizontal clearance gap between nodes is narrower than label width + padding,
+    // automatically lift the label vertical offset above the node box half-height
+    const fromBox = o && typeof o._fromBox === 'object' ? o._fromBox : null;
+    const toBox = o && typeof o._toBox === 'object' ? o._toBox : null;
+    const boxH = Math.max(o?.boxH || 0, fromBox?.h || 0, toBox?.h || 0, a?.h || 0, b?.h || 0);
+    const gapX = Math.abs(b.x - a.x);
+    if (!bend && boxH > 0 && gapX < w + 20) {
+      off = Math.max(off, boxH / 2 + size * 0.65);
+    }
+
     // Further out when the label runs along the arrow's direction.
     const extra = Math.abs(nx) * w * 0.5;
     return { x: mid.x + nx * (off + extra), y: mid.y + ny * off, w, size, font };

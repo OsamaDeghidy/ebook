@@ -299,25 +299,28 @@ function cleanScientificTextForSpeech(input: string): string {
   cleaned = cleaned.replace(/\\cup|\bcup\b|∪/g, " اتِّحَاد ");
   cleaned = cleaned.replace(/\\cap|\bcap\b|∩/g, " تَقَاطُع ");
   cleaned = cleaned.replace(/\\notin|∉/g, " لَا يَنْتَمِي إِلَى ");
-  cleaned = cleaned.replace(/\\in|∈/g, " يَنْتَمِي إِلَى ");
+  cleaned = cleaned.replace(/\\in(?![a-zA-Z])|∈/g, " يَنْتَمِي إِلَى ");
   cleaned = cleaned.replace(/\\not\\subset|⊄/g, " لَيْسَتْ مَجْمُوعَةً جُزْئِيَّةً مِنْ ");
   cleaned = cleaned.replace(/\\subset|⊂/g, " مَجْمُوعَةٌ جُزْئِيَّةٌ مِنْ ");
   cleaned = cleaned.replace(/\\lor|∨/g, " أَوْ ");
   cleaned = cleaned.replace(/\\land|∧/g, " وَ ");
+  cleaned = cleaned.replace(/\\(?:neg|lnot)\s*([A-Za-z0-9\u0600-\u06FF]+)|¬\s*([A-Za-z0-9\u0600-\u06FF]+)/g, " نَفْي $1$2 ");
   cleaned = cleaned.replace(/\\mathbb\{R\}|ℝ|(?<=مجموعة\s+|المجموعة\s+|[∈∉⊂⊄]\s*)ح(?![^\s،.!\$\)])/g, " مَجْمُوعَةُ الأَعْدَادِ الحَقِيقِيَّة ");
   cleaned = cleaned.replace(/\\mathbb\{Q\}'|ℚ'|(?<=مجموعة\s+|المجموعة\s+|[∈∉⊂⊄]\s*)ن['’َ](?![^\s،.!\$\)])/g, " مَجْمُوعَةُ الأَعْدَادِ غَيْرِ النِّسْبِيَّة ");
   cleaned = cleaned.replace(/\\mathbb\{Q\}|ℚ|(?<=مجموعة\s+|المجموعة\s+|[∈∉⊂⊄]\s*)ن(?![^\s،.!\$\)])/g, " مَجْمُوعَةُ الأَعْدَادِ النِّسْبِيَّة ");
   cleaned = cleaned.replace(/\\mathbb\{Z\}|ℤ|(?<=مجموعة\s+|المجموعة\s+|[∈∉⊂⊄]\s*)ص(?![^\s،.!\$\)])/g, " مَجْمُوعَةُ الأَعْدَادِ الصَّحِيحَة ");
   cleaned = cleaned.replace(/\\mathbb\{N\}|ℕ|(?<=مجموعة\s+|المجموعة\s+|[∈∉⊂⊄]\s*)ط(?![^\s،.!\$\)])/g, " مَجْمُوعَةُ الأَعْدَادِ الطَّبِيعِيَّة ");
   cleaned = cleaned.replace(/\\mid/g, " حَيْثُ ");
-  cleaned = cleaned.replace(/-\\infty|-∞/g, " سَالِب مَا لَا نِهَايَة ");
-  cleaned = cleaned.replace(/\\infty|∞/g, " مَا لَا نِهَايَة ");
 
-  // F3. Intervals Notation [a, b] or ]a, b[ or [a, b[
-  cleaned = cleaned.replace(/\[\s*(-?\d+|-\\infty|-∞)\s*,\s*(-?\d+|\\infty|∞)\s*\]/g, " الفَتْرَةُ الْمُغْلَقَةُ مِنْ $1 إِلَى $2 ");
-  cleaned = cleaned.replace(/\]\s*(-?\d+|-\\infty|-∞)\s*,\s*(-?\d+|\\infty|∞)\s*\[/g, " الفَتْرَةُ الْمَفْتُوحَةُ مِنْ $1 إِلَى $2 ");
-  cleaned = cleaned.replace(/\[\s*(-?\d+|-\\infty|-∞)\s*,\s*(-?\d+|\\infty|∞)\s*\[/g, " الفَتْرَةُ نِصْفُ الْمُغْلَقَةِ مِنْ $1 إِلَى $2 ");
-  cleaned = cleaned.replace(/\]\s*(-?\d+|-\\infty|-∞)\s*,\s*(-?\d+|\\infty|∞)\s*\]/g, " الفَتْرَةُ نِصْفُ الْمَفْتُوحَةِ مِنْ $1 إِلَى $2 ");
+  // F3. Intervals Notation [a, b] or ]a, b[ or [a, b[ (Handled before standalone infinity)
+  cleaned = cleaned.replace(/\[\s*(-?\d+(?:\.\d+)?|[+-]?\s*(?:\\infty|∞))\s*[,،]\s*(-?\d+(?:\.\d+)?|[+-]?\s*(?:\\infty|∞))\s*\]/g, " الفَتْرَةُ الْمُغْلَقَةُ مِنْ $1 إِلَى $2 ");
+  cleaned = cleaned.replace(/\]\s*(-?\d+(?:\.\d+)?|[+-]?\s*(?:\\infty|∞))\s*[,،]\s*(-?\d+(?:\.\d+)?|[+-]?\s*(?:\\infty|∞))\s*\[/g, " الفَتْرَةُ الْمَفْتُوحَةُ مِنْ $1 إِلَى $2 ");
+  cleaned = cleaned.replace(/\[\s*(-?\d+(?:\.\d+)?|[+-]?\s*(?:\\infty|∞))\s*[,،]\s*(-?\d+(?:\.\d+)?|[+-]?\s*(?:\\infty|∞))\s*\[/g, " الفَتْرَةُ نِصْفُ الْمُغْلَقَةِ مِنْ $1 إِلَى $2 ");
+  cleaned = cleaned.replace(/\]\s*(-?\d+(?:\.\d+)?|[+-]?\s*(?:\\infty|∞))\s*[,،]\s*(-?\d+(?:\.\d+)?|[+-]?\s*(?:\\infty|∞))\s*\]/g, " الفَتْرَةُ نِصْفُ الْمَفْتُوحَةِ مِنْ $1 إِلَى $2 ");
+
+  cleaned = cleaned.replace(/\\?-\s*(?:\\infty|∞)|-∞/g, " سَالِب مَا لَا نِهَايَة ");
+  cleaned = cleaned.replace(/\\?\+\s*(?:\\infty|∞)|\+∞/g, " مُوجَب مَا لَا نِهَايَة ");
+  cleaned = cleaned.replace(/\\infty|∞/g, " مَا لَا نِهَايَة ");
 
   // F4. Digital Logic & Computer Architecture Terminology (الحاسب الآلي ونظم الأعداد)
   cleaned = cleaned.replace(/\bHalf\s*Adder\b/gi, " نِصْفُ الْجَامِع ");
@@ -919,6 +922,12 @@ async function syncBookToSupabase(book: any) {
 }
 
 function loadEbooks(): any[] {
+  if (pendingSaveEbooksData && Array.isArray(pendingSaveEbooksData)) {
+    return pendingSaveEbooksData;
+  }
+  if (ebooks && Array.isArray(ebooks) && ebooks.length > 0) {
+    return ebooks;
+  }
   try {
     if (fs.existsSync(EBOOKS_FILE)) {
       const data = fs.readFileSync(EBOOKS_FILE, "utf-8");
@@ -2612,19 +2621,21 @@ ${chapterRawText.substring(0, 15000)}
         // --- 2. SPATIAL HUB LAYOUT (Central Core with Connected Spokes) ---
         const centerId = `hub_center_${sc.id}`;
         const centerLabel = esc(sc.centerLabel || boxes[0]?.label || chapter.title);
-        scenesJs += `    s.box('${centerLabel}', { id: '${centerId}', x: ${centerX}, y: ${isVertical ? 620 : 470}, w: ${isVertical ? 560 : 480}, size: 30, icon: '${esc(sc.icon || "compass")}', color: 'ink', at: 0.2 });\n`;
+        const centerW = isVertical ? 540 : 420;
+        scenesJs += `    s.box('${centerLabel}', { id: '${centerId}', x: ${centerX}, y: ${isVertical ? 620 : 470}, w: ${centerW}, size: 30, icon: '${esc(sc.icon || "compass")}', color: 'ink', at: 0.2 });\n`;
         scenesJs += `    s.focus('${centerId}', { at: 0.2 });\n`;
 
-        const spokes = boxes.slice(1, 4).length > 0 ? boxes.slice(1, 4) : boxes.slice(0, 3);
+        const spokes = boxes.slice(1, 3).length > 0 ? boxes.slice(1, 3) : boxes.slice(0, 2);
         const arrowText = esc(sc.arrowLabel || 'يرتبط بـ');
         spokes.forEach((sp: any, idx: number) => {
           const spokeId = `spoke_${sc.id}_${idx}`;
           const isLeft = idx % 2 === 0;
-          const posX = isVertical ? (isLeft ? (centerX - 240) : (centerX + 240)) : (isLeft ? (centerX - 460) : (centerX + 460));
+          const posX = isVertical ? (isLeft ? (centerX - 240) : (centerX + 240)) : (isLeft ? (centerX - 540) : (centerX + 540));
           const posY = isVertical ? (idx === 2 ? 1120 : 920) : (idx === 2 ? 680 : 470);
           const spColor = esc(sp.color || (idx === 0 ? "teal" : (idx === 1 ? "orange" : "purple")));
-          scenesJs += `    s.box('${esc(sp.label)}', { id: '${spokeId}', x: ${posX}, y: ${posY}, w: ${isVertical ? 440 : 400}, size: 26, icon: '${esc(sp.icon || "check")}', color: '${spColor}', at: '#m2' });\n`;
-          scenesJs += `    s.arrow('${centerId}', '${spokeId}', { color: 'orange', label: '${arrowText}', at: '#m3' });\n`;
+          const spokeW = isVertical ? 420 : 340;
+          scenesJs += `    s.box('${esc(sp.label)}', { id: '${spokeId}', x: ${posX}, y: ${posY}, w: ${spokeW}, size: 26, icon: '${esc(sp.icon || "check")}', color: '${spColor}', at: '#m2' });\n`;
+          scenesJs += `    s.arrow('${centerId}', '${spokeId}', { color: 'orange', label: '${arrowText}', labelSize: 22, labelOffset: 38, at: '#m3' });\n`;
         });
         scenesJs += `    s.annotate('${centerId}', { type: 'circle', color: 'orange', padding: 22, at: '#m4' });\n`;
 
@@ -2636,18 +2647,18 @@ ${chapterRawText.substring(0, 15000)}
         if (isVertical) {
           flowBoxes.forEach((b: any, bIdx: number) => {
             const boxId = `flow_${sc.id}_${bIdx}`;
-            const boxY = 540 + bIdx * 320;
+            const boxY = 480 + bIdx * 390;
             scenesJs += `    s.box('${esc(b.label)}', { id: '${boxId}', x: ${centerX}, y: ${boxY}, w: 900, size: 30, icon: '${esc(b.icon || "check")}', color: '${esc(b.color || (bIdx === 0 ? "teal" : "orange"))}', at: '#m${bIdx + 1}' });\n`;
             scenesJs += `    s.focus('${boxId}', { at: '#m${bIdx + 1}' });\n`;
             if (bIdx > 0) {
               const prevId = `flow_${sc.id}_${bIdx - 1}`;
-              scenesJs += `    s.arrow('${prevId}', '${boxId}', { color: 'orange', label: '${arrowText}', at: '#m${bIdx + 1}' });\n`;
+              scenesJs += `    s.arrow('${prevId}', '${boxId}', { color: 'orange', label: '${arrowText}', labelSize: 24, labelOffset: 34, at: '#m${bIdx + 1}' });\n`;
             }
           });
         } else {
           const total = flowBoxes.length || 1;
-          const totalSpan = Math.min(1500, total * 480);
-          const colW = Math.min(440, Math.floor(totalSpan / total) - 30);
+          const colW = total === 3 ? 360 : (total === 2 ? 440 : 500);
+          const totalSpan = total === 3 ? 1600 : (total === 2 ? 1160 : 600);
           const startX = centerX - (totalSpan / 2) + (colW / 2);
           const stepX = total > 1 ? (totalSpan - colW) / (total - 1) : 0;
           flowBoxes.forEach((b: any, bIdx: number) => {
@@ -2657,7 +2668,7 @@ ${chapterRawText.substring(0, 15000)}
             scenesJs += `    s.focus('${boxId}', { at: '#m${bIdx + 1}' });\n`;
             if (bIdx > 0) {
               const prevId = `flow_${sc.id}_${bIdx - 1}`;
-              scenesJs += `    s.arrow('${prevId}', '${boxId}', { color: 'orange', label: '${arrowText}', at: '#m${bIdx + 1}' });\n`;
+              scenesJs += `    s.arrow('${prevId}', '${boxId}', { color: 'orange', label: '${arrowText}', labelSize: 24, labelOffset: 38, at: '#m${bIdx + 1}' });\n`;
             }
           });
         }
@@ -5030,8 +5041,11 @@ const gcpUploader = multer({
 
 app.post("/api/upload-to-gcp", gcpUploader.single("file"), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: "لم يتم استلام أي ملف للرفع." });
+    if (!req.file || req.file.size === 0) {
+      if (req.file?.path) {
+        try { fs.unlinkSync(req.file.path); } catch (e) { }
+      }
+      return res.status(400).json({ error: "لم يتم استلام أي ملف للرفع أو أن الملف فارغ (Empty or missing file)" });
     }
 
     const sizeMB = (req.file.size / (1024 * 1024)).toFixed(1);

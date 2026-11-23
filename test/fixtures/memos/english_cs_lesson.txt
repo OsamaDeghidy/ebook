@@ -1,0 +1,57 @@
+# Computer Architecture and Digital Logic Circuits
+
+## Module Overview: Fundamentals of Binary Computing
+Modern digital computers are built on two-state electronic switches that represent binary values: 0 (LOW voltage) and 1 (HIGH voltage). All computational algorithms, memory structures, and control logic are synthesized from fundamental logic gates.
+
+### Binary Place Values and Powers of Two
+Binary numbers are positional notations with base 2:
+- Bit 0: 2^0 = 1
+- Bit 1: 2^1 = 2
+- Bit 2: 2^2 = 4
+- Bit 3: 2^3 = 8
+- Bit 4: 2^4 = 16
+
+### Example: Binary to Decimal Conversion
+Converting binary (11010)_2 to decimal notation:
+(11010)_2 = (1 * 2^4) + (1 * 2^3) + (0 * 2^2) + (1 * 2^1) + (0 * 2^0)
+          = 16 + 8 + 0 + 2 + 0 = 26
+
+## Primary Logic Gates and Boolean Algebra
+
+### 1. AND Gate
+- Definition: Produces an active output HIGH (1) if and only if both inputs A and B are HIGH.
+- Boolean Expression: Y = A * B
+- Truth Table:
+  - Input A=0, B=0 -> Output Y=0
+  - Input A=0, B=1 -> Output Y=0
+  - Input A=1, B=0 -> Output Y=0
+  - Input A=1, B=1 -> Output Y=1
+
+### 2. OR Gate
+- Definition: Produces an active output HIGH (1) if at least one input is HIGH.
+- Boolean Expression: Y = A + B
+
+### 3. NOT Gate (Inverter)
+- Definition: Complements the input signal.
+- Boolean Expression: Y = !A (or A-bar)
+
+### 4. XOR Gate (Exclusive OR)
+- Definition: Generates HIGH when inputs differ; LOW when inputs are identical.
+- Boolean Expression: Y = A ^ B = (!A * B) + (A * !B)
+
+## Arithmetic Circuits: Adders
+
+### The Half Adder
+A Half Adder adds two single-bit values A and B, generating a Sum (S) bit and a Carry (C) bit:
+- Sum Bit: S = A XOR B
+- Carry Bit: C = A AND B
+
+### The Full Adder
+A Full Adder computes the sum of three binary bits: A, B, and Carry-in (Cin):
+- S = A XOR B XOR Cin
+- Cout = (A AND B) OR (Cin AND (A XOR B))
+
+## Review Exercises
+1. Determine the output of a 3-input NAND gate when all inputs are 1.
+2. Construct the truth table for the Boolean function F = (A + B) * (!A + C).
+3. Explain why the Full Adder requires two Half Adders and one OR gate.

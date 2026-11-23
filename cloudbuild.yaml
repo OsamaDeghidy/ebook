@@ -1,4 +1,12 @@
 steps:
+  # 0. Automated test verification gate before build & deploy (install dependencies in clean workspace)
+  - name: 'node:22-slim'
+    entrypoint: 'npm'
+    args: ['ci']
+  - name: 'node:22-slim'
+    entrypoint: 'npm'
+    args: ['test']
+
   # 1. Build the Docker image with a clean tag (without trailing dashes)
   - name: 'gcr.io/cloud-builders/docker'
     args:
@@ -15,7 +23,7 @@ steps:
       - 'push'
       - 'europe-west1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/ebookoseraserver:$COMMIT_SHA'
 
-  # 3. Deploy to Cloud Run automatically
+  # 3. Deploy to Cloud Run automatically with production resilience
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -28,6 +36,11 @@ steps:
       - 'europe-west1'
       - '--memory'
       - '2Gi'
+      - '--cpu'
+      - '2'
+      - '--no-cpu-throttling'
+      - '--timeout'
+      - '900'
       - '--port'
       - '8080'
       - '--allow-unauthenticated'

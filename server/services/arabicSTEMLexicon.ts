@@ -97,26 +97,31 @@ const MATHEMATICS_RULES: STEMLexiconRule[] = [
   { pattern: /\\cup|\bcup\b|∪/g, replacement: " اتِّحَاد " },
   { pattern: /\\cap|\bcap\b|∩/g, replacement: " تَقَاطُع " },
   { pattern: /\\notin|∉/g, replacement: " لَا يَنْتَمِي إِلَى " },
-  { pattern: /\\in|∈/g, replacement: " يَنْتَمِي إِلَى " },
+  { pattern: /\\in(?![a-zA-Z])|∈/g, replacement: " يَنْتَمِي إِلَى " },
   { pattern: /\\not\\subset|⊄/g, replacement: " لَيْسَتْ مَجْمُوعَةً جُزْئِيَّةً مِنْ " },
   { pattern: /\\subset|⊂/g, replacement: " مَجْمُوعَةٌ جُزْئِيَّةٌ مِنْ " },
   { pattern: /\\emptyset|∅/g, replacement: " الْمَجْمُوعَةُ الْخَالِيَةُ فَاي " },
   { pattern: /\\lor|∨/g, replacement: " أَوْ " },
   { pattern: /\\land|∧/g, replacement: " وَ " },
+  { pattern: /\\neg\s*([A-Za-z0-9\u0600-\u06FF]+)/g, replacement: " نَفْي $1 " },
+  { pattern: /\\lnot\s*([A-Za-z0-9\u0600-\u06FF]+)|¬\s*([A-Za-z0-9\u0600-\u06FF]+)/g, replacement: " نَفْي $1$2 " },
   { pattern: /\\mathbb\{R\}|ℝ|(?<=مجموعة\s+|المجموعة\s+|[∈∉⊂⊄]\s*)ح(?![^\s،.!\$\)])/g, replacement: " مَجْمُوعَةُ الأَعْدَادِ الْحَقِيقِيَّةِ ح " },
   { pattern: /\\mathbb\{Q\}'|ℚ'|(?<=مجموعة\s+|المجموعة\s+|[∈∉⊂⊄]\s*)ن['’َ](?![^\s،.!\$\)])/g, replacement: " مَجْمُوعَةُ الأَعْدَادِ غَيْرِ النِّسْبِيَّةِ ن شَرْطَة " },
   { pattern: /\\mathbb\{Q\}|ℚ|(?<=مجموعة\s+|المجموعة\s+|[∈∉⊂⊄]\s*)ن(?![^\s،.!\$\)])/g, replacement: " مَجْمُوعَةُ الأَعْدَادِ النِّسْبِيَّةِ ن " },
   { pattern: /\\mathbb\{Z\}|ℤ|(?<=مجموعة\s+|المجموعة\s+|[∈∉⊂⊄]\s*)ص(?![^\s،.!\$\)])/g, replacement: " مَجْمُوعَةُ الأَعْدَادِ الصَّحِيحَةِ ص " },
   { pattern: /\\mathbb\{N\}|ℕ|(?<=مجموعة\s+|المجموعة\s+|[∈∉⊂⊄]\s*)ط(?![^\s،.!\$\)])/g, replacement: " مَجْمُوعَةُ الأَعْدَادِ الطَّبِيعِيَّةِ ط " },
   { pattern: /\\mid/g, replacement: " حَيْثُ " },
-  { pattern: /-\\infty|-∞/g, replacement: " سَالِب مَا لَا نِهَايَة " },
-  { pattern: /\\infty|∞/g, replacement: " مُوجَب مَا لَا نِهَايَة " },
 
-  // Intervals [a, b], ]a, b[, [a, b[, ]a, b]
-  { pattern: /\[\s*(-?\d+|-\\infty|-∞)\s*,\s*(-?\d+|\\infty|∞)\s*\]/g, replacement: " الْفَتْرَةُ الْمُغْلَقَةُ مِنْ $1 إِلَى $2 " },
-  { pattern: /\]\s*(-?\d+|-\\infty|-∞)\s*,\s*(-?\d+|\\infty|∞)\s*\[/g, replacement: " الْفَتْرَةُ الْمَفْتُوحَةُ مِنْ $1 إِلَى $2 " },
-  { pattern: /\[\s*(-?\d+|-\\infty|-∞)\s*,\s*(-?\d+|\\infty|∞)\s*\[/g, replacement: " الْفَتْرَةُ نِصْفُ الْمُغْلَقَةِ مِنْ $1 إِلَى $2 " },
-  { pattern: /\]\s*(-?\d+|-\\infty|-∞)\s*,\s*(-?\d+|\\infty|∞)\s*\]/g, replacement: " الْفَتْرَةُ نِصْفُ الْمَفْتُوحَةِ مِنْ $1 إِلَى $2 " },
+  // Intervals [a, b], ]a, b[, [a, b[, ]a, b] (Handled before standalone infinity so brackets & +/- infinity are preserved)
+  { pattern: /\[\s*(-?\d+(?:\.\d+)?|[+-]?\s*(?:\\infty|∞))\s*[,،]\s*(-?\d+(?:\.\d+)?|[+-]?\s*(?:\\infty|∞))\s*\]/g, replacement: " الْفَتْرَةُ الْمُغْلَقَةُ مِنْ $1 إِلَى $2 " },
+  { pattern: /\]\s*(-?\d+(?:\.\d+)?|[+-]?\s*(?:\\infty|∞))\s*[,،]\s*(-?\d+(?:\.\d+)?|[+-]?\s*(?:\\infty|∞))\s*\[/g, replacement: " الْفَتْرَةُ الْمَفْتُوحَةُ مِنْ $1 إِلَى $2 " },
+  { pattern: /\[\s*(-?\d+(?:\.\d+)?|[+-]?\s*(?:\\infty|∞))\s*[,،]\s*(-?\d+(?:\.\d+)?|[+-]?\s*(?:\\infty|∞))\s*\[/g, replacement: " الْفَتْرَةُ نِصْفُ الْمُغْلَقَةِ مِنْ $1 إِلَى $2 " },
+  { pattern: /\]\s*(-?\d+(?:\.\d+)?|[+-]?\s*(?:\\infty|∞))\s*[,،]\s*(-?\d+(?:\.\d+)?|[+-]?\s*(?:\\infty|∞))\s*\]/g, replacement: " الْفَتْرَةُ نِصْفُ الْمَفْتُوحَةِ مِنْ $1 إِلَى $2 " },
+
+  // Standalone Infinity
+  { pattern: /\\?-\s*(?:\\infty|∞)|-∞/g, replacement: " سَالِب مَا لَا نِهَايَة " },
+  { pattern: /\\?\+\s*(?:\\infty|∞)|\+∞/g, replacement: " مُوجَب مَا لَا نِهَايَة " },
+  { pattern: /\\infty|∞/g, replacement: " مُوجَب مَا لَا نِهَايَة " },
 
   // Geometry & Trigonometry
   { pattern: /\\triangle|\b\u25B3\b/g, replacement: " الْمُثَلَّث " },
