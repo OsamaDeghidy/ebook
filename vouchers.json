@@ -302,5 +302,149 @@
     "cancelled_at": null,
     "cancellation_deadline": "2026-09-15T16:52:22.069Z",
     "created_at": "2026-09-14T16:52:22.069Z"
+  },
+  {
+    "code": "SMP-STEM-1795461287618",
+    "book_id": "book-physics-101",
+    "voucher_type": "book_access",
+    "is_used": true,
+    "used_by": "student@example.com",
+    "used_at": "2026-11-23T19:14:49.337Z",
+    "created_at": "2026-11-23T19:14:49.337Z"
+  },
+  {
+    "code": "SMP-STEM-1795461771008",
+    "book_id": "book-physics-101",
+    "voucher_type": "book_access",
+    "is_used": true,
+    "used_by": "student@example.com",
+    "used_at": "2026-11-23T19:22:53.843Z",
+    "created_at": "2026-11-23T19:22:53.843Z"
+  },
+  {
+    "code": "SMP-STEM-1795461832345",
+    "book_id": "book-physics-101",
+    "voucher_type": "book_access",
+    "is_used": true,
+    "used_by": "student@example.com",
+    "used_at": "2026-11-23T19:23:54.014Z",
+    "created_at": "2026-11-23T19:23:54.014Z"
+  },
+  {
+    "code": "SMP-STEM-1795462765968",
+    "book_id": "book-physics-101",
+    "voucher_type": "book_access",
+    "is_used": true,
+    "used_by": "student@example.com",
+    "used_at": "2026-11-23T19:39:27.604Z",
+    "created_at": "2026-11-23T19:39:27.604Z"
+  },
+  {
+    "code": "SMP-STEM-1795463381441",
+    "book_id": "book-physics-101",
+    "voucher_type": "book_access",
+    "is_used": true,
+    "used_by": "student@example.com",
+    "used_at": "2026-11-23T19:49:43.343Z",
+    "created_at": "2026-11-23T19:49:43.343Z"
+  },
+  {
+    "code": "SMP-STEM-1795464058869",
+    "book_id": "book-physics-101",
+    "voucher_type": "book_access",
+    "is_used": true,
+    "used_by": "student@example.com",
+    "used_at": "2026-11-23T20:01:00.673Z",
+    "created_at": "2026-11-23T20:01:00.673Z"
+  },
+  {
+    "code": "SMP-STEM-1795464063281",
+    "book_id": "book-physics-101",
+    "voucher_type": "book_access",
+    "is_used": true,
+    "used_by": "student@example.com",
+    "used_at": "2026-11-23T20:01:04.519Z",
+    "created_at": "2026-11-23T20:01:04.519Z"
+  },
+  {
+    "code": "SMP-STEM-1795466984437",
+    "book_id": "book-physics-101",
+    "voucher_type": "book_access",
+    "is_used": true,
+    "used_by": "student@example.com",
+    "used_at": "2026-11-23T20:49:46.041Z",
+    "created_at": "2026-11-23T20:49:46.041Z"
+  },
+  {
+    "code": "SMP-STEM-1795467653754",
+    "book_id": "book-physics-101",
+    "voucher_type": "book_access",
+    "is_used": true,
+    "used_by": "student@example.com",
+    "used_at": "2026-11-23T21:00:55.393Z",
+    "created_at": "2026-11-23T21:00:55.393Z"
+  },
+  {
+    "code": "SMP-STEM-1795468416225",
+    "book_id": "book-physics-101",
+    "voucher_type": "book_access",
+    "is_used": true,
+    "used_by": "student@example.com",
+    "used_at": "2026-11-23T21:13:37.820Z",
+    "created_at": "2026-11-23T21:13:37.820Z"
+  },
+  {
+    "code": "SMP-STEM-1795468442629",
+    "book_id": "book-physics-101",
+    "voucher_type": "book_access",
+    "is_used": true,
+    "used_by": "student@example.com",
+    "used_at": "2026-11-23T21:14:03.973Z",
+    "created_at": "2026-11-23T21:14:03.973Z"
+  },
+  {
+    "code": "SMP-STEM-1795468784225",
+    "book_id": "book-physics-101",
+    "voucher_type": "book_access",
+    "is_used": true,
+    "used_by": "student@example.com",
+    "used_at": "2026-11-23T21:19:45.696Z",
+    "created_at": "2026-11-23T21:19:45.696Z"
+  },
+  {
+    "code": "SMP-STEM-1795469004992",
+    "book_id": "book-physics-101",
+    "voucher_type": "book_access",
+    "is_used": true,
+    "used_by": "student@example.com",
+    "used_at": "2026-11-23T21:23:28.944Z",
+    "created_at": "2026-11-23T21:23:28.944Z"
+  },
+  {
+    "code": "SMP-STEM-1795469089927",
+    "book_id": "book-physics-101",
+    "voucher_type": "book_access",
+    "is_used": true,
+    "used_by": "student@example.com",
+    "used_at": "2026-11-23T21:24:53.176Z",
+    "created_at": "2026-11-23T21:24:53.176Z"
+  },
+  {
+    "code": "SMP-STEM-1795470558523",
+    "book_id": "book-physics-101",
+    "voucher_type": "book_access",
+    "is_used": true,
+    "used_by": "student@example.com",
+    "used_at": "2026-11-23T21:49:20.809Z",
+    "created_at": "2026-11-23T21:49:20.809Z"
+  },
+  {
+    "code": "SMP-STEM-1795471097605",
+    "book_id": "book-physics-101",
+    "voucher_type": "book_access",
+    "is_used": true,
+    "used_by": "student@example.com",
+    "used_at": "2026-11-23T21:58:19.425Z",
+    "created_at": "2026-11-23T21:58:19.425Z"
   }
 ]
