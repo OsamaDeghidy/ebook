@@ -31,7 +31,7 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
   });
 
   // Video topic focus & pedagogical depth
-  const [videoTopicOption, setVideoTopicOption] = useState<'masterclass' | 'exercises' | 'concepts' | 'reels'>('masterclass');
+  const [videoTopicOption, setVideoTopicOption] = useState<'masterclass' | 'exercises' | 'concepts' | 'reels' | 'shakhbata'>('shakhbata');
 
   // Teacher Personalization State (Collapsible & Persistent)
   const [showBranding, setShowBranding] = useState<boolean>(false);
@@ -131,7 +131,9 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
   const handleStartBatchVideoGeneration = async (forceAll = false) => {
     setIsStartingBatch(true);
     try {
-      const computedTopic = videoTopicOption === 'masterclass'
+      const computedTopic = videoTopicOption === 'shakhbata'
+        ? 'أسلوب شخبطة والسبورة البيضاء: قصة تفاعلية واستعارات بصرية شيقة تبسط المفاهيم'
+        : videoTopicOption === 'masterclass'
         ? 'حصة تدريسية شاملة وكاملة من 6 إلى 10 مشاهد تغطي كافة المفاهيم والقوانين والتمارين بالتفصيل الأكاديمي'
         : videoTopicOption === 'exercises' 
           ? 'حل بنك الأسئلة والتمارين بنظام الاستبعاد الذكي وتطبيق القوانين بالتفصيل' 
@@ -139,7 +141,7 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
             ? 'ملخص سريع ومركز للدرس كبسولة سريعة' 
             : 'شرح مفاهيم الدرس الأساسية والمصطلحات العلمية';
 
-      const computedType = videoTopicOption === 'reels' ? 'reels' : videoTopicOption === 'exercises' ? 'solutions' : 'explainer';
+      const computedType = videoTopicOption === 'shakhbata' ? 'shakhbata' : videoTopicOption === 'reels' ? 'reels' : videoTopicOption === 'exercises' ? 'solutions' : 'explainer';
 
       const res = await fetch('/api/explainroo/batch-generate-book', {
         method: 'POST',
@@ -215,7 +217,9 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
 
     const clientRunId = `run_${Date.now()}`;
 
-    const computedTopic = videoTopicOption === 'masterclass'
+    const computedTopic = videoTopicOption === 'shakhbata'
+      ? 'أسلوب شخبطة والسبورة البيضاء: قصة تفاعلية واستعارات بصرية شيقة تبسط المفاهيم'
+      : videoTopicOption === 'masterclass'
       ? 'حصة تدريسية شاملة وكاملة من 6 إلى 10 مشاهد تغطي كافة المفاهيم والقوانين والتمارين بالتفصيل الأكاديمي'
       : videoTopicOption === 'exercises' 
         ? 'حل بنك الأسئلة والتمارين بنظام الاستبعاد الذكي وتطبيق القوانين بالتفصيل' 
@@ -223,7 +227,7 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
           ? 'ملخص سريع ومركز للدرس كبسولة سريعة' 
           : 'شرح مفاهيم الدرس الأساسية والمصطلحات العلمية';
 
-    const computedType = videoTopicOption === 'reels' ? 'reels' : videoTopicOption === 'exercises' ? 'solutions' : 'explainer';
+    const computedType = videoTopicOption === 'shakhbata' ? 'shakhbata' : videoTopicOption === 'reels' ? 'reels' : videoTopicOption === 'exercises' ? 'solutions' : 'explainer';
 
     // Poll isolated strictly to this clientRunId
     const pollInterval = setInterval(async () => {
@@ -535,11 +539,30 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
                 <span>العمق التدريسي وعدد المشاهد:</span>
               </label>
               <span className="text-[10px] text-purple-700 font-bold bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
-                {videoTopicOption === 'masterclass' ? '🔥 6 - 10 مشاهد (3 - 4 دقائق)' : videoTopicOption === 'exercises' ? '🎯 4 - 6 أسئلة (استبعاد ذكي)' : videoTopicOption === 'concepts' ? '📺 6 - 8 مشاهد' : '⚡ 3 - 5 مشاهد'}
+                {videoTopicOption === 'shakhbata' ? '🎨 5 - 7 مشاهد (قصص واستعارات بصرية)' : videoTopicOption === 'masterclass' ? '🔥 6 - 10 مشاهد (3 - 4 دقائق)' : videoTopicOption === 'exercises' ? '🎯 4 - 6 أسئلة (استبعاد ذكي)' : videoTopicOption === 'concepts' ? '📺 6 - 8 مشاهد' : '⚡ 3 - 5 مشاهد'}
               </span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => { setAspectRatio('16:9'); setVideoTopicOption('shakhbata'); setSelectedTheme('paper'); setMusicStyle('warm'); }}
+                className={`p-3 rounded-2xl border text-start transition cursor-pointer flex items-center gap-2.5 sm:col-span-2 ${
+                  aspectRatio === '16:9' && videoTopicOption === 'shakhbata'
+                    ? 'bg-amber-600 text-white border-amber-600 ring-2 ring-amber-400 font-black shadow-xs'
+                    : 'bg-amber-50/70 text-amber-950 border-amber-200 font-bold hover:bg-amber-100/80'
+                }`}
+              >
+                <span className="text-xl shrink-0">🎨</span>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black">أسلوب شخبطة والسبورة (Whiteboard Storytelling)</span>
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${aspectRatio === '16:9' && videoTopicOption === 'shakhbata' ? 'bg-white/20 text-white' : 'bg-amber-200 text-amber-900'}`}>جديد ومميز ✨</span>
+                  </div>
+                  <div className="text-[10px] opacity-90 font-normal">قصة تفاعلية، استعارات بصرية وواقعية، خامة ورق، رسم متحرك، وموسيقى جيتار دافئة</div>
+                </div>
+              </button>
+
               <button
                 type="button"
                 onClick={() => { setAspectRatio('16:9'); setVideoTopicOption('masterclass'); }}

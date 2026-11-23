@@ -2039,6 +2039,7 @@ async function generateLessonVideoCore(params: {
     const chapterRawText = (chapter.content || chapter.originalContent || "").trim();
     const isReels = videoType === "reels";
     const isSolutions = videoType === "solutions" || videoType === "exercise_drill";
+    const isShakhbata = videoType === "shakhbata" || videoType === "shakhbata_story";
 
     // Extract available question bank items for this chapter
     const chapterQuestions = (book?.question_bank || []).filter((q: any) =>
@@ -2103,6 +2104,63 @@ ${allowedBuiltinIcons}
       "narration": "نص الشرح الصوتي المفصل والمشكول الذي يقرأ السؤال ويفند الخيارات الخاطئة ويؤكد الإجابة الصحيحة.",
       "boxes": [
         { "label": "السر الذهبي للإجابة الصحيحة", "icon": "check", "color": "teal" }
+      ]
+    }
+  ]
+}
+`;
+    } else if (isShakhbata) {
+      prompt = `
+أنت المخرج البيداغوجي والسيناريست المتخصص الأول في أسلوب "شخبطة" ورسوم السبورة البيضاء والقصص التفاعلية (RSA Animate / Whiteboard Storytelling) لمنصة Osera AI.
+المهمة الصارمة: تحويل محتوى الدرس أدناه إلى سكريبت فيديو أنيميشن سبورة بيضاء يعتمد كلياً على أسلوب الحكواتي المشوق (Storytelling) والاستعارات البصرية اليومية (Visual Metaphors / Analogies).
+المقرر المعتمد: "${book?.title || 'مقرر دراسي'}"
+المادة والمرحلة: "${subjectName || book?.category || 'عام'}"
+الفصل / الدرس المطلوب: "${chapter.title}"
+${specificTopicPrompt}
+أبعاد الفيديو المطلوبة: ${aspectRatio} (${isVertical ? 'Vertical Reels 1080x1920' : 'Landscape 1920x1080'})
+العدد المطلوب: 5 إلى 7 مشاهد قصصية بصرية مترابطة (مدة 2.5 إلى 4 دقائق).
+
+المحتوى المصدري المعتمد للدرس:
+"""
+${chapterRawText.substring(0, 15000)}
+"""
+
+قواعد سكريبت "شخبطة" والقصة التفاعلية:
+1. البناء السردي الدرامي والاستعارة البصرية (Visual Metaphor):
+   - المشهد 1 (الخطاف القصصي Hook): يبدأ بسؤال حقيقي أو معضلة يومية تشد الانتباه (مثال: "تخيل لو دخلت متجر، والأسعار كلها مكتوبة بلغة غير مفهومة...").
+   - المشهد 2 (المقارنة الواقعية Analogy): ربط المفهوم الأكاديمي بشيء حسي ملموس من واقع الحياة اليومية (تشبيه الذاكرة بخزانة، أو النظام الثنائي بمفاتيح الإنارة On/Off).
+   - المشاهد 3 إلى 5 (التفكيك البصري والحل خطوة بخطوة): شرح القاعدة العلمية أو المعادلة من خلال التشبيه البصري، مع مقارنة مباشرة بين المفهوم العلمي والمثال الواقعي.
+   - المشهد الأخير (الخلاصة المبهجة): الحكمة الذهبية المستفادة وتطبيق عملي يثبت في الذاكرة.
+
+2. التعليق الصوتي (Narration) بأسلوب الحكواتي:
+   - لغة الإلقاء: فصحى مبسطة وقريبة جداً من فهم الطالب، دافئة وذكية وتطرح تساؤلات تفاعلية، ومشكولة بدقة.
+   - الطول: من 40 إلى 55 كلمة مشكولة لكل مشهد لتلائم رتم الرسم الهادئ وموسيقى الجيتار الحالمة.
+   - ممنوع الترحيبات أو ذكر أسماء أشخاص. ادخل فوراً في القصة والتشبيه.
+
+3. التخطيط البصري لكل مشهد (Scenes Layout):
+   - استخدم layoutType من الأنواع التالية:
+     * "doodle_story": بطاقتان متقابلتان: الأولى للمفهوم العلمي (Academic Concept)، والثانية للتشبيه الواقعي المستعار (Real-world Analogy) يربط بينهما سهم تفاعلي مع تركيز الكاميرا.
+     * "concept_analogy": فكرة محورية مع تشبيه واقعي ذكي وبطاقة تركيز توضيحية.
+     * "step_by_step": خطوات متسلسلة للحل تمشي مع تدفق القصة.
+     * "golden_alert": تنبيه ذكي لأكبر خطأ يقع فيه الطلاب مع إبراز الحل.
+   - في حقل "boxes": ضع 2 إلى 3 عناصر مركزة (كل عنصر عبارة عن تشبيه مقتضب وواضح من 4 إلى 7 كلمات).
+   - اختر أيقونات حصراً من قائمة الأيقونات المعتمدة المدمجة:
+     ${allowedBuiltinIcons}
+
+المطلوب: أجب حصراً بكائن JSON صالح مطابق تماماً للبنية الآتية بدون أي نصوص خارجها:
+{
+  "title": "رحلة استكشاف: ${chapter.title}",
+  "scenes": [
+    {
+      "id": "scene1",
+      "heading": "المدخل القصصي",
+      "layoutType": "doodle_story",
+      "mathFormula": "",
+      "icon": "lightbulb",
+      "narration": "نص التعليق الصوتي القصصي المشكول بأسلوب دافئ ومبسط يبدأ بالخطاف ويثير الفضول.",
+      "boxes": [
+        { "label": "المفهوم العلمي المحدد", "icon": "cpu", "color": "teal" },
+        { "label": "التشبيه الواقعي الملموس", "icon": "lightbulb", "color": "yellow" }
       ]
     }
   ]
@@ -2285,6 +2343,31 @@ ${chapterRawText.substring(0, 15000)}
             ]
           });
         }
+      } else if (isShakhbata) {
+        // Fallback for Shakhbata Storytelling
+        const metaphors = [
+          { concept: "الفكرة الأساسية في الحياة اليومية", analogy: "تشبيه بسيط من واقعنا يوضح الفكرة", icon: "lightbulb" },
+          { concept: "القاعدة العلمية والخطوات", analogy: "مثل تروس الساعة التي تعمل بتناغم تام", icon: "layers" },
+          { concept: "التطبيق العملي بالأرقام", analogy: "التحويل خطوة بخطوة كما نعد النقود", icon: "calculator" },
+          { concept: "الفخ الشائع الذي يخدع الجميع", analogy: "احذر من الوقوع في هذا الشرك المعتاد", icon: "alert-circle" },
+          { concept: "الخلاصة الذهبية", analogy: "القاعدة السحرية التي ستحفظها للأبد", icon: "star" }
+        ];
+        const totalScenes = Math.min(6, Math.max(4, rawLines.length));
+        for (let sIdx = 0; sIdx < totalScenes; sIdx++) {
+          const m = metaphors[sIdx % metaphors.length];
+          const lineText = rawLines[sIdx % rawLines.length] || `مفهوم ${chapter.title}`;
+          generatedScenes.push({
+            id: `scene${sIdx + 1}`,
+            heading: sIdx === 0 ? `المدخل القصصي: ${chapter.title}` : `المحور ${sIdx + 1}: ${m.concept}`,
+            layoutType: sIdx === 0 || sIdx === 2 ? 'doodle_story' : (sIdx === 3 ? 'golden_alert' : 'concept_analogy'),
+            icon: m.icon,
+            narration: `تخيل معي في هذا المحور من درس ${chapter.title}، كيف يمكننا تبسيط الأمر: ${lineText}. إن الأمر يشبه تماماً ${m.analogy}، حيث تتضح الرؤية ويسهل التطبيق في الاختبار.`,
+            boxes: [
+              { label: `${m.concept}: ${lineText.substring(0, 35)}`, icon: "check", color: "teal" },
+              { label: m.analogy, icon: m.icon, color: "yellow" }
+            ]
+          });
+        }
       } else {
         // Fallback for Explainer / Masterclass
         const totalScenesToBuild = Math.min(10, Math.max(6, rawLines.length));
@@ -2324,14 +2407,14 @@ ${chapterRawText.substring(0, 15000)}
 
     // 2. Build video.json with selected theme and music
     const allowedThemes = ['paper', 'chalk', 'midnight', 'clean'];
-    const activeTheme = allowedThemes.includes(theme) ? theme : 'paper';
+    const activeTheme = isShakhbata ? 'paper' : (allowedThemes.includes(theme) ? theme : 'paper');
 
     const allowedMusicStyles = ['warm', 'calm', 'upbeat', 'tech', 'playful'];
-    const activeMusicStyle = allowedMusicStyles.includes(musicStyle)
+    const activeMusicStyle = isShakhbata ? 'warm' : (allowedMusicStyles.includes(musicStyle)
       ? musicStyle
-      : (activeTheme === 'paper' ? 'warm' : (activeTheme === 'clean' ? 'upbeat' : 'calm'));
+      : (activeTheme === 'paper' ? 'warm' : (activeTheme === 'clean' ? 'upbeat' : 'calm')));
 
-    const transitionStyle = activeTheme === 'paper' ? 'brush' : (activeTheme === 'midnight' ? 'zoom' : (activeTheme === 'chalk' ? 'wipe' : 'fade'));
+    const transitionStyle = isShakhbata ? 'brush' : (activeTheme === 'paper' ? 'brush' : (activeTheme === 'midnight' ? 'zoom' : (activeTheme === 'chalk' ? 'wipe' : 'fade')));
 
     const videoConfig = {
       title: scriptData.title || chapter.title,
@@ -2341,7 +2424,7 @@ ${chapterRawText.substring(0, 15000)}
       voice: "af_heart",
       speed: 1.0,
       watermark: false,
-      music: musicStyle === 'none' ? false : { style: activeMusicStyle, volume: 0.10 },
+      music: musicStyle === 'none' ? false : { style: activeMusicStyle, volume: 0.12 },
       sfx: "minimal",
       captions: false,
       transition: transitionStyle,
@@ -2477,7 +2560,43 @@ ${chapterRawText.substring(0, 15000)}
       const layoutType = sc.layoutType || (sc.boxes?.length === 3 ? 'step_by_step' : (sc.boxes?.length === 2 ? 'split_comparison' : 'concept_hero'));
       const boxes = Array.isArray(sc.boxes) ? sc.boxes : [];
 
-      if (layoutType === 'process_flow' || (layoutType === 'step_by_step' && !isVertical && boxes.length >= 2)) {
+      if (layoutType === 'doodle_story' || layoutType === 'concept_analogy') {
+        // --- DOODLE STORY & VISUAL METAPHOR LAYOUT (RSA Animate / Shakhbata style) ---
+        scenesJs += emitFormulaCode(isVertical ? 340 : 210, isVertical ? 54 : 58, 0.1);
+
+        const b0 = boxes[0] || { label: 'المفهوم العلمي', icon: 'cpu', color: 'teal' };
+        const b1 = boxes[1] || { label: 'التشبيه الواقعي الملموس', icon: 'lightbulb', color: 'yellow' };
+        const id0 = `doodle_${sc.id}_0`;
+        const id1 = `doodle_${sc.id}_1`;
+
+        if (isVertical) {
+          // Vertical Layout (9:16)
+          scenesJs += `    s.box('${esc(b0.label)}', { id: '${id0}', x: ${centerX}, y: 640, w: 920, size: 34, iconSize: 42, icon: '${esc(b0.icon || "check")}', color: '${esc(b0.color || "teal")}', at: '#m1' });\n`;
+          scenesJs += `    s.focus('${id0}', { at: '#m1' });\n`;
+          scenesJs += `    s.box('${esc(b1.label)}', { id: '${id1}', x: ${centerX}, y: 1140, w: 920, size: 34, iconSize: 42, icon: '${esc(b1.icon || "lightbulb")}', color: '${esc(b1.color || "yellow")}', at: '#m2' });\n`;
+          scenesJs += `    s.focus('${id1}', { at: '#m2' });\n`;
+          scenesJs += `    s.arrow('${id0}', '${id1}', { color: 'orange', label: 'يشبه في الواقع', at: '#m2' });\n`;
+          scenesJs += `    s.annotate('${id1}', { type: 'circle', color: 'teal', padding: 20, at: '#m2' });\n`;
+        } else {
+          // Landscape Layout (16:9): Split screen with metaphorical connection
+          const compY = hasValidMath ? 580 : 540;
+          scenesJs += `    s.box('${esc(b0.label)}', { id: '${id0}', x: ${centerX - 440}, y: ${compY}, w: 720, size: 34, iconSize: 40, icon: '${esc(b0.icon || "cpu")}', color: '${esc(b0.color || "teal")}', at: '#m1' });\n`;
+          scenesJs += `    s.focus('${id0}', { at: '#m1' });\n`;
+          scenesJs += `    s.box('${esc(b1.label)}', { id: '${id1}', x: ${centerX + 440}, y: ${compY}, w: 720, size: 34, iconSize: 40, icon: '${esc(b1.icon || "lightbulb")}', color: '${esc(b1.color || "yellow")}', at: '#m2' });\n`;
+          scenesJs += `    s.focus('${id1}', { at: '#m2' });\n`;
+          scenesJs += `    s.arrow('${id0}', '${id1}', { color: 'orange', label: 'يشبه في الواقع', at: '#m2' });\n`;
+          scenesJs += `    s.annotate('${id1}', { type: 'circle', color: 'teal', padding: 22, at: '#m2' });\n`;
+        }
+
+        if (boxes.length >= 3) {
+          const b2 = boxes[2];
+          const id2 = `doodle_${sc.id}_2`;
+          const noteY = isVertical ? 1540 : 860;
+          scenesJs += `    s.box('${esc(b2.label)}', { id: '${id2}', x: ${centerX}, y: ${noteY}, w: ${isVertical ? 920 : 1060}, size: 30, icon: '${esc(b2.icon || "star")}', color: 'purple', at: '#m3' });\n`;
+          scenesJs += `    s.focus('${id2}', { at: '#m3' });\n`;
+        }
+
+      } else if (layoutType === 'process_flow' || (layoutType === 'step_by_step' && !isVertical && boxes.length >= 2)) {
         // --- 1. HORIZONTAL PROCESS PIPELINE (Connective nodes with dynamic arrows) ---
         scenesJs += emitFormulaCode(isVertical ? 340 : 210, isVertical ? 54 : 56, 0.1);
 
