@@ -476,6 +476,10 @@ export default function BookDetailsRoute({
   const [pregenPercent, setPregenPercent] = useState(0);
   const [pregenStep, setPregenStep] = useState('');
 
+  // Source document attach states
+  const [isAttachingFile, setIsAttachingFile] = useState(false);
+  const attachFileInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (book && book.chapters && book.chapters.length > 0 && !activeChapterId) {
       setActiveChapterId(book.chapters[0].id);
@@ -798,9 +802,6 @@ export default function BookDetailsRoute({
       setIsExpandingChapters(false);
     }
   };
-
-  const [isAttachingFile, setIsAttachingFile] = useState(false);
-  const attachFileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAttachSourceFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
