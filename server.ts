@@ -2038,11 +2038,82 @@ async function generateLessonVideoCore(params: {
     const specificTopicPrompt = videoTopic ? `التركيز الخاص في هذا الفيديو التكميلي: "${videoTopic}"` : "";
     const chapterRawText = (chapter.content || chapter.originalContent || "").trim();
     const isReels = videoType === "reels";
-    const targetSceneCount = isReels
-      ? "3 إلى 5 مشاهد كبسولة سريعة ومكثفة (60-90 ثانية) تناسب الشورتس والهاتف (9:16)"
-      : "10 إلى 15 مشهداً تعليمياً دقيقاً ومكثفاً بحد أقصى (مدة 5 دقائق كاملة) بدون أي حشو أو تكرار للكلام، يركز على الرسوم والمفاهيم والأمثلة العملية";
+    const isSolutions = videoType === "solutions" || videoType === "exercise_drill";
 
-    const prompt = `
+    // Extract available question bank items for this chapter
+    const chapterQuestions = (book?.question_bank || []).filter((q: any) =>
+      q.chapterId === chapter.id || q.chapter_id === chapter.id || String(q.chapterTitle || '').includes(chapter.title)
+    );
+
+    const allowedBuiltinIcons = `[calculator, atom, cpu, book-open, dna, scale, microscope, globe, layers, lightbulb, check, award, compass, activity, alert-circle, shield, zap, target, file-text, help-circle, pie-chart, bar-chart, folder, server, terminal, network, code, wrench, flame, smile, heart, star]`;
+
+    let prompt = "";
+
+    if (isSolutions) {
+      prompt = `
+أنت المخرج البيداغوجي والمتخصص الأول في استراتيجيات حل امتحانات المناهج الأكاديمية لمنصة Osera AI.
+المهمة الصارمة: تحويل أسئلة وتمارين الدرس أدناه إلى سكريبت فيديو تعليمي تفاعلي لحل الأسئلة بنظام "الاستبعاد الذكي" (Smart Elimination Strategy).
+المقرر المعتمد: "${book?.title || 'مقرر دراسي'}"
+المادة والمرحلة: "${subjectName || book?.category || 'عام'}"
+الفصل / الدرس المطلوب: "${chapter.title}"
+أبعاد الفيديو المطلوبة: ${aspectRatio} (${isVertical ? 'Vertical Reels 1080x1920' : 'Landscape 1920x1080'})
+العدد المطلوب: 4 إلى 6 أسئلة اختيار من متعدد (MCQ) تطبيقية ممتازة تغطي أفكار الدرس وفخاخ الامتحانات (مدة 3 إلى 4 دقائق).
+
+المحتوى المصدري والأسئلة المتوفرة للدرس:
+"""
+${chapterRawText.substring(0, 10000)}
+${chapterQuestions.length > 0 ? "\nأسئلة مقترحة من بنك الأسئلة المعتمد:\n" + JSON.stringify(chapterQuestions.slice(0, 6), null, 2) : ""}
+"""
+
+قواعد سكريبت حل الأسئلة بنظام الاستبعاد الذكي:
+1. كل مشهد يمثل سؤالاً كاملاً ومستقلاً:
+   - "layoutType": "question_solution"
+   - "heading": عنوان السؤال (مثال: "السؤال الأول: مفهوم كذا" أو "مسألة وزارية هامة")
+   - "questionText": نص السؤال واضحاً ومحدد الصياغة في سطرين كحد أقصى.
+   - "options": مصفوفة تحتوي بدقة على 4 خيارات (أ، ب، ج، د) بصياغات متوازنة.
+   - "correctOptionIndex": رقم الفهرس للإجابة الصحيحة (0 للـ أ، 1 للـ ب، 2 للـ ج، 3 للـ د).
+   - "mathFormula": القانون أو المعادلة الرياضية المستخدمة في الحل إن وجدت (أو اتركه فارغاً إذا كان السؤال نظرياً).
+   - "icon": أيقونة متوافقة حصراً من قائمة الأيقونات المعتمدة أدناه.
+
+2. التعليق الصوتي التعليمي (Narration) لكل سؤال:
+   - لغة الإلقاء: فصحى مشكولة ومبسطة ومحفزة بدون أي ترحيبات أو أسماء أشخاص.
+   - قسّم التعليق الصوتي بالتسلسل الآتي (من 40 إلى 55 كلمة مشكولة):
+     * يبدأ بقراءة السؤال بهدوء وتحديد معطياته.
+     * توضيح الكلمة المفتاحية في السؤال وسر فك اللغز.
+     * تفنيد الخيار الخاطئ الأول وشطبه بالمنطق العلمي.
+     * تفنيد الخيار الخاطئ الثاني وبيان سبب استبعاده.
+     * تأكيد الخيار الصحيح وشرح القاعدة العلمية المؤكدة له.
+
+قائمة الأيقونات المعتمدة المسموح بها حصراً:
+${allowedBuiltinIcons}
+
+المطلوب: أجب حصراً بكائن JSON صالح مطابق تماماً للبنية الآتية بدون أي نصوص أو كتل خارجها:
+{
+  "title": "حل بنك أسئلة وتدريبات: ${chapter.title}",
+  "scenes": [
+    {
+      "id": "scene1",
+      "heading": "السؤال الأول: تحديد المفهوم الأساسي",
+      "layoutType": "question_solution",
+      "questionText": "نص السؤال التعليمي المحدد والواضح؟",
+      "options": ["الخيار الأول", "الخيار الثاني", "الخيار الثالث", "الخيار الرابع"],
+      "correctOptionIndex": 1,
+      "mathFormula": "",
+      "icon": "help-circle",
+      "narration": "نص الشرح الصوتي المفصل والمشكول الذي يقرأ السؤال ويفند الخيارات الخاطئة ويؤكد الإجابة الصحيحة.",
+      "boxes": [
+        { "label": "السر الذهبي للإجابة الصحيحة", "icon": "check", "color": "teal" }
+      ]
+    }
+  ]
+}
+`;
+    } else {
+      const targetSceneCount = isReels
+        ? "3 إلى 5 مشاهد كبسولة سريعة ومكثفة (60-90 ثانية) تناسب الشورتس والهاتف (9:16)"
+        : "6 إلى 10 مشاهد تعليمية مركزة ومكثفة (مدة 3 إلى 4 دقائق) بدون أي حشو أو تكرار، تركز على الرسوم والمفاهيم والأمثلة العملية";
+
+      prompt = `
 أنت المخرج البيداغوجي والسيناريست التعليمي المتخصص لمنصة Osera AI.
 المهمة الصارمة: تحويل نص الشرح المكتوب أدناه إلى سكريبت فيديو تعليمي تفصيلي، غني بالرسوم والمخططات 100% مستمد من هذا النص تحديداً بدون أي هلوسة بصرية وبدون أي تكرار للكلام.
 المقرر المعتمد: "${book?.title || 'مقرر دراسي'}"
@@ -2063,14 +2134,14 @@ ${chapterRawText.substring(0, 15000)}
    - ممنوع المقدمات الترحيبية (أهلاً بك يا فلان، معكم المستر، إلخ). ابدأ فوراً ومباشرة في صلب المادة العلمية.
    - لغة الإلقاء: لغة عربية فصحى مشكولة ومضبوطة بدقة بالتشكيل الكامل لنطق سليم 100% من محرك الصوت البشري بدون أي تداخل صوتي.
 
-2. **منع التكرار نهائياً وضبط العدد بـ 10 إلى 15 مشهداً (مدة 5 دقائق):**
-   - قسّم الدرس إلى تسلسل متكامل ومفصل لا يزيد عن 10 إلى 15 مشهداً بحد أقصى، حيث يناقش كل مشهد فكرة جديدة تماماً دون تكرار أي عبارات:
-     * المشاهد 1 إلى 3: الفكرة المحورية والدافع والتعريف الأساسي.
-     * المشاهد 4 إلى 7: القواعد والمعادلات وصيغ TeX والمقارنات التوضيحية.
-     * المشاهد 8 إلى 12: الأمثلة والمسائل الحسابية والخطوات العملية بالأرقام.
-     * المشاهد 13 إلى 15: فخ الامتحان الشائع والخلاصة الذهبية النهائية.
+2. **منع التكرار نهائياً وضبط العدد بـ 6 إلى 10 مشاهد (مدة 3 إلى 4 دقائق):**
+   - قسّم الدرس إلى تسلسل متكامل ومفصل لا يزيد عن 6 إلى 10 مشاهد بحد أقصى، حيث يناقش كل مشهد فكرة جديدة تماماً دون تكرار أي عبارات:
+     * المشاهد 1 إلى 2: الفكرة المحورية والدافع والتعريف الأساسي.
+     * المشاهد 3 إلى 5: القواعد والمعادلات وصيغ TeX والمقارنات التوضيحية.
+     * المشاهد 6 إلى 8: الأمثلة والمسائل الحسابية والخطوات العملية بالأرقام.
+     * المشاهد 9 إلى 10: فخ الامتحان الشائع والخلاصة الذهبية النهائية.
    - إذا كان الفيديو "reels": التزم بـ 3 إلى 5 مشاهد كبسولة سريعة ومكثفة.
-   - لكل مشهد: صِغ تعليقاً صوتياً وافياً ومشكولاً (من 35 إلى 50 كلمة منتقاة بعناية) لتكون مدة الفيديو الإجمالية في حدود 5 دقائق متوازنة.
+   - لكل مشهد: صِغ تعليقاً صوتياً وافياً ومشكولاً (من 35 إلى 50 كلمة منتقاة بعناية) لتكون مدة الفيديو الإجمالية في حدود 3 إلى 4 دقائق متوازنة.
 
 3. **تنوع التخطيط البصري وقواعد النصوص داخل البطاقات (Card Formatting):**
    - في حقل "boxes": اكتب نص كل بطاقة بتركيز شديد وإيجاز ذكي (من 5 إلى 9 كلمات كحد أقصى) لتظهر البطاقة بسطر أو سطرين دون أي تكدس أو تداخل.
@@ -2082,10 +2153,11 @@ ${chapterRawText.substring(0, 15000)}
      * "concept_hero": مفهوم محوري مع أيقونة ضخمة وبطاقة تركيز واحدة مشروحة بإيجاز.
      * "golden_alert": بطاقة تنبيه ذهبية لفخاخ الامتحانات (Exam Trap) والأخطاء الشائعة.
 
-4. **الرموز الرياضية وقواعد TeX الصارمة:**
+4. **الرموز الرياضية وقواعد TeX الصارمة والأيقونات المدمجة:**
    - ضع المعادلة الرياضية الصحيحة بصيغة TeX في حقل "mathFormula".
    - لا تستخدم علامة & مطلقاً في صيغ TeX ما لم تكن داخل بيئة matrix أو aligned.
-   - استخدم أيقونات متوافقة مع مادة الدرس فقط.
+   - اختر أيقونات حصراً من قائمة الأيقونات المعتمدة المدمجة:
+     ${allowedBuiltinIcons}
 
 المطلوب: أجب حصراً بكائن JSON صالح مطابق تماماً للبنية الآتية بدون أي نصوص أو كتل خارجها:
 {
@@ -2105,6 +2177,7 @@ ${chapterRawText.substring(0, 15000)}
   ]
 }
 `;
+    }
 
     const geminiRes = await generateContentWithRetry(ai, {
       contents: [prompt],
@@ -2171,39 +2244,78 @@ ${chapterRawText.substring(0, 15000)}
 
     let scriptData: any = sanitizeGeminiJson(geminiRes?.text || "");
 
-    // Comprehensive Grounded Fallback: If Gemini fails, construct 12 to 15 rich scenes directly from chapter content!
+    // Comprehensive Grounded Fallback: If Gemini fails, construct rich scenes directly from chapter content or question bank!
     if (!scriptData || !Array.isArray(scriptData.scenes) || scriptData.scenes.length === 0) {
-      console.log(`[Explainroo Fallback] Generating comprehensive grounded scenes from chapter content for: ${chapter.title}`);
+      console.log(`[Explainroo Fallback] Generating comprehensive grounded scenes from chapter content for: ${chapter.title} (Type: ${videoType})`);
       const rawLines = chapterRawText.split(/\n+/).map((l: string) => sanitizeNarrationForScript(l)).filter((l: string) => l.length > 20);
       const generatedScenes: any[] = [];
-      const totalScenesToBuild = Math.min(15, Math.max(8, rawLines.length));
 
-      for (let sIdx = 0; sIdx < totalScenesToBuild; sIdx++) {
-        const lineText = rawLines[sIdx % rawLines.length] || `شرح ومفاهيم ${chapter.title}`;
-        const layoutTypes = ['concept_hero', 'step_by_step', 'split_comparison', 'golden_alert'];
-        const chosenLayout = layoutTypes[sIdx % layoutTypes.length];
+      if (isSolutions) {
+        // Fallback for Smart Solutions / Question Solver
+        const totalQuestions = Math.min(6, Math.max(3, chapterQuestions.length || 4));
+        for (let qIdx = 0; qIdx < totalQuestions; qIdx++) {
+          const qObj = chapterQuestions[qIdx];
+          const qText = qObj?.question || rawLines[qIdx % rawLines.length] || `سؤال تطبيقي هام على درس ${chapter.title}`;
+          const qOpts = Array.isArray(qObj?.options) && qObj.options.length >= 2
+            ? qObj.options.slice(0, 4)
+            : [
+                `تطبيق مباشر للقاعدة الأساسية في ${chapter.title}`,
+                `حالة استثنائية مشتقة من القانون العام`,
+                `افتراض غير صحيح ينافي شروط الدرس`,
+                `علاقة عكسية بين المتغيرات المذكورة`
+              ];
 
-        generatedScenes.push({
-          id: `scene${sIdx + 1}`,
-          heading: sIdx === 0 ? chapter.title : `المحور ${sIdx + 1}: ${lineText.substring(0, 35)}...`,
-          layoutType: chosenLayout,
-          icon: book?.category?.includes("رياض") ? "calculator" : (book?.category?.includes("حاسب") ? "cpu" : "book-open"),
-          narration: `نتناول في هذا المحور من درس ${chapter.title} التفاصيل التالية: ${lineText}. وتعتبر هذه النقطة من الركائز الجوهرية لفهم المنهج والتفوق في الاختبارات.`,
-          boxes: chosenLayout === 'step_by_step' ? [
-            { label: "الخطوة 1: استيعاب المفهوم وتحديد المعطيات بدقة", icon: "layers", color: "teal" },
-            { label: "الخطوة 2: تطبيق القاعدة الرياضية المعتمدة", icon: "calculator", color: "purple" },
-            { label: "الخطوة 3: التحقق من صحة الناتج النهائي", icon: "check", color: "green" }
-          ] : chosenLayout === 'split_comparison' ? [
-            { label: "الحالة الأولى: تطبيق القاعدة في الوضع المباشر", icon: "check", color: "teal" },
-            { label: "الحالة المقابلة: الحالات الخاصة والتطبيقات الاستثنائية", icon: "scale", color: "yellow" }
-          ] : [
-            { label: lineText.substring(0, 45), icon: "check", color: "teal" }
-          ]
-        });
+          let correctIdx = 0;
+          if (qObj?.correct_answer !== undefined) {
+            const parsed = parseInt(String(qObj.correct_answer), 10);
+            if (!isNaN(parsed) && parsed >= 0 && parsed < qOpts.length) correctIdx = parsed;
+          }
+
+          generatedScenes.push({
+            id: `scene${qIdx + 1}`,
+            heading: `السؤال ${qIdx + 1}: ${chapter.title}`,
+            layoutType: 'question_solution',
+            questionText: qText,
+            options: qOpts,
+            correctOptionIndex: correctIdx,
+            icon: 'help-circle',
+            narration: `ننتقل الآن للسؤال رقم ${qIdx + 1}: ${sanitizeNarrationForScript(qText)}. بتحليل السؤال، نجد أن الكلمة المفتاحية تحدد المفهوم بدقة. الخيار الأول مستبعد لعدم انطباق الشروط، والخيار الثالث غير صحيح علمياً، وبذلك تكون الإجابة الصحيحة المؤكدة هي الخيار ${['أ', 'ب', 'ج', 'د'][correctIdx] || 'الصحيح'}.`,
+            boxes: [
+              { label: "القاعدة الذهبية لحل هذا النمط", icon: "check", color: "teal" }
+            ]
+          });
+        }
+      } else {
+        // Fallback for Explainer / Masterclass
+        const totalScenesToBuild = Math.min(10, Math.max(6, rawLines.length));
+
+        for (let sIdx = 0; sIdx < totalScenesToBuild; sIdx++) {
+          const lineText = rawLines[sIdx % rawLines.length] || `شرح ومفاهيم ${chapter.title}`;
+          const layoutTypes = ['concept_hero', 'step_by_step', 'split_comparison', 'golden_alert'];
+          const chosenLayout = layoutTypes[sIdx % layoutTypes.length];
+
+          generatedScenes.push({
+            id: `scene${sIdx + 1}`,
+            heading: sIdx === 0 ? chapter.title : `المحور ${sIdx + 1}: ${lineText.substring(0, 35)}...`,
+            layoutType: chosenLayout,
+            icon: book?.category?.includes("رياض") ? "calculator" : (book?.category?.includes("حاسب") ? "cpu" : "book-open"),
+            narration: `نتناول في هذا المحور من درس ${chapter.title} التفاصيل التالية: ${lineText}. وتعتبر هذه النقطة من الركائز الجوهرية لفهم المنهج والتفوق في الاختبارات.`,
+            boxes: chosenLayout === 'step_by_step' ? [
+              { label: "الخطوة 1: استيعاب المفهوم وتحديد المعطيات بدقة", icon: "layers", color: "teal" },
+              { label: "الخطوة 2: تطبيق القاعدة الرياضية المعتمدة", icon: "calculator", color: "purple" },
+              { label: "الخطوة 3: التحقق من صحة الناتج النهائي", icon: "check", color: "green" }
+            ] : chosenLayout === 'split_comparison' ? [
+              { label: "الحالة الأولى: تطبيق القاعدة في الوضع المباشر", icon: "check", color: "teal" },
+              { label: "الحالة المقابلة: الحالات الخاصة والتطبيقات الاستثنائية", icon: "scale", color: "yellow" }
+            ] : [
+              { label: lineText.substring(0, 45), icon: "check", color: "teal" }
+            ]
+          });
+        }
       }
 
       scriptData = {
-        title: chapter.title,
+        title: isSolutions ? `حل بنك أسئلة: ${chapter.title}` : chapter.title,
         scenes: generatedScenes
       };
     }
@@ -2247,7 +2359,16 @@ ${chapterRawText.substring(0, 15000)}
 
       // Calculate evenly spaced marks across the full narration words
       const markPositions = new Map<number, string>();
-      if (boxesCount === 1) {
+      if (sc.layoutType === 'question_solution') {
+        const p1 = Math.max(1, Math.floor(words.length * 0.15));
+        const p2 = Math.max(p1 + 2, Math.floor(words.length * 0.40));
+        const p3 = Math.max(p2 + 2, Math.floor(words.length * 0.65));
+        const p4 = Math.max(p3 + 2, Math.floor(words.length * 0.85));
+        markPositions.set(p1, "m1");
+        markPositions.set(p2, "m2");
+        markPositions.set(p3, "m3");
+        markPositions.set(p4, "m4");
+      } else if (boxesCount === 1) {
         const p1 = Math.max(1, Math.floor(words.length * 0.15));
         markPositions.set(p1, "m1");
       } else if (boxesCount === 2) {
@@ -2448,8 +2569,70 @@ ${chapterRawText.substring(0, 15000)}
           scenesJs += `    s.arrow('${id0}', '${id1}', { color: 'orange', label: 'مقارنة', at: '#m2' });\n`;
         }
 
+      } else if (layoutType === 'question_solution') {
+        // --- 5. SMART MCQ & QUESTION SOLVER LAYOUT ---
+        const qId = `q_box_${sc.id}`;
+        const qText = esc(sc.questionText || sc.heading || 'سؤال تطبيقي من امتحانات المنهج');
+        const qY = isVertical ? 300 : 200;
+        const qW = isVertical ? 960 : 1380;
+        scenesJs += `    s.box('${qText}', { id: '${qId}', x: ${centerX}, y: ${qY}, w: ${qW}, size: ${isVertical ? 32 : 36}, icon: 'help-circle', color: 'indigo', at: 0.1 });\n`;
+        scenesJs += `    s.annotate('${qId}', { type: 'highlight', color: 'yellow', at: '#m1' });\n`;
+
+        // If math equation exists in question
+        if (hasValidMath) {
+          scenesJs += emitFormulaCode(isVertical ? 460 : 315, isVertical ? 48 : 52, 0.2);
+        }
+
+        const options = Array.isArray(sc.options) && sc.options.length > 0
+          ? sc.options
+          : (Array.isArray(sc.boxes) && sc.boxes.length >= 2 ? sc.boxes.map((b: any) => b.label) : ['الخيار (أ)', 'الخيار (ب)', 'الخيار (ج)', 'الخيار (د)']);
+        const correctIndex = typeof sc.correctOptionIndex === 'number' ? sc.correctOptionIndex : 0;
+        const optIds: string[] = [];
+
+        if (isVertical) {
+          // Vertical Layout (9:16): 4 stacked boxes
+          const startY = hasValidMath ? 580 : 480;
+          options.slice(0, 4).forEach((opt: any, oIdx: number) => {
+            const optId = `opt_${sc.id}_${oIdx}`;
+            optIds.push(optId);
+            const optY = startY + oIdx * 250;
+            const optText = esc(typeof opt === 'string' ? opt : (opt.text || opt.label || `الخيار ${oIdx + 1}`));
+            const optLetter = ['أ', 'ب', 'ج', 'د'][oIdx] || `${oIdx + 1}`;
+            scenesJs += `    s.box('${optLetter}) ${optText}', { id: '${optId}', x: ${centerX}, y: ${optY}, w: 940, size: 30, color: 'slate', at: 0.3 });\n`;
+          });
+        } else {
+          // Landscape Layout (16:9): 2x2 Balanced Grid
+          const startY = hasValidMath ? 470 : 420;
+          options.slice(0, 4).forEach((opt: any, oIdx: number) => {
+            const optId = `opt_${sc.id}_${oIdx}`;
+            optIds.push(optId);
+            const col = oIdx % 2; // 0 = right, 1 = left in RTL
+            const row = Math.floor(oIdx / 2);
+            const optX = col === 0 ? (centerX + 420) : (centerX - 420);
+            const optY = startY + row * 220;
+            const optText = esc(typeof opt === 'string' ? opt : (opt.text || opt.label || `الخيار ${oIdx + 1}`));
+            const optLetter = ['أ', 'ب', 'ج', 'د'][oIdx] || `${oIdx + 1}`;
+            scenesJs += `    s.box('${optLetter}) ${optText}', { id: '${optId}', x: ${optX}, y: ${optY}, w: 760, size: 32, color: 'slate', at: 0.3 });\n`;
+          });
+        }
+
+        // #m2: Cross out first wrong option (Red)
+        const wrongIdxs = [0, 1, 2, 3].filter(idx => idx !== correctIndex && idx < optIds.length);
+        if (wrongIdxs.length >= 1) {
+          scenesJs += `    s.annotate('${optIds[wrongIdxs[0]]}', { type: 'cross', color: 'red', at: '#m2' });\n`;
+        }
+        // #m3: Cross out second wrong option (Red)
+        if (wrongIdxs.length >= 2) {
+          scenesJs += `    s.annotate('${optIds[wrongIdxs[1]]}', { type: 'cross', color: 'red', at: '#m3' });\n`;
+        }
+        // #m4: Circle the correct option in Green & focus camera!
+        if (optIds[correctIndex]) {
+          scenesJs += `    s.annotate('${optIds[correctIndex]}', { type: 'circle', color: 'green', padding: 20, at: '#m4' });\n`;
+          scenesJs += `    s.focus('${optIds[correctIndex]}', { at: '#m4' });\n`;
+        }
+
       } else if (layoutType === 'golden_alert') {
-        // --- 5. GOLDEN ALERT / EXAM TRAP LAYOUT ---
+        // --- 6. GOLDEN ALERT / EXAM TRAP LAYOUT ---
         scenesJs += `    s.icon('award', { id: 'alert_icon_${sc.id}', x: ${centerX}, y: ${isVertical ? 380 : 270}, size: ${isVertical ? 140 : 130}, color: 'yellow', at: 0.1 });\n`;
         scenesJs += emitFormulaCode(isVertical ? 620 : 460, isVertical ? 58 : 64, 0.4, 'red');
         const alertLabel = esc(boxes[0]?.label || 'تنبيه هام: تجنب الوقوع في أخطاء الامتحانات الشائعة!');

@@ -132,14 +132,14 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
     setIsStartingBatch(true);
     try {
       const computedTopic = videoTopicOption === 'masterclass'
-        ? 'حصة تدريسية شاملة وكاملة من 10 إلى 15 مشهداً تغطي كافة المفاهيم والقوانين والتمارين بالتفصيل الأكاديمي'
+        ? 'حصة تدريسية شاملة وكاملة من 6 إلى 10 مشاهد تغطي كافة المفاهيم والقوانين والتمارين بالتفصيل الأكاديمي'
         : videoTopicOption === 'exercises' 
-          ? 'حل المسائل والتمارين النموذجية للدرس وتطبيق القوانين بالتفصيل خطوة بخطوة' 
+          ? 'حل بنك الأسئلة والتمارين بنظام الاستبعاد الذكي وتطبيق القوانين بالتفصيل' 
           : videoTopicOption === 'reels' 
             ? 'ملخص سريع ومركز للدرس كبسولة سريعة' 
             : 'شرح مفاهيم الدرس الأساسية والمصطلحات العلمية';
 
-      const computedType = videoTopicOption === 'reels' ? 'reels' : videoTopicOption === 'exercises' ? 'exercise_drill' : 'explainer';
+      const computedType = videoTopicOption === 'reels' ? 'reels' : videoTopicOption === 'exercises' ? 'solutions' : 'explainer';
 
       const res = await fetch('/api/explainroo/batch-generate-book', {
         method: 'POST',
@@ -216,14 +216,14 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
     const clientRunId = `run_${Date.now()}`;
 
     const computedTopic = videoTopicOption === 'masterclass'
-      ? 'حصة تدريسية شاملة وكاملة من 15 إلى 25 مشهداً تغطي كافة المفاهيم والقوانين والتمارين بالتفصيل الأكاديمي'
+      ? 'حصة تدريسية شاملة وكاملة من 6 إلى 10 مشاهد تغطي كافة المفاهيم والقوانين والتمارين بالتفصيل الأكاديمي'
       : videoTopicOption === 'exercises' 
-        ? 'حل المسائل والتمارين النموذجية للدرس وتطبيق القوانين بالتفصيل خطوة بخطوة' 
+        ? 'حل بنك الأسئلة والتمارين بنظام الاستبعاد الذكي وتطبيق القوانين بالتفصيل' 
         : videoTopicOption === 'reels' 
           ? 'ملخص سريع ومركز للدرس كبسولة سريعة' 
           : 'شرح مفاهيم الدرس الأساسية والمصطلحات العلمية';
 
-    const computedType = videoTopicOption === 'reels' ? 'reels' : videoTopicOption === 'exercises' ? 'exercise_drill' : 'explainer';
+    const computedType = videoTopicOption === 'reels' ? 'reels' : videoTopicOption === 'exercises' ? 'solutions' : 'explainer';
 
     // Poll isolated strictly to this clientRunId
     const pollInterval = setInterval(async () => {
@@ -535,7 +535,7 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
                 <span>العمق التدريسي وعدد المشاهد:</span>
               </label>
               <span className="text-[10px] text-purple-700 font-bold bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
-                {videoTopicOption === 'masterclass' ? '🔥 10 - 15 مشهداً (5 دقائق كاملة)' : videoTopicOption === 'exercises' ? '✍️ 8 - 12 مشهداً' : videoTopicOption === 'concepts' ? '📺 6 - 8 مشاهد' : '⚡ 3 - 5 مشاهد'}
+                {videoTopicOption === 'masterclass' ? '🔥 6 - 10 مشاهد (3 - 4 دقائق)' : videoTopicOption === 'exercises' ? '🎯 4 - 6 أسئلة (استبعاد ذكي)' : videoTopicOption === 'concepts' ? '📺 6 - 8 مشاهد' : '⚡ 3 - 5 مشاهد'}
               </span>
             </div>
 
@@ -551,8 +551,8 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
               >
                 <span className="text-lg shrink-0">🏆</span>
                 <div>
-                  <div className="text-xs font-black">حصة كاملة مركزة (10 - 15 مشهداً)</div>
-                  <div className="text-[10px] opacity-85 font-normal">شرح مفصل 5 دقائق بدون أي تكرار مع رسوم وأمثلة</div>
+                  <div className="text-xs font-black">حصة كاملة مركزة (6 - 10 مشاهد)</div>
+                  <div className="text-[10px] opacity-85 font-normal">شرح مكثف 3 إلى 4 دقائق بدون تكرار مع مخططات وأمثلة</div>
                 </div>
               </button>
 
@@ -565,10 +565,10 @@ export const ExplainrooStudioView: React.FC<ExplainrooStudioViewProps> = ({
                     : 'bg-white text-slate-700 border-slate-200 font-bold hover:bg-slate-50'
                 }`}
               >
-                <span className="text-lg shrink-0">✍️</span>
+                <span className="text-lg shrink-0">🎯</span>
                 <div>
-                  <div className="text-xs font-bold">حل المسائل والتمارين (12 - 20 مشهداً)</div>
-                  <div className="text-[10px] opacity-85 font-normal">تطبيق القوانين وحل المسائل بالأرقام خطوة بخطوة</div>
+                  <div className="text-xs font-bold">حل بنك الأسئلة بالاستبعاد الذكي (4 - 6 أسئلة)</div>
+                  <div className="text-[10px] opacity-85 font-normal">تظليل المفاتيح، شطب الخيارات الخاطئة، وتحديد الصح بالدايرة الخضراء</div>
                 </div>
               </button>
 
