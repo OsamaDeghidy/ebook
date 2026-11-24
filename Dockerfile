@@ -21,8 +21,9 @@ RUN npm install
 # نسخ ملفات الكود المصدري للمشروع
 COPY . .
 
-# تثبيت حزم محرك Explainroo الداخلي لضمان توفر playwright-core و roughjs في بيئة الحاوية
-RUN cd explainroo && npm install --omit=dev
+# تثبيت حزم محرك Explainroo الداخلي لضمان توفر playwright-core و roughjs في بيئة الحاوية مع حظر أي سكريبتات خارجية معطوبة
+ENV ONNXRUNTIME_NODE_INSTALL_CUDA=skip
+RUN cd explainroo && npm install --omit=dev --ignore-scripts
 
 # تشغيل البناء (Vite للواجهة + esbuild لسيرفر Express)
 RUN npm run build
