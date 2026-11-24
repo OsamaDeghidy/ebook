@@ -207,6 +207,8 @@ export interface Ebook {
   semester?: string;
   academic_year?: string;
   source_file_name?: string;
+  source_file_url?: string;
+  blueprint?: any;
   tags?: string[];
   price?: number; // 0 = Free
   is_external?: boolean;
@@ -253,6 +255,8 @@ export interface MarketplaceBook extends Ebook {
   semester?: string;
   academic_year?: string;
   source_file_name?: string;
+  source_file_url?: string;
+  blueprint?: any;
   tags: string[];
   price: number;
   is_external: boolean;

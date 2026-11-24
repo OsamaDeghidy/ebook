@@ -1265,6 +1265,8 @@ app.get("/api/ebooks", (req, res) => {
     reviews_count: b.reviews_count || 120,
     created_at: b.created_at || b.createdAt,
     tags: b.tags || ['كتاب_تفاعلي'],
+    source_file_url: b.source_file_url || (b.blueprint as any)?.source_file_url || null,
+    blueprint: b.blueprint ? { total_lessons: b.blueprint.total_lessons, is_scanned_pdf: b.blueprint.is_scanned_pdf, total_pdf_pages: b.blueprint.total_pdf_pages, source_file_url: b.blueprint.source_file_url } : null,
     chapters_count: (b.chapters || []).length,
     chapters: (b.chapters || []).map((c: any) => ({
       id: c.id,
@@ -3649,6 +3651,28 @@ async function resolveCloudOrLocalFileBuffer(fileUrl: string): Promise<{ buffer:
   if (!fileUrl) return { buffer: null };
   const cleanUrl = fileUrl.trim();
 
+  // 0. Direct file path check (supports Windows absolute paths, relative paths, container paths)
+  if (fs.existsSync(cleanUrl)) {
+    try {
+      if (fs.statSync(cleanUrl).isFile()) {
+        const buf = fs.readFileSync(cleanUrl);
+        console.log(`[Storage Resolver] Loaded from direct local path: ${cleanUrl} (${(buf.length / 1048576).toFixed(1)}MB)`);
+        return { buffer: buf, resolvedFileName: path.basename(cleanUrl) };
+      }
+    } catch (e) { }
+  }
+  const baseNameCandidate = path.basename(cleanUrl.split('?')[0]);
+  const cachedUploadCandidate = path.join(PERSISTENT_UPLOADS_DIR, baseNameCandidate);
+  if (fs.existsSync(cachedUploadCandidate)) {
+    try {
+      if (fs.statSync(cachedUploadCandidate).isFile()) {
+        const buf = fs.readFileSync(cachedUploadCandidate);
+        console.log(`[Storage Resolver] Loaded from PERSISTENT_UPLOADS_DIR candidate: ${cachedUploadCandidate} (${(buf.length / 1048576).toFixed(1)}MB)`);
+        return { buffer: buf, resolvedFileName: baseNameCandidate };
+      }
+    } catch (e) { }
+  }
+
   // 1. Check direct local disk path (/data/uploads/...)
   if (cleanUrl.startsWith("/data/uploads/") || cleanUrl.startsWith("data/uploads/")) {
     const diskPath = path.join(process.cwd(), cleanUrl.startsWith("/") ? cleanUrl.substring(1) : cleanUrl);
@@ -3822,8 +3846,14 @@ app.post("/api/ai/suggest-book-metadata", async (req, res) => {
       try {
         console.log(`[AI Metadata Classifier] Reading cover pages from PDF for authentic identification: ${originalInputUrl}...`);
         const { buffer } = await resolveCloudOrLocalFileBuffer(originalInputUrl);
-        if (buffer) {
-          const sample = await extractPdfPageRange(buffer, 1, 3);
+        const aiClient = getGenAIClient();
+        if (buffer && aiClient) {
+          const sample = await extractPdfPageRange(
+            buffer,
+            1,
+            3,
+            async (params) => generateContentWithRetry(aiClient, params, ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite-preview", "gemini-3-flash-preview"])
+          );
           if (sample && sample.length > 50) {
             pdfSampleText = sample.slice(0, 3000);
             console.log(`[AI Metadata Classifier] Read ${pdfSampleText.length} characters from authentic PDF!`);

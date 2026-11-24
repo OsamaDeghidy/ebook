@@ -274,7 +274,7 @@ function AppContent() {
       // ⚡ High-Performance Catalog Select: Only fetch lightweight metadata (skip heavy full chapter markdown / original_text)
       const { data, error } = await supabase
         .from('books')
-        .select('id, title, description, author_name, category, subcategory, education_level, academic_system, grade_level, semester, academic_year, price, is_external, external_url, preview_video_url, is_published, thumbnail_url, rating, reviews_count, created_at, tags')
+        .select('id, title, description, author_name, category, subcategory, education_level, academic_system, grade_level, semester, academic_year, price, is_external, external_url, preview_video_url, is_published, thumbnail_url, rating, reviews_count, created_at, tags, source_file_url, blueprint')
         .order('created_at', { ascending: false });
       
       if (!error && data) {
@@ -318,7 +318,9 @@ function AppContent() {
             thumbnail_url: b.thumbnail_url || 'https://images.unsplash.com/photo-1532012197267-da84d127e765?auto=format&fit=crop&w=800&q=80',
             rating: b.rating || 5.0,
             reviews_count: b.reviews_count || 120,
-            chapters: b.chapters || []
+            chapters: b.chapters || [],
+            source_file_url: b.source_file_url || (b.blueprint as any)?.source_file_url || null,
+            blueprint: b.blueprint || null
           };
         });
 

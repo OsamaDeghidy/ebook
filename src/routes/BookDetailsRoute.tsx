@@ -400,12 +400,20 @@ export default function BookDetailsRoute({
         .then(fullBook => {
           if (fullBook && fullBook.id) {
             setLocalBook(fullBook);
+            if (setEbooks) {
+              setEbooks(prev => prev.map(b => b.id === fullBook.id ? { ...b, ...fullBook } : b));
+            }
           }
         })
         .catch(async () => {
           try {
             const { data } = await supabase.from('books').select('*').eq('id', id).single();
-            if (data) setLocalBook(data);
+            if (data) {
+              setLocalBook(data);
+              if (setEbooks) {
+                setEbooks(prev => prev.map(b => b.id === data.id ? { ...b, ...data } : b));
+              }
+            }
           } catch (e) {}
         })
         .finally(() => setIsLoadingBook(false));
@@ -771,7 +779,11 @@ export default function BookDetailsRoute({
       if (data.newChapters && data.newChapters.length > 0) {
         const updatedChapters = [...(book.chapters || []), ...data.newChapters];
         const updatedBlueprint = data.book?.blueprint || (book as any).blueprint;
-        setEbooks(prev => prev.map(b => b.id === book.id ? { ...b, chapters: updatedChapters, blueprint: updatedBlueprint } as any : b));
+        const updatedBookObj = { ...book, ...data.book, chapters: updatedChapters, blueprint: updatedBlueprint };
+        if (setEbooks) {
+          setEbooks(prev => prev.map(b => b.id === book.id ? updatedBookObj as any : b));
+        }
+        setLocalBook(updatedBookObj);
         try {
           await supabase.from('books').update({ 
             chapters: updatedChapters,
@@ -1184,8 +1196,13 @@ export default function BookDetailsRoute({
         </div>
       )}
 
-      {/* ⚠️ MISSING SOURCE FILE ALERT BANNER (If Book Has Incomplete Source Link) */}
-      {book && (!book.source_file_url || ((book.chapters?.length || 0) <= 2 && (!book.blueprint || (book.blueprint.total_lessons || 0) <= 2))) && (
+      {/* ⚠️ MISSING SOURCE FILE ALERT BANNER (Only when book genuinely lacks any source document binding) */}
+      {book && !isLoadingBook && !(
+        book.source_file_url || 
+        book.blueprint?.source_file_url || 
+        (book.external_url && !book.is_external) || 
+        (book as any).fileUrl
+      ) && (
         <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-amber-950 animate-fade-in" dir={dir}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-600 flex items-center justify-center shrink-0">
