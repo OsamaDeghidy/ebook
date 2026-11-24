@@ -3610,5 +3610,31 @@
     "quizAttempts": [],
     "isCompleted": false,
     "lastActive": "2026-11-23T22:35:19.849Z"
+  },
+  {
+    "timestamp": "2026-11-24T01:13:56.415Z",
+    "studentId": "student-tester-1",
+    "bookId": "activity-book-1795482822281",
+    "chapterId": "ch-lab-1",
+    "eventType": "activity_submission",
+    "score": 8,
+    "totalPoints": 10,
+    "percentage": 80,
+    "isPassed": true,
+    "archetype": "categorization",
+    "timeSpentSeconds": 120
+  },
+  {
+    "timestamp": "2026-11-24T01:14:00.394Z",
+    "studentId": "student-tester-1",
+    "bookId": "activity-book-1795482822281",
+    "chapterId": "ch-lab-1",
+    "eventType": "activity_submission",
+    "score": 5,
+    "totalPoints": 10,
+    "percentage": 50,
+    "isPassed": false,
+    "archetype": "categorization",
+    "timeSpentSeconds": 90
   }
 ]

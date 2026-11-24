@@ -446,5 +446,14 @@
     "used_by": "student@example.com",
     "used_at": "2026-11-23T21:58:19.425Z",
     "created_at": "2026-11-23T21:58:19.425Z"
+  },
+  {
+    "code": "SMP-STEM-1795482832051",
+    "book_id": "book-physics-101",
+    "voucher_type": "book_access",
+    "is_used": true,
+    "used_by": "student@example.com",
+    "used_at": "2026-11-24T01:13:55.075Z",
+    "created_at": "2026-11-24T01:13:55.075Z"
   }
 ]
