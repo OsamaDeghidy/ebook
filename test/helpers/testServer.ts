@@ -5,6 +5,17 @@ import path from 'path';
 // Force VERCEL='1' before importing server so it does not auto-listen on port 3000
 process.env.VERCEL = '1';
 
+// Provide deterministic mock GCS credentials in clean CI test runners (Cloud Build / GitHub Actions)
+if (!process.env.GCS_ACCESS_KEY) {
+  process.env.GCS_ACCESS_KEY = 'test_mock_access_key';
+}
+if (!process.env.GCS_SECRET_KEY) {
+  process.env.GCS_SECRET_KEY = 'test_mock_secret_key_1234567890abcdef';
+}
+if (!process.env.GCS_BUCKET_NAME) {
+  process.env.GCS_BUCKET_NAME = 'ebookstoreg';
+}
+
 // Unref any background intervals so tests can exit cleanly without hanging on timers
 const originalSetInterval = globalThis.setInterval;
 (globalThis as any).setInterval = function (callback: any, ms?: number, ...args: any[]) {
