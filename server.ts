@@ -32,9 +32,9 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { PDFParse } from "pdf-parse";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
-import { parseDocumentBuffer, extractPdfTextViaVisionPages, extractPdfPageRange, renderPdfPagesToImages, extractVisualSyllabusFromToc, calculatePhysicalPage, detectLessonAnchorPage, detectBookGlobalOffset } from "./server/services/documentParser";
+import { parseDocumentBuffer, extractPdfTextViaVisionPages, extractPdfPageRange, renderPdfPagesToImages, extractVisualSyllabusFromToc, calculatePhysicalPage, detectLessonAnchorPage, detectBookGlobalOffset, getPdfTotalPages, classifyPageType } from "./server/services/documentParser";
 import { buildMasterPedagogicalPrompt, evaluatePedagogicalChunking, deduplicateChapterTitles } from "./server/services/pedagogicalChunker";
-import { extractDocumentBlueprint, getPendingLessons, markLessonsCompleted, DocumentSyllabusBlueprint, SyllabusLessonBlueprint } from "./server/services/documentBlueprint";
+import { extractDocumentBlueprint, getPendingLessons, markLessonsCompleted, rollbackBlueprintState, separateStudyAndExerciseText, DocumentSyllabusBlueprint, SyllabusLessonBlueprint } from "./server/services/documentBlueprint";
 import { buildGroundedBatchPrompt } from "./server/services/groundedLessonBuilder";
 import { fetchPedagogicalGuardrails, recordPedagogicalInsight, processTeacherEditSelfLearning } from "./server/services/pedagogicalMemory";
 import { buildEducationalReelPrompt } from "./server/services/educationalReels";
@@ -144,6 +144,40 @@ async function uploadAudioFileToSupabase(filePath: string, fileName: string): Pr
 
     return publicUrlData?.publicUrl || null;
   } catch (err) {
+    return null;
+  }
+}
+
+/**
+ * Upload arbitrary buffer directly to Supabase Storage bucket
+ */
+export async function uploadBufferToSupabaseStorage(
+  bucket: 'booklets' | 'book-pages' | 'book-audios' | 'book-covers',
+  storagePath: string,
+  buffer: Buffer,
+  contentType: string
+): Promise<string | null> {
+  try {
+    if (!supabase || !supabase.storage) return null;
+    const { error } = await supabase.storage
+      .from(bucket)
+      .upload(storagePath, buffer, {
+        contentType,
+        upsert: true
+      });
+
+    if (error) {
+      console.warn(`[Supabase Storage] Notice uploading to ${bucket}/${storagePath}:`, error.message);
+      return null;
+    }
+
+    const { data: publicData } = supabase.storage
+      .from(bucket)
+      .getPublicUrl(storagePath);
+
+    return publicData?.publicUrl || null;
+  } catch (err: any) {
+    console.warn(`[Supabase Storage] Error uploading to ${bucket}:`, err?.message || err);
     return null;
   }
 }
@@ -892,6 +926,10 @@ async function syncBookToSupabase(book: any) {
     if (book.is_stem_enhanced !== undefined) basePayload.is_stem_enhanced = book.is_stem_enhanced;
     if (book.blueprint) basePayload.blueprint = book.blueprint;
     if (book.page_offset !== undefined) basePayload.page_offset = Number(book.page_offset) || 0;
+    if (book.last_processed_page !== undefined) basePayload.last_processed_page = Number(book.last_processed_page) || 0;
+    if (book.total_pdf_pages !== undefined || book.total_pages !== undefined) basePayload.total_pages = Number(book.total_pdf_pages || book.total_pages) || 0;
+    if (book.is_fully_completed !== undefined) basePayload.is_fully_completed = Boolean(book.is_fully_completed);
+    if (book.original_text) basePayload.original_text = book.original_text;
 
     let { error } = await supabase.from('books').upsert(basePayload, { onConflict: 'id' });
     if (error && (error.message.includes('academic_system') || error.message.includes('curriculum_') || error.message.includes('language') || error.message.includes('column') || error.message.includes('blueprint'))) {
@@ -1287,8 +1325,19 @@ app.get("/api/config", (req, res) => {
 });
 
 // 2. Get ebook by id
-app.get("/api/ebooks/:id", (req, res) => {
-  const ebook = ebooks.find((e) => e.id === req.params.id);
+app.get("/api/ebooks/:id", async (req, res) => {
+  let ebook = ebooks.find((e) => e.id === req.params.id);
+  if (!ebook && supabase) {
+    try {
+      const { data, error } = await supabase.from('books').select('*').eq('id', req.params.id).maybeSingle();
+      if (data && !error) {
+        ebook = data;
+        ebooks.push(ebook);
+      }
+    } catch (e) {
+      console.warn("[GET /api/ebooks/:id Rehydrate Notice]:", e);
+    }
+  }
   if (!ebook) {
     return res.status(404).json({ error: "Ebook not found" });
   }
@@ -1384,33 +1433,23 @@ app.post("/api/ebooks/:id/chapters/save", async (req, res) => {
     return res.status(404).json({ error: "Ebook not found" });
   }
 
+  let rolledBackEndPage: number | undefined = undefined;
+
   if (chapters && Array.isArray(chapters)) {
     const previousChapters = book.chapters || [];
     const newChapters = chapters;
     const deletedChapters = previousChapters.filter((pc: any) => !newChapters.some((nc: any) => nc.id === pc.id));
 
-    if (deletedChapters.length > 0 && book.blueprint && Array.isArray(book.blueprint.lessons)) {
-      deletedChapters.forEach((delCh: any) => {
-        // Was this chapter the latest/tail chapter of the book?
-        const wasTail = previousChapters.length > 0 && previousChapters[previousChapters.length - 1].id === delCh.id;
+    if (deletedChapters.length > 0) {
+      const lastRemaining = newChapters.length > 0 ? newChapters[newChapters.length - 1] : null;
+      rolledBackEndPage = lastRemaining ? (Number(lastRemaining.end_page) || 0) : 0;
+      book.last_processed_page = rolledBackEndPage;
+      book.is_fully_completed = false;
 
-        const bpMatch = book.blueprint.lessons.find((l: any) =>
-          l.id === delCh.id ||
-          l.lesson_title === delCh.title ||
-          (l.lesson_title && delCh.title && (l.lesson_title.includes(delCh.title) || delCh.title.includes(l.lesson_title)))
-        );
-
-        if (bpMatch) {
-          if (wasTail) {
-            console.log(`[Tail-Delete Retry Trigger] User deleted latest chapter "${delCh.title}". Resetting blueprint status to 'pending' to trigger clean re-generation!`);
-            bpMatch.status = "pending";
-            delete bpMatch.raw_text_snippet;
-          } else {
-            console.log(`[Middle Chapter Prune] User permanently removed intermediate chapter "${delCh.title}".`);
-            bpMatch.status = "pruned_by_user";
-          }
-        }
-      });
+      if (book.blueprint) {
+        book.blueprint = rollbackBlueprintState(book.blueprint, rolledBackEndPage, newChapters.length);
+      }
+      console.log(`[Chapters Save Rollback] Rolled back book "${book.title}" to page ${rolledBackEndPage} with ${newChapters.length} remaining chapters.`);
     }
 
     book.chapters = chapters;
@@ -1443,15 +1482,19 @@ app.post("/api/ebooks/:id/chapters/save", async (req, res) => {
     }
   }
 
-  saveEbooks(ebooks);
+  saveEbooks(ebooks, book);
 
   try {
-    await supabase.from('books').update({ chapters: book.chapters }).eq('id', id);
+    const updatePayload: any = { chapters: book.chapters };
+    if (book.blueprint) updatePayload.blueprint = book.blueprint;
+    if (book.last_processed_page !== undefined) updatePayload.last_processed_page = book.last_processed_page;
+    if (book.is_fully_completed !== undefined) updatePayload.is_fully_completed = book.is_fully_completed;
+    await supabase.from('books').update(updatePayload).eq('id', id);
   } catch (dbErr) {
     console.warn("[Chapter Save] Supabase sync notice:", dbErr);
   }
 
-  res.json({ success: true, chapters: book.chapters, book });
+  res.json({ success: true, chapters: book.chapters, book, rolledBackEndPage });
 });
 
 // 4c. Exams Repository Endpoints
@@ -3454,17 +3497,22 @@ app.get("/api/ebooks/:bookId/chapters/:chapterId/videos", (req, res) => {
 
 /**
  * Persists high-res rendered page images to disk files in data/page-cache
- * and returns lightweight URL references (/api/page-cache/...)
- * This keeps ebooks-db.json under 10MB and prevents Node.js from running out of memory (OOM).
+ * and uploads to Supabase Storage 'book-pages' bucket and public.chapter_pages table.
  */
-function persistPageImagesToDisk(bookId: string, chapterId: string, pages: any[]): any[] {
+async function persistPageImagesToDisk(bookId: string, chapterId: string, pages: any[]): Promise<any[]> {
   if (!Array.isArray(pages) || pages.length === 0) return [];
   const cleanBookId = String(bookId || 'book').replace(/[^a-zA-Z0-9_-]/g, '_');
   const cleanChapterId = String(chapterId || 'chapter').replace(/[^a-zA-Z0-9_-]/g, '_');
   const targetDir = path.join(PAGE_CACHE_DIR, cleanBookId, cleanChapterId);
 
-  return pages.map((page, idx) => {
-    if (!page || typeof page !== 'object') return page;
+  const result: any[] = [];
+
+  for (let idx = 0; idx < pages.length; idx++) {
+    const page = pages[idx];
+    if (!page || typeof page !== 'object') {
+      result.push(page);
+      continue;
+    }
     const pageNum = page.pageNumber || (idx + 1);
 
     if (page.dataUrl && typeof page.dataUrl === 'string' && page.dataUrl.startsWith('data:image/')) {
@@ -3475,23 +3523,51 @@ function persistPageImagesToDisk(bookId: string, chapterId: string, pages: any[]
         const matches = page.dataUrl.match(/^data:image\/([a-zA-Z]+);base64,(.+)$/);
         if (matches) {
           const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1];
+          const mimeType = matches[1] === 'jpeg' ? 'image/jpeg' : `image/${matches[1]}`;
           const b64Data = matches[2];
           const buffer = Buffer.from(b64Data, 'base64');
           const fileName = `p_${pageNum}.${ext}`;
           const filePath = path.join(targetDir, fileName);
           fs.writeFileSync(filePath, buffer);
 
-          return {
+          let finalUrl = `/api/page-cache/${cleanBookId}/${cleanChapterId}/${fileName}`;
+
+          // Upload to Supabase Storage 'book-pages'
+          const storagePath = `${cleanBookId}/${cleanChapterId}/${fileName}`;
+          const cloudUrl = await uploadBufferToSupabaseStorage('book-pages', storagePath, buffer, mimeType);
+          if (cloudUrl) {
+            finalUrl = cloudUrl;
+          }
+
+          // Record in public.chapter_pages table
+          if (supabase) {
+            try {
+              await supabase.from('chapter_pages').upsert({
+                book_id: bookId,
+                chapter_id: chapterId,
+                page_number: pageNum,
+                image_url: finalUrl,
+                page_label: page.pageLabel || `صفحة ${pageNum}`
+              }, { onConflict: 'book_id,chapter_id,page_number' });
+            } catch (cpErr: any) {
+              console.warn(`[chapter_pages sync notice] p${pageNum}:`, cpErr?.message || cpErr);
+            }
+          }
+
+          result.push({
             ...page,
-            dataUrl: `/api/page-cache/${cleanBookId}/${cleanChapterId}/${fileName}`
-          };
+            dataUrl: finalUrl
+          });
+          continue;
         }
       } catch (err) {
         console.warn(`[Page Cache Disk Persist] Failed for page ${pageNum}:`, err);
       }
     }
-    return page;
-  });
+    result.push(page);
+  }
+
+  return result;
 }
 
 /**
@@ -4074,14 +4150,18 @@ export async function generateFaithfulLessonContent(params: {
 }): Promise<string> {
   const { chapterTitle, startPage, endPage, extractedText, category, grade_level, ai } = params;
 
+  // Separate study explanation from exercise worksheets
+  const { studyText } = separateStudyAndExerciseText(extractedText || "");
+  const effectiveStudyText = studyText || extractedText || "";
+
   let sourceSnippetBlock = "";
-  if (extractedText && extractedText.trim().length > 0) {
+  if (effectiveStudyText && effectiveStudyText.trim().length > 0) {
     sourceSnippetBlock = `
 إليك النص الخام المستخرج بصرياً وبدقة من صفحات المذكرة الفعلية (الصفحات المطبوعة ${startPage} إلى ${endPage}) لدرس: "${chapterTitle}".
 
-النص الخام من صفحات المذكرة:
+النص الخام لشرح ومفاهيم الدرس:
 """
-${extractedText}
+${effectiveStudyText}
 """
 `;
   } else {
@@ -4099,7 +4179,7 @@ ${sourceSnippetBlock}
 1. 🚫 ممنوع منعاً باتاً كتابة أي مقدمات حوارية أو ديباجات آلية (مثل: "بصفتي المحرر...", "أقدم لك...", "إليك محتوى...", "وفقاً للتوجيهات..."). ابدأ فوراً بعنوان الدرس ثم متن الشرح التربوي المنظم.
 2. 📏 الشرح الموسع الشامل دون تلخيص مخل (حظر تلخيص عدة صفحات إلى فقرة عابرة):
    - اشرح كل مفهوم، وظاهرة، وقانون، وتجربة واردة شرحاً تربوياً مفصلاً ووافياً وعميقاً (من 1500 إلى 2500 كلمة).
-   - إذا تضمنت الصفحات أنشطة أو أوراق عمل بنقاط فارغة ("........" أو "___" أو "أكمل ما يأتي:")، حظر ترك نقاط فارغة نهائياً! اكتب الحقيقة العلمية والشرح كاملاً مع الإجابة النموذجية المكتملة.
+   - متن الدرس مخصص للشرح والمفاهيم والأمثلة التوضيحية المحلولة؛ لا تضع أسئلة أو تدريبات أو واجبات في متن القراءة.
 3. 🚫 حظر تام لجداول المقارنة وحظر الفواصل بالشرط:
    - ممنوع منعاً باتاً استخدام جداول المقارنة نهائياً لأنها تشوه العرض وتفسد القراءة الصوتية.
    - استبدل أي مقارنة بين أمرين ببطاقات مفاهيم واضحة ومتتالية:
@@ -4117,7 +4197,7 @@ ${sourceSnippetBlock}
    - مفردات ولغويات منظمة: الكلمة ومعناها بين قوسين (معناها) ومضادها ومفردها/جمعها دون شرطات.
    - شرح تحليلي مفصل ومواطن جمال وقواعد إعرابية تطبيقية مع الأمثلة المعربة.
 6. احذف الهيدر والفوتر وأرقام الهواتف والدعايات وهوامش أرقام الصفحات المستقلة.
-7. احذف أي بنوك أسئلة وامتحانات في نهاية الدرس (نحن نريد متن الشرح والتعلم فقط).
+7. الفصل الصارم لبنوك الأسئلة والتمارين: احذف أي بنوك أسئلة أو تدريبات أو واجبات أو امتحانات في نهاية الدرس؛ مكانها المخصص هو تبويب التمارين التفاعلية المستقل.
 `;
 
   try {
@@ -4417,6 +4497,7 @@ async function runBackgroundEbookConversion(
     let isScannedVisionPdf = false;
     let scannedTotalPages = 0;
     let scannedLastPage = 0;
+    let totalPdfPageCount = 0;
     let effectiveFileName = fileName || "";
 
     if (fileUrl) {
@@ -4458,6 +4539,14 @@ async function runBackgroundEbookConversion(
             effectiveFileName.toLowerCase().endsWith(".pdf") ||
             fileUrl.toLowerCase().includes(".pdf");
 
+          if (isPdfDoc && buffer) {
+            try {
+              totalPdfPageCount = await getPdfTotalPages(buffer);
+            } catch (pgErr) {
+              console.warn("[Job Worker] Total PDF pages extraction warning:", pgErr);
+            }
+          }
+
           try {
             const parsedDoc = await parseDocumentBuffer(
               buffer,
@@ -4465,6 +4554,9 @@ async function runBackgroundEbookConversion(
               effectiveFileName || "cloud_doc.pdf"
             );
             extractedText = parsedDoc.text;
+            if (parsedDoc.pageCount && !totalPdfPageCount) {
+              totalPdfPageCount = parsedDoc.pageCount;
+            }
           } catch (pErr) {
             console.warn("[Job Worker] Local parsing from cloud URL warning:", pErr);
           }
@@ -4519,9 +4611,18 @@ async function runBackgroundEbookConversion(
       const isPdfDoc =
         fileType.includes("pdf") || (effectiveFileName && effectiveFileName.toLowerCase().endsWith(".pdf"));
 
+      if (isPdfDoc && buffer) {
+        try {
+          totalPdfPageCount = await getPdfTotalPages(buffer);
+        } catch (e) {}
+      }
+
       try {
         const parsedDoc = await parseDocumentBuffer(buffer, fileType, effectiveFileName || "document");
         extractedText = parsedDoc.text;
+        if (parsedDoc.pageCount && !totalPdfPageCount) {
+          totalPdfPageCount = parsedDoc.pageCount;
+        }
       } catch (parseErr: any) {
         console.warn("[Job Worker] Local parseDocumentBuffer warning:", parseErr);
       }
@@ -4603,11 +4704,17 @@ async function runBackgroundEbookConversion(
         },
         async (params) => generateContentWithRetry(ai, params, ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite-preview", "gemini-3-flash-preview", "gemini-3.5-flash"])
       );
-      if (syllabusBlueprint && isScannedVisionPdf) {
-        syllabusBlueprint.is_scanned_pdf = true;
-        syllabusBlueprint.total_pdf_pages = scannedTotalPages;
-        syllabusBlueprint.last_scanned_page = scannedLastPage;
-        syllabusBlueprint.source_file_url = fileUrl;
+      if (syllabusBlueprint) {
+        if (totalPdfPageCount > 0) {
+          syllabusBlueprint.total_pdf_pages = totalPdfPageCount;
+        } else if (isScannedVisionPdf && scannedTotalPages > 0) {
+          syllabusBlueprint.total_pdf_pages = scannedTotalPages;
+        }
+        if (isScannedVisionPdf) {
+          syllabusBlueprint.is_scanned_pdf = true;
+          syllabusBlueprint.last_scanned_page = scannedLastPage;
+          syllabusBlueprint.source_file_url = fileUrl;
+        }
       }
 
       // 🌟 VISUAL TOC ENHANCER: If text OCR found only 1 lesson or produced heuristic "(الجزء 1)" lessons, scan visual TOC!
@@ -4964,8 +5071,21 @@ async function runBackgroundEbookConversion(
     finalizedEbook.pregeneration_status = 'completed';
     finalizedEbook.pregeneration_percent = 100;
     finalizedEbook.tags = academicTags;
+    const initialEndPages = (finalizedEbook.chapters || [])
+      .map((c: any) => Number(c.end_page) || 0)
+      .filter((p: number) => p > 0);
+    const initialMaxEnd = initialEndPages.length > 0 ? Math.max(...initialEndPages) : 0;
+    finalizedEbook.last_processed_page = initialMaxEnd;
+    finalizedEbook.is_fully_completed = false;
+    finalizedEbook.total_pdf_pages = totalPdfPageCount || scannedTotalPages || 0;
+    finalizedEbook.total_pages = finalizedEbook.total_pdf_pages;
+
     // 🏛️ SOVEREIGN ASSET ATTACHMENT: Persist blueprint, original text, and source file URL
     if (syllabusBlueprint) {
+      syllabusBlueprint.last_processed_page = initialMaxEnd;
+      if (totalPdfPageCount > 0) {
+        syllabusBlueprint.total_pdf_pages = totalPdfPageCount;
+      }
       finalizedEbook.blueprint = syllabusBlueprint;
     }
     if (extractedText) {
@@ -5149,11 +5269,27 @@ app.post("/api/upload-to-gcp", gcpUploader.single("file"), async (req, res) => {
       }
     }
 
+    // 2b. Upload to Supabase Storage (Bucket: booklets) for multi-cloud durability across deployments
+    let supabaseBookletUrl: string | null = null;
+    try {
+      const fileBuf = fs.readFileSync(localFilePath);
+      supabaseBookletUrl = await uploadBufferToSupabaseStorage('booklets', safeFileName, fileBuf, effectiveMime);
+      if (supabaseBookletUrl) {
+        if (!gcsUrl) {
+          effectiveFileUrl = supabaseBookletUrl;
+        }
+        console.log(`[Supabase Storage] Booklet upload completed successfully: ${supabaseBookletUrl}`);
+      }
+    } catch (sbErr: any) {
+      console.warn("[Supabase Storage] Booklet upload notice:", sbErr?.message || sbErr);
+    }
+
     // 3. Respond with permanent cloud URL to ensure stateless durability
     res.json({
       success: true,
       fileUrl: effectiveFileUrl,
-      cloudUrl: gcsUrl || effectiveFileUrl,
+      cloudUrl: gcsUrl || supabaseBookletUrl || effectiveFileUrl,
+      supabaseUrl: supabaseBookletUrl || undefined,
       localFileUrl,
       fileName: decodedName,
       fileType: effectiveMime,
@@ -6653,6 +6789,29 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
     }
   }
 
+  // Strict N+1 resumption marker calculation
+  const validEndPages = currentChapters.map((c: any) => Number(c.end_page) || 0).filter(p => p > 0);
+  const terminalPage = validEndPages.length > 0 ? Math.max(...validEndPages) : 0;
+  const resumeStartPage = terminalPage > 0 ? terminalPage + 1 : (Number((ebook as any).page_offset) || 1);
+  let totalDocPages = Number(ebook.blueprint?.total_pdf_pages || (ebook as any).total_pdf_pages || (ebook as any).total_pages || 0);
+
+  // Check genuine completion: only when resumeStartPage strictly exceeds totalDocPages > 0
+  if (totalDocPages > 0 && resumeStartPage > totalDocPages) {
+    (ebook as any).is_fully_completed = true;
+    saveEbooks(ebooks, ebook);
+    await syncBookToSupabase(ebook);
+    return res.json({
+      success: true,
+      newChapters: [],
+      totalChapters: currentChapters.length,
+      remainingLessons: 0,
+      lastProcessedPage: terminalPage,
+      isFullyCompleted: true,
+      message: "تم اكتمال تغطية جميع صفحات المذكرة بالكامل.",
+      book: ebook
+    });
+  }
+
   // Check for pending lessons in syllabus blueprint
   let pendingLessons: SyllabusLessonBlueprint[] = ebook.blueprint ? getPendingLessons(ebook.blueprint, batchSize) : [];
 
@@ -6689,6 +6848,8 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
           const appendedLessons = (nextBlueprint.lessons || []).map((l, idx) => ({
             ...l,
             lesson_order: baseOrder + idx + 1,
+            start_page: l.start_page ? l.start_page + lastScannedPage : lastScannedPage + (idx * 5 + 1),
+            end_page: l.end_page ? l.end_page + lastScannedPage : Math.min(totalPdfPages || 9999, lastScannedPage + ((idx + 1) * 5)),
             status: "pending" as const
           }));
           if (ebook.blueprint) {
@@ -6909,8 +7070,16 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
       })
     );
 
-    const newChapters = (result.chapters || []).map((ch: any, idx: number) => {
-      const cIdx = currentChapters.length + idx + 1;
+    let currentResumeCursor = resumeStartPage;
+
+    const newChapters: any[] = [];
+    for (let idx = 0; idx < (result.chapters || []).length; idx++) {
+      if (totalDocPages > 0 && currentResumeCursor > totalDocPages) {
+        console.log(`[Expand Chapters] Stopping chapter generation early: currentResumeCursor (${currentResumeCursor}) > totalDocPages (${totalDocPages})`);
+        break;
+      }
+      const ch = result.chapters[idx];
+      const cIdx = currentChapters.length + newChapters.length + 1;
       const chapterId = `ch-${ebook.id}-${cIdx}`;
       const matchedLesson = pendingLessons[idx];
       const rawSlice = matchedLesson?.raw_text_snippet || "";
@@ -6923,21 +7092,100 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
       if (!cleanTitle.trim()) cleanTitle = cleanStr(ch.title) || `الدرس ${cIdx}`;
       const deepContent = detailedContents[idx] || sanitizeServerContent(ch.content) || "محتوى الدرس قيد المعالجة.";
 
-      // Extract concepts from keyConcepts array or content headings
-      const conceptsList: Array<{ concept: string; explanation: string }> = Array.isArray(ch.keyConcepts) && ch.keyConcepts.length > 0
-        ? ch.keyConcepts.map((k: string) => ({ concept: cleanStr(k), explanation: `المفهوم والمحور التعليمي لدرس ${cleanTitle}.` }))
-        : (deepContent || "").match(/###\s+([^\n]+)/g)?.slice(0, 4).map((h: string) => ({
-          concept: cleanStr(h.replace(/###\s+/, '')),
-          explanation: `من المحاور الجوهرية المقررة في درس ${cleanTitle}.`
-        })) || [
-          { concept: cleanTitle, explanation: `المفهوم التعليمي الأساسي لدرس ${cleanTitle}.` }
+      // Extract concepts with real descriptive text from deepContent or keyConcepts
+      const sectionMatches = Array.from((deepContent || "").matchAll(/###\s+([^\n]+)\n+([\s\S]*?)(?=(?:###|$))/g));
+      let conceptsList: Array<{ concept: string; explanation: string }> = [];
+
+      if (sectionMatches.length > 0) {
+        conceptsList = sectionMatches.slice(0, 4).map(m => {
+          const rawConcept = cleanStr(m[1].replace(/[*_#]/g, ''));
+          const firstPara = m[2].replace(/[*_#>`-]/g, ' ').replace(/\s+/g, ' ').trim();
+          const firstSentence = firstPara.split(/[.؟!؛\n]/)[0]?.trim();
+          const explanation = firstSentence && firstSentence.length >= 20 && firstSentence.length <= 150
+            ? firstSentence
+            : `الشرح والتحليل العلمي لـ (${rawConcept}) في سياق درس ${cleanTitle}.`;
+          return { concept: rawConcept, explanation };
+        });
+      }
+
+      if (conceptsList.length < 2 && Array.isArray(ch.keyConcepts) && ch.keyConcepts.length > 0) {
+        conceptsList = ch.keyConcepts.slice(0, 4).map((k: string) => {
+          const rawConcept = cleanStr(k);
+          const escapedK = rawConcept.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const sentenceMatch = deepContent.match(new RegExp(`([^.؟!؛\\n]*${escapedK}[^.؟!؛\\n]*)`, 'i'));
+          const foundSentence = sentenceMatch ? cleanStr(sentenceMatch[1].replace(/[*_#>`-]/g, ' ')).trim() : '';
+          const explanation = foundSentence && foundSentence.length >= 20 && foundSentence.length <= 150
+            ? foundSentence
+            : `القاعدة التعليمية والمحور الأساسي لـ (${rawConcept}) في درس ${cleanTitle}.`;
+          return { concept: rawConcept, explanation };
+        });
+      }
+
+      if (conceptsList.length < 2) {
+        conceptsList = [
+          { concept: cleanTitle, explanation: `استيعاب المرتكزات والمفاهيم التعليمية لدرس ${cleanTitle}.` },
+          { concept: `تطبيقات ${cleanTitle}`, explanation: `الخطوات الإجرائية والعملية لحل تدريبات ${cleanTitle}.` }
+        ];
+      }
+
+      // Strict N+1 sequential page continuity calculation
+      const lessonSpan = Math.max(3, Math.min(8, Number(matchedLesson?.end_page && matchedLesson?.start_page ? matchedLesson.end_page - matchedLesson.start_page + 1 : 6)));
+      const startPg = currentResumeCursor;
+      const endPg = Math.min(totalDocPages > 0 ? totalDocPages : 9999, startPg + lessonSpan - 1);
+      currentResumeCursor = endPg + 1;
+
+      // Authentic, curriculum-grounded quiz items derived from lesson concepts
+      const authenticQuiz = conceptsList.slice(0, 4).map((c, qIdx) => {
+        const otherExplanations = conceptsList
+          .filter((_, oIdx) => oIdx !== qIdx)
+          .map(x => x.explanation);
+
+        const poolDistractors = [
+          ...otherExplanations,
+          `تطبيق إثرائي غير مقرر في خطة درس ${cleanTitle}`,
+          `افتراض نظري بديل لا يتطابق مع معطيات درس ${cleanTitle}`,
+          `مفهوم تمهيدي خارج نطاق الأهداف المقررة لـ ${cleanTitle}`,
+          `إجراء رياضي أو تجريبي لا يرتبط بقواعد ${cleanTitle}`,
+          `قاعدة استنتاجية عامة تخص فصلاً دراسياً آخر غير ${cleanTitle}`
         ];
 
-      return {
+        // Ensure all 4 options are distinct, educational, and realistic
+        const uniqueOptions = [c.explanation];
+        for (const dist of poolDistractors) {
+          if (uniqueOptions.length >= 4) break;
+          if (!uniqueOptions.includes(dist) && dist.trim().length > 0) {
+            uniqueOptions.push(dist);
+          }
+        }
+        while (uniqueOptions.length < 4) {
+          uniqueOptions.push(`خيار دراسي بديل رقم ${uniqueOptions.length + 1} لدرس ${cleanTitle}`);
+        }
+
+        return {
+          id: `q-${chapterId}-${qIdx + 1}`,
+          question: `وفقاً لما ورد في درس (${cleanTitle})، ما المقصود بـ (${c.concept})؟`,
+          options: uniqueOptions,
+          correctOptionIndex: 0,
+          explanation: `الإجابة الصحيحة هي: ${c.explanation}، حيث تمثل القاعدة الجوهرية للدرس.`
+        };
+      });
+
+      const labMeta = detectInteractiveLabType(cleanTitle, ebook.category, deepContent);
+      const exerciseBank = authenticQuiz.map((q, eIdx) => ({
+        id: `ex-${chapterId}-${eIdx + 1}`,
+        question: q.question,
+        options: [...q.options],
+        correctOptionIndex: q.correctOptionIndex,
+        modelAnswer: q.options[q.correctOptionIndex],
+        explanation: q.explanation,
+        difficulty: eIdx === 0 ? "easy" : (eIdx === 1 ? "medium" : "hard")
+      }));
+
+      newChapters.push({
         id: chapterId,
         title: cleanTitle,
-        start_page: matchedLesson?.start_page || (cIdx * 6 + 5),
-        end_page: matchedLesson?.end_page || (cIdx * 6 + 10),
+        start_page: startPg,
+        end_page: endPg,
         content: deepContent,
         originalContent: deepContent,
         summary: cleanStr(ch.summary) || `ملخص وشرح شامل لدرس ${cleanTitle}.`,
@@ -6952,22 +7200,7 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
             description: `فيديو تعليمي إثرائي لشرح وتوضيح درس ${cleanTitle}.`
           }
         ],
-        quiz: [
-          {
-            id: `q-${chapterId}-1`,
-            question: `ما هو المحور الأساسي الذي يدور حوله درس (${cleanTitle})؟`,
-            options: [`تطبيق واستيعاب ${cleanTitle}`, `مفاهيم تمهيدية عامة`, `مراجعة عامة للمقرر`, `نشاط إثرائي غير مقرر`],
-            correctOptionIndex: 0,
-            explanation: `يدور الدرس أساساً حول شرح وتطبيق مفاهيم ${cleanTitle} وفق المنهج المقرر.`
-          },
-          {
-            id: `q-${chapterId}-2`,
-            question: `أي مما يلي يعبر عن القاعدة أو المفهوم الجوهري في درس (${cleanTitle})؟`,
-            options: [`الالتزام بالضوابط والمعايير التعليمية للدرس`, `تجاوز المتطلبات الأساسية دون فهم`, `تجاهل التطبيقات العملية`, `عدم الربط بين السبب والنتيجة`],
-            correctOptionIndex: 0,
-            explanation: `التطبيق الصحيح للمفهوم يعتمد على الالتزام بالقواعد والضوابط التعليمية المقررة.`
-          }
-        ],
+        quiz: authenticQuiz,
         flashcards: conceptsList.slice(0, 4).map((c, fIdx) => ({
           id: `fc-${chapterId}-${fIdx + 1}`,
           front: c.concept,
@@ -6987,32 +7220,13 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
         labs: [
           {
             id: `lab-${chapterId}`,
-            ...detectInteractiveLabType(cleanTitle, ebook.category, deepContent),
+            ...labMeta,
             config: {},
-            exerciseBank: [
-              {
-                id: `ex-${chapterId}-1`,
-                question: `ما هو المحور الأساسي الذي يدور حوله درس (${cleanTitle})؟`,
-                options: [`تطبيق واستيعاب ${cleanTitle}`, `مفاهيم تمهيدية عامة`, `مراجعة عامة للمقرر`, `نشاط إثرائي غير مقرر`],
-                correctOptionIndex: 0,
-                modelAnswer: `تطبيق واستيعاب ${cleanTitle}`,
-                explanation: `يدور الدرس أساساً حول شرح وتطبيق مفاهيم ${cleanTitle} وفق المنهج المقرر.`,
-                difficulty: "easy"
-              },
-              {
-                id: `ex-${chapterId}-2`,
-                question: `أي مما يلي يعبر عن القاعدة أو المفهوم الجوهري في درس (${cleanTitle})؟`,
-                options: [`الالتزام بالضوابط والمعايير التعليمية للدرس`, `تجاوز المتطلبات الأساسية دون فهم`, `تجاهل التطبيقات العملية`, `عدم الربط بين السبب والنتيجة`],
-                correctOptionIndex: 0,
-                modelAnswer: `الالتزام بالضوابط والمعايير التعليمية للدرس`,
-                explanation: `التطبيق الصحيح للمفهوم يعتمد على الالتزام بالقواعد والضوابط التعليمية المقررة.`,
-                difficulty: "medium"
-              }
-            ]
+            exerciseBank
           }
         ]
-      };
-    });
+      });
+    }
 
     // 📸 REAL PAGE IMAGE RENDERING FOR EXPANDED CHAPTERS
     // Renders physical booklet page snapshots so "صفحات المذكرة الأصلية" shows authentic booklet images for every chapter!
@@ -7027,7 +7241,7 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
             console.log(`[Expand Chapters Image Rendering] Rendering pages ${startP}..${endP} (offset: ${pageOffset}) for "${ch.title}"...`);
             const rendered = await renderPdfPagesToImages(resolvedPdf.buffer, startP, endP, pageOffset);
             if (rendered && rendered.length > 0) {
-              ch.pages = persistPageImagesToDisk(ebook.id, ch.id, rendered);
+              ch.pages = await persistPageImagesToDisk(ebook.id, ch.id, rendered);
               console.log(`[Expand Chapters Image Rendering] Successfully attached ${ch.pages.length} page snapshots to "${ch.title}".`);
             }
           }
@@ -7041,7 +7255,7 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
     if (pendingLessons.length > 0 && ebook.blueprint) {
       ebook.blueprint = markLessonsCompleted(
         ebook.blueprint,
-        pendingLessons.map(l => l.lesson_order)
+        pendingLessons.slice(0, newChapters.length).map(l => l.lesson_order)
       );
     }
 
@@ -7070,17 +7284,16 @@ app.post("/api/ebooks/:id/expand-chapters", async (req, res) => {
       (ebook.blueprint as any).last_processed_page = maxEndPage;
     }
 
-    const totalDocPages = Number(ebook.blueprint?.total_pdf_pages || (ebook as any).total_pdf_pages || 0);
+    totalDocPages = Number(ebook.blueprint?.total_pdf_pages || (ebook as any).total_pdf_pages || (ebook as any).total_pages || 0);
     const pendingInBlueprint = ebook.blueprint && Array.isArray(ebook.blueprint.lessons)
       ? ebook.blueprint.lessons.filter(l => l.status === "pending").length
       : 0;
 
-    const isBookFullyCompleted = (totalDocPages > 0 && maxEndPage >= totalDocPages) ||
-      (ebook.blueprint && ebook.blueprint.lessons && ebook.blueprint.lessons.length > 0 && pendingInBlueprint === 0);
+    const isBookFullyCompleted = totalDocPages > 0
+      ? maxEndPage >= totalDocPages
+      : (ebook.blueprint && ebook.blueprint.lessons && ebook.blueprint.lessons.length > 0 && pendingInBlueprint === 0);
 
-    if (isBookFullyCompleted) {
-      (ebook as any).is_fully_completed = true;
-    }
+    (ebook as any).is_fully_completed = Boolean(isBookFullyCompleted);
 
     saveEbooks(ebooks, ebook);
 
@@ -7635,6 +7848,31 @@ app.get("/api/ebooks/:id/chapters/:chapterId/pages", async (req, res) => {
       return res.json({ success: true, pages: chapter.pages, pageOffset, source: "cache" });
     }
 
+    // 1.05 🛡️ SUPABASE CHAPTER_PAGES REHYDRATION: If memory/disk was cleared, restore from Supabase table!
+    if (supabase) {
+      try {
+        const { data: dbPages } = await supabase
+          .from('chapter_pages')
+          .select('*')
+          .eq('book_id', bookId)
+          .eq('chapter_id', chapterId)
+          .order('page_number', { ascending: true });
+
+        if (dbPages && dbPages.length > 0) {
+          chapter.pages = dbPages.map((dp: any) => ({
+            pageNumber: dp.page_number,
+            dataUrl: dp.image_url,
+            pageLabel: dp.page_label
+          }));
+          saveEbooks(ebooks, book);
+          console.log(`[Chapter Pages] 🛡️ Successfully rehydrated ${dbPages.length} pages from Supabase chapter_pages for "${chapter.title}".`);
+          return res.json({ success: true, pages: chapter.pages, pageOffset, source: "supabase_table" });
+        }
+      } catch (sbErr) {
+        // Fallback to disk cache or render
+      }
+    }
+
     // 1.1 🛡️ DISK CACHE REHYDRATION: If memory/DB was cleared, restore directly from disk cache!
     const diskPagesDir = path.join(PAGE_CACHE_DIR, cleanBookId, cleanChapterId);
     if (fs.existsSync(diskPagesDir)) {
@@ -7781,7 +8019,7 @@ app.get("/api/ebooks/:id/chapters/:chapterId/pages", async (req, res) => {
 
     const renderedImages = await renderPdfPagesToImages(pdfBuffer, startPage, endPage, effectiveOffset);
     if (renderedImages && renderedImages.length > 0) {
-      const persistedImages = persistPageImagesToDisk(bookId, chapterId, renderedImages);
+      const persistedImages = await persistPageImagesToDisk(bookId, chapterId, renderedImages);
       chapter.pages = persistedImages;
       chapter.start_page = startPage;
       chapter.end_page = endPage;
@@ -8435,6 +8673,23 @@ app.get("/api/ebooks/:id/chapters/:chapterId/exercises", async (req, res) => {
 
     const pageOffset = Number((book as any).page_offset) || 0;
 
+    // 🌟 Rehydrate exercises from Supabase if not present in memory
+    if ((!chapter.exercises || chapter.exercises.length === 0) && supabase && force !== 'true' && !manualPage) {
+      try {
+        const { data: dbEx } = await supabase
+          .from('chapter_exercises')
+          .select('*')
+          .eq('book_id', bookId)
+          .eq('chapter_id', chapterId);
+        if (dbEx && dbEx.length > 0) {
+          chapter.exercises = dbEx;
+          saveEbooks(ebooks, book);
+        }
+      } catch (dbErr) {
+        // Fallback to local / generation
+      }
+    }
+
     // 🌟 1. HANDLE MANUAL PRINTED PAGE INPUT FROM USER
     let manualRenderedPages: any[] = [];
     if (manualPage && typeof manualPage === 'string' && book.source_file_url) {
@@ -8461,13 +8716,13 @@ app.get("/api/ebooks/:id/chapters/:chapterId/exercises", async (req, res) => {
             console.log(`[Manual Page Handler] Rendering printed page(s) ${startManual}..${endManual} with offset ${pageOffset}...`);
             const rendered = await renderPdfPagesToImages(resolved.buffer, startManual, endManual, pageOffset);
             if (rendered && rendered.length > 0) {
-              const tagged = rendered.map(p => ({ ...p, pageType: 'exercise' }));
-              manualRenderedPages = persistPageImagesToDisk(book.id, chapter.id, tagged);
+              const tagged = rendered.map(p => ({ ...p, pageType: 'exercise' as const }));
+              manualRenderedPages = await persistPageImagesToDisk(book.id, chapter.id, tagged);
 
               // Merge into chapter.pages
               const existing = (chapter.pages || []).filter((p: any) => !manualRenderedPages.some(np => np.pageNumber === p.pageNumber));
               chapter.pages = [...existing, ...manualRenderedPages].sort((a: any, b: any) => a.pageNumber - b.pageNumber);
-              saveEbooks(ebooks);
+              saveEbooks(ebooks, book);
             }
           }
         } catch (e) {
@@ -8508,11 +8763,11 @@ app.get("/api/ebooks/:id/chapters/:chapterId/exercises", async (req, res) => {
           if (resolved.buffer) {
             const rendered = await renderPdfPagesToImages(resolved.buffer, startPage, endPage, pageOffset);
             if (rendered && rendered.length > 0) {
-              const persisted = persistPageImagesToDisk(book.id, chapter.id, rendered);
+              const persisted = await persistPageImagesToDisk(book.id, chapter.id, rendered);
               chapter.pages = persisted;
               chapter.start_page = startPage;
               chapter.end_page = endPage;
-              saveEbooks(ebooks);
+              saveEbooks(ebooks, book);
             }
           }
         } catch (e) {
@@ -8631,7 +8886,30 @@ ${(chapter.content || "").substring(0, 5000)}
           const genExercises = safeParseExercises(resp.text || "[]");
           if (genExercises.length > 0) {
             chapter.exercises = genExercises;
-            saveEbooks(ebooks);
+            saveEbooks(ebooks, book);
+
+            if (supabase) {
+              try {
+                await supabase.from('chapter_exercises').upsert(
+                  genExercises.map((ex: any) => ({
+                    book_id: book.id,
+                    chapter_id: chapter.id,
+                    page_source: primaryExercisePage?.pageNumber || null,
+                    question_text: ex.question_text || ex.question,
+                    question_type: ex.question_type || 'mcq',
+                    options: ex.options || [],
+                    model_answer: ex.model_answer || ex.modelAnswer || '',
+                    rubric_criteria: ex.rubric_criteria || [],
+                    max_score: ex.max_score || 10,
+                    difficulty: ex.difficulty || 'medium',
+                    is_generated: true
+                  }))
+                );
+              } catch (exDbErr) {
+                console.warn("[chapter_exercises persistence warning]:", exDbErr);
+              }
+            }
+
             return res.json({
               success: true,
               hasExercisePages: false,
@@ -8740,7 +9018,29 @@ ${(chapter.content || "").substring(0, 5000)}
 
     if (Array.isArray(exercises) && exercises.length > 0) {
       chapter.exercises = exercises;
-      saveEbooks(ebooks);
+      saveEbooks(ebooks, book);
+
+      if (supabase) {
+        try {
+          await supabase.from('chapter_exercises').upsert(
+            exercises.map((ex: any) => ({
+              book_id: book.id,
+              chapter_id: chapter.id,
+              page_source: primaryExercisePage?.pageNumber || null,
+              question_text: ex.question_text || ex.question,
+              question_type: ex.question_type || 'mcq',
+              options: ex.options || [],
+              model_answer: ex.model_answer || ex.modelAnswer || '',
+              rubric_criteria: ex.rubric_criteria || [],
+              max_score: ex.max_score || 10,
+              difficulty: ex.difficulty || 'medium',
+              is_generated: false
+            }))
+          );
+        } catch (exDbErr) {
+          console.warn("[chapter_exercises vision sync warning]:", exDbErr);
+        }
+      }
     }
 
     res.json({

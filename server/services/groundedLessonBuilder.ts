@@ -84,13 +84,11 @@ ${pedagogicalGuardrails ? `${pedagogicalGuardrails}\n` : ''}
      * **القوانين والتطبيقات الرياضية:** ذكر نص القانون، المعادلة بـ LaTeX ($2n^2$)، المعنى الفيزيائي لكل رمز، وحل أمثلة ومسائل رقمية متدرجة (المعطيات -> القانون -> التعويض -> الناتج مع وحدة القياس).
      * **التعليلات العلمية ("علل لما يأتي"):** شرح أسباب الظواهر (مثل: علل الذرة متعادلة كهربياً، علل لا تنطبق العلاقة $2n^2$ على المستويات الأعلى من الرابع).
 
-6. 🚫 PROHIBITION ON EXERCISE BLANKS ("...........") & FILL-IN-THE-BLANKS:
-   - When the booklet contains student worksheets or activities with dotted lines ("...........", "___", "أكمل ما يأتي:"), NEVER leave dots or blank lines!
-   - You MUST solve, explain, and state the complete scientific fact in full clear educational sentences:
-     * ❌ WRONG: "مستوى الطاقة الأول K: ....................."
-     * ✅ CORRECT: "• **مستوى الطاقة الأول ($K$):** يحمل رقم ($n = 1$)، ويتشبع بـ **إلكترونين فقط ($2$)** تطبيقاً للعلاقة الرياضية ($2n^2 = 2(1)^2 = 2$)."
-   - If a question appears in an activity (e.g. "ماذا يحدث لطاقة الإلكترون كلما ابتعد عن النواة؟"), provide the detailed scientific answer and explanation:
-     "**تزداد طاقة الإلكترون كلما ابتعد عن النواة، وبذلك يكون مستوى الطاقة الأقرب للنواة ($K$) هو الأقل طاقة، والمستوى الأبعد ($Q$) هو الأعلى طاقة.**"
+6. 🚫 STRICT SEPARATION OF PRACTICE & EXERCISES FROM STUDY TEXT:
+   - The lesson reading text ("content") is strictly for STUDYING, CONCEPTS, AND UNDERSTANDING.
+   - DO NOT embed worksheet questions, fill-in-the-blanks, tests, or end-of-lesson homework into the lesson reading text.
+   - Any end-of-lesson exercises, practice tests, or worksheet questions (e.g. "تمارين", "تدريبات", "اختبر نفسك", "أسئلة الكتاب") must be completely separated from the reading text into the lesson's practice section / exercise bank.
+   - In the reading text, explain the core facts, laws, definitions, and worked examples clearly. If an in-text conceptual activity appears in the study section, explain the underlying scientific principle or worked example directly without turning it into a questionnaire.
 
 7. 📚 RICH HUMANITIES & ARABIC STRUCTURE:
    For Arabic Language, Religious Studies & Humanities (اللغة العربية والتربية الإسلامية والدراسات):
@@ -117,9 +115,11 @@ ${pedagogicalGuardrails ? `${pedagogicalGuardrails}\n` : ''}
    - 🚫 STRIP OCR bullet artifacts (▲, ▼, ◆, ◇, ■, ★).
    - 🚫 STRIP parenthetical exam notes and year tags (e.g. "(دور أول 2022)" or "(امتحان 2021)").
 
-10. 🚫 EXCLUDE EXERCISE BANKS & END-OF-LESSON HOMEWORK:
+10. 🚫 EXCLUDE EXERCISE BANKS & WORKSHEETS FROM READING TEXT:
     - The lesson reading text is for STUDYING and UNDERSTANDING.
-    - STOP as soon as an end-of-lesson exercise bank or homework appears (e.g. "تمارين الدرس", "تدريبات الفصل", "واجب منزلي", "اختبر نفسك"). DO NOT clutter the reading text with test questions.
+    - NEVER include question stems, multiple choice options (A, B, C, D), or test exercises in ("content").
+    - STOP as soon as an end-of-lesson exercise bank or homework appears (e.g. "تمارين الدرس", "تدريبات الفصل", "واجب منزلي", "اختبر نفسك", "أنشطة التقويم").
+    - Real booklet questions will be placed directly in the lesson's interactive practice tabs (quiz & exercise bank).
 
 11. 🎙️ SPOKEN NARRATION SCRIPT (audioNarration):
     - Generate an 'audioNarration' field for each chapter.

@@ -598,6 +598,153 @@ export interface RenderedPageImage {
 }
 
 /**
+ * Accurately determines total pages in a PDF document buffer
+ */
+export async function getPdfTotalPages(buffer: Buffer): Promise<number> {
+  if (!buffer || buffer.length === 0) return 0;
+  let pdfParser: PDFParse | null = null;
+  try {
+    const uint8 = toSafeUint8Array(buffer);
+    pdfParser = new PDFParse(uint8 as any);
+    const textProbe = await withSilencedPdfWarnings(() =>
+      pdfParser!.getText({ partial: [1] } as any)
+    ).catch(() => null);
+    const pageMatch = (textProbe?.text || "").match(/--\s*\d+\s*of\s*(\d+)\s*--/i);
+    const total = (textProbe as any)?.total || (textProbe as any)?.numpages || (pageMatch ? parseInt(pageMatch[1], 10) : 0);
+    return Number(total) || 0;
+  } catch (err) {
+    console.warn("[getPdfTotalPages] Error determining total pages:", err);
+    return 0;
+  } finally {
+    if (pdfParser && typeof (pdfParser as any).destroy === 'function') {
+      try { await (pdfParser as any).destroy(); } catch (e) {}
+    }
+  }
+}
+
+/**
+ * Classifies a booklet page as 'exercise' or 'study' based on semantic heading and content markers.
+ * Replaces naive position-based heuristics with content inspection.
+ */
+export function classifyPageType(pageText: string, pageHeading?: string): 'exercise' | 'study' {
+  const normText = normalizeArabicPresentationForms(pageText || "").trim();
+  const normHeading = normalizeArabicPresentationForms(pageHeading || "").trim();
+
+  // Strong exercise markers in headings
+  const exerciseHeadingRegex = /((?:ال)?تمارين|(?:ال)?تدريبات|(?:ال)?أسئلة|اختبر\s*نفسك|أنشطة\s*(?:ال)?تقويم|(?:ال)?تقويم\s*(?:ال)?(?:درس|مستمر|نهائي)?|(?:ورقة|أوراق)\s*(?:ال)?عمل|(?:ال)?واجب\s*(?:ال)?منزلي|بنك\s*(?:ال)?أسئلة|(?:ال)?مسائل\s*(وتطبيقات|تدريبية|حسابية)?|(?:نماذج\s*)?(?:ال)?امتحان(?:ات)?|(?:ال)?اختبار(?:ات)?\s*(الوحدة|الفصل|قياس)?)/i;
+
+  // Explicit study / explanation markers in headings
+  const studyHeadingRegex = /(شرح\s*(الدرس|القاعدة|المفهوم)?|نص\s*(القراءة|الاستماع|الشعري|قراءة)?|قواعد\s*(نحوية|وتراكيب)?|المفاهيم\s*الأساسية|كلماتي\s*الجديدة|معاني\s*المفردات|أهداف\s*الدرس|تمهيد|فوائد|مقدمة|(?:ال)?رياضة|(?:ال)?بدنية|(?:ال)?لياقة)/i;
+
+  if (normHeading) {
+    const hasExerciseHeading = exerciseHeadingRegex.test(normHeading);
+    const hasStudyHeading = studyHeadingRegex.test(normHeading);
+
+    // Compound heading handling: When a heading contains both study and exercise indicators (or general terms like
+    // "أهداف الدرس والتمارين التمهيدية", "نص قراءة مع أسئلة استيعاب", "فوائد الرياضة والتمارين البدنية"),
+    // do not immediately classify as 'exercise'. Inspect body text: only classify as 'exercise' if body text
+    // contains 3 or more explicit question patterns; otherwise classify as 'study'.
+    if (hasExerciseHeading && hasStudyHeading) {
+      const questionPatternsInText = /(السؤال\s*(الأول|الثاني|الثالث|الرابع|الخامس|\d+)|اختر\s*الإجابة\s*الصحيحة|ضع\s*علامة\s*\(?[\u2713\u2714\u066D✓]\)?|علل\s*لما\s*يأتي|أكمل\s*(العبارات|ما\s*يأتي)|بم\s*تفسر|س\s*\d+\s*:)/gi;
+      const qMatches = (normText.match(questionPatternsInText) || []).length;
+      return qMatches >= 3 ? 'exercise' : 'study';
+    }
+
+    if (hasExerciseHeading) {
+      return 'exercise';
+    }
+
+    if (hasStudyHeading) {
+      // Check if text is overwhelmingly exercise questions despite study title
+      const questionPatternsInText = /(السؤال\s*(الأول|الثاني|الثالث|الرابع|الخامس|\d+)|اختر\s*الإجابة\s*الصحيحة|ضع\s*علامة\s*\(?[\u2713\u2714\u066D✓]\)?|علل\s*لما\s*يأتي|أكمل\s*(العبارات|ما\s*يأتي)|بم\s*تفسر|س\s*\d+\s*:)/gi;
+      const qMatches = (normText.match(questionPatternsInText) || []).length;
+      if (qMatches >= 3) {
+        return 'exercise';
+      }
+      return 'study';
+    }
+  }
+
+  if (!normText) {
+    return 'study';
+  }
+
+  // 1. Heading-like lines inside text (e.g. "تمارين الدرس", "تدريبات", "اختبر نفسك")
+  const lines = normText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const firstFewLines = lines.slice(0, 5).join(" ");
+  if (exerciseHeadingRegex.test(firstFewLines)) {
+    if (studyHeadingRegex.test(firstFewLines)) {
+      const questionPatternsInText = /(السؤال\s*(الأول|الثاني|الثالث|الرابع|الخامس|\d+)|اختر\s*الإجابة\s*الصحيحة|ضع\s*علامة\s*\(?[\u2713\u2714\u066D✓]\)?|علل\s*لما\s*يأتي|أكمل\s*(العبارات|ما\s*يأتي)|بم\s*تفسر|س\s*\d+\s*:)/gi;
+      const qMatches = (normText.match(questionPatternsInText) || []).length;
+      if (qMatches >= 3) return 'exercise';
+      return 'study';
+    }
+    return 'exercise';
+  }
+
+  // 2. Count characteristic exercise prompt patterns
+  let exerciseScore = 0;
+
+  if (/(تمارين|تدريبات|أسئلة\s*(الدرس|المراجعة|الكتاب)|اختبر\s*نفسك|أنشطة\s*التقويم)/i.test(normText)) {
+    exerciseScore += 3;
+  }
+
+  const questionStems = [
+    /اختر\s*(الإجابة|الصحيحة|مما\s*بين\s*القوسين|من\s*الخيارات)/i,
+    /ضع\s*علامة\s*\(?[✓✔ص\u2713\u2714]?\)?\s*أو\s*\(?[✗✘خ\u2717\u2718]?\)?/i,
+    /صح\s*(أو|أم)\s*خطأ/i,
+    /أكمل\s*(ما\s*يأتي|العبارات|الفراغات|الجمل)/i,
+    /علل\s*(لما\s*يأتي|ما\s*يلي)/i,
+    /بم\s*تفسر/i,
+    /ما\s*النتائج\s*المترتبة\s*على/i,
+    /قارن\s*بين/i,
+    /اكتب\s*المصطلح\s*العلمي/i,
+    /صوب\s*ما\s*تحته\s*خط/i,
+    /اذكر\s*(السبب|وظيفة|أهمية)/i,
+    /ماذا\s*يحدث\s*(لو|عندما)/i,
+    /عرف\s*كل\s*من/i,
+    /ما\s*المقصود\s*بكل\s*من/i,
+    /السؤال\s*(الأول|الثاني|الثالث|الرابع|الخامس|\d+)/i,
+    /(^|\n)\s*(س\d+|س\s*\d+)[\s:\-]/i,
+  ];
+
+  for (const stem of questionStems) {
+    if (stem.test(normText)) {
+      exerciseScore += 2;
+    }
+  }
+
+  // Dotted fill-in blanks pattern e.g. "........" or "_____"
+  const blankPattern = /(\.{3,}|_{3,})/g;
+  const blankMatches = (normText.match(blankPattern) || []).length;
+  if (blankMatches >= 2) {
+    exerciseScore += 2;
+  }
+
+  // Multiple choice brackets e.g. "(أ - ب - ج)"
+  const mcqOptionPattern = /\([^\)]+[\-–،,][^\)]+\)/g;
+  const mcqMatches = (normText.match(mcqOptionPattern) || []).length;
+  if (mcqMatches >= 2) {
+    exerciseScore += 2;
+  }
+
+  // Study / explanation markers counter-balancing
+  let studyScore = 0;
+  if (/(الشرح|نستنتج\s*أن|القاعدة:|المفاهيم\s*الأساسية|عزيزي\s*الطالب|أهداف\s*الدرس)/i.test(normText)) {
+    studyScore += 2;
+  }
+  if (normText.length > 500 && blankMatches === 0 && mcqMatches === 0 && !/(السؤال|س\d+)/.test(normText)) {
+    studyScore += 3;
+  }
+
+  if (exerciseScore >= 3 && exerciseScore > studyScore) {
+    return 'exercise';
+  }
+
+  return 'study';
+}
+
+/**
  * 🏛️ Global Front-Matter Offset Detector for Egyptian Curricula & School Booklets
  * Scans the front matter (pages 1 to 25) of the PDF to pinpoint where the Table of Contents / Intro ends
  * and Lesson 1 actually starts in the physical PDF pages, compared to its printed page number in the TOC.
@@ -872,6 +1019,23 @@ export async function renderPdfPagesToImages(
     const renderedPages: any[] = shotResult?.pages || [];
     const results: RenderedPageImage[] = [];
 
+    // Extract per-page text for authentic semantic classification
+    const pageTextsMap = new Map<number, string>();
+    try {
+      const textShot = await withSilencedPdfWarnings(() =>
+        pdfParser!.getText({ partial: physicalPagesToRender } as any)
+      );
+      if (textShot?.pages && Array.isArray(textShot.pages)) {
+        for (const p of textShot.pages) {
+          if (p && typeof p.num === 'number') {
+            pageTextsMap.set(p.num, p.text || "");
+          }
+        }
+      }
+    } catch {
+      // Non-blocking fallback for scanned image-only PDFs
+    }
+
     for (let i = 0; i < renderedPages.length; i++) {
       const pageObj = renderedPages[i];
       // Display logical printed page number to the student matching printed page on image
@@ -888,12 +1052,12 @@ export async function renderPdfPagesToImages(
         dataUrl = `data:image/png;base64,${base64}`;
       }
       if (dataUrl) {
-        // Last page of a lesson block is standardly the exercises page in Egyptian booklets
-        const isExercise = renderedPages.length > 1 && i === renderedPages.length - 1;
+        const pageText = pageTextsMap.get(physPageNum) || "";
+        const detectedType = classifyPageType(pageText);
         results.push({ 
           pageNumber: logicalPageNum, 
           dataUrl,
-          pageType: isExercise ? 'exercise' : 'study'
+          pageType: detectedType
         });
       }
     }

@@ -863,6 +863,7 @@ export default function BookDetailsRoute({
     }
 
     const updated = (book.chapters || []).filter(c => c.id !== chapterId);
+    setLocalBook(prev => prev ? { ...prev, chapters: updated } : null);
     setEbooks(prev => prev.map(b => b.id === book.id ? { ...b, chapters: updated } : b));
     if (activeChapterId === chapterId) {
       setActiveChapterId(updated[0]?.id || null);
@@ -870,11 +871,18 @@ export default function BookDetailsRoute({
     showToast("تم حذف الفصل بنجاح", "success");
 
     try {
-      await fetch(`/api/ebooks/${book.id}/chapters/save`, {
+      const resp = await fetch(`/api/ebooks/${book.id}/chapters/save`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chapters: updated })
       });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data?.book) {
+          setLocalBook(data.book);
+          setEbooks(prev => prev.map(b => b.id === book.id ? data.book : b));
+        }
+      }
       await supabase.from('books').update({ chapters: updated }).eq('id', book.id);
     } catch (err) {
       console.warn("Delete chapter sync error:", err);
@@ -2105,14 +2113,22 @@ export default function BookDetailsRoute({
             onDeleteChapter={async () => {
               if (book.chapters.length <= 1) return;
               const updated = book.chapters.filter(c => c.id !== activeChapter.id);
+              setLocalBook(prev => prev ? { ...prev, chapters: updated } : null);
               setEbooks(prev => prev.map(b => b.id === book.id ? { ...b, chapters: updated } : b));
               setActiveChapterId(updated[0]?.id || null);
               try {
-                await fetch(`/api/ebooks/${book.id}/chapters/save`, {
+                const resp = await fetch(`/api/ebooks/${book.id}/chapters/save`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ chapters: updated })
                 });
+                if (resp.ok) {
+                  const data = await resp.json();
+                  if (data?.book) {
+                    setLocalBook(data.book);
+                    setEbooks(prev => prev.map(b => b.id === book.id ? data.book : b));
+                  }
+                }
               } catch (apiErr) {
                 console.warn("Backend delete chapter sync error:", apiErr);
               }

@@ -24,6 +24,7 @@ export interface DocumentSyllabusBlueprint {
   raw_full_text?: string;
   is_scanned_pdf?: boolean;
   total_pdf_pages?: number;
+  last_processed_page?: number;
   last_scanned_page?: number;
   source_file_url?: string;
   createdAt: string;
@@ -470,5 +471,79 @@ export function markLessonsCompleted(
     lessons: lessons.map(l =>
       completedSet.has(l.lesson_order) ? { ...l, status: "completed" } : l
     )
+  };
+}
+
+/**
+ * Rolls back the blueprint state upon lesson deletion.
+ * Resets all subsequent lessons to pending and adjusts last_processed_page.
+ */
+export function rollbackBlueprintState(
+  blueprint: DocumentSyllabusBlueprint,
+  rolledBackEndPage: number,
+  remainingChaptersCount: number
+): DocumentSyllabusBlueprint {
+  if (!blueprint || !Array.isArray(blueprint.lessons)) return blueprint;
+  const safeEndPage = Number(rolledBackEndPage) || 0;
+  const safeCount = Math.max(0, Number(remainingChaptersCount) || 0);
+
+  return {
+    ...blueprint,
+    last_processed_page: safeEndPage,
+    last_scanned_page: (safeEndPage === 0 && safeCount === 0) ? 0 : (safeEndPage > 0 ? safeEndPage : (blueprint.last_scanned_page || 0)),
+    lessons: blueprint.lessons.map((l, idx) => {
+      const order = Number(l.lesson_order) || (idx + 1);
+      const isPastRemaining = order > safeCount;
+      const isAfterRollbackPage = safeEndPage > 0 && Number(l.start_page) > safeEndPage;
+
+      if (isPastRemaining || isAfterRollbackPage) {
+        return {
+          ...l,
+          raw_text_snippet: "",
+          status: "pending" as const
+        };
+      }
+      return l;
+    })
+  };
+}
+
+/**
+ * Splits extracted lesson text into explanation text and exercise text.
+ * Prevents practice/worksheet questions from being embedded or solved in reading text.
+ */
+export function separateStudyAndExerciseText(text: string): { studyText: string; exerciseText: string } {
+  if (!text) return { studyText: "", exerciseText: "" };
+
+  const exerciseSplitRegex = /(?:^|\n)\s*(?:#{1,3}\s*)?((?:ال)?تمارين|(?:ال)?تدريبات|(?:ال)?أسئلة\s*(?:الدرس|المراجعة|الكتاب|الفصل)?|اختبر\s*نفسك|أنشطة\s*(?:ال)?تقويم|(?:ال)?تقويم\s*(?:ال)?(?:درس|مستمر)?|(?:ورقة|أوراق)\s*(?:ال)?عمل|(?:ال)?واجب\s*(?:ال)?منزلي|بنك\s*(?:ال)?أسئلة|(?:ال)?مسائل\s*(?:وتطبيقات|تدريبية|حسابية)?|(?:نماذج\s*)?(?:ال)?امتحان(?:ات)?|(?:ال)?اختبار(?:ات)?\s*(?:الوحدة|الفصل|قياس)?)(?:\s|:|$|[^\p{L}\p{N}])/iu;
+
+  const match = text.match(exerciseSplitRegex);
+  if (match && typeof match.index === "number") {
+    const splitIndex = match.index;
+    const studyPart = text.substring(0, splitIndex).trim();
+    const exercisePart = text.substring(splitIndex).trim();
+    return {
+      studyText: studyPart,
+      exerciseText: exercisePart
+    };
+  }
+
+  // Fallback: check if text starts with or contains a question block (e.g. "السؤال الأول:" or "س1:")
+  const questionBlockRegex = /(?:^|\n)\s*(?:#{1,3}\s*)?(السؤال\s*(?:الأول|1|١)|س\s*[1١]\s*:|أولاً\s*:\s*(?:الأسئلة|التدريبات))(?:\s|:|$|[^\p{L}\p{N}])/iu;
+  const qMatch = text.match(questionBlockRegex);
+  if (qMatch && typeof qMatch.index === "number") {
+    const precedingText = text.substring(0, qMatch.index).trim();
+    // Allow question block splitting at index 0 or if preceded only by a brief header (< 250 chars) or in later portion (> 35%)
+    if (qMatch.index > text.length * 0.35 || precedingText.length <= 250) {
+      return {
+        studyText: precedingText,
+        exerciseText: text.substring(qMatch.index).trim()
+      };
+    }
+  }
+
+  return {
+    studyText: text.trim(),
+    exerciseText: ""
   };
 }
